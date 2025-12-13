@@ -1,0 +1,193 @@
+
+=================================================================================
+
+[FullControl]->Group
+
+	AccessMaskNames    : GenericAll
+	BinaryLength       : 36
+	AceQualifier       : AccessAllowed
+	IsCallback         : False
+	OpaqueLength       : 0
+	AccessMask         : 983551
+	SecurityIdentifier : S-1-5-21-[...]
+	AceType            : AccessAllowed
+	AceFlags           : None
+	IsInherited        : False
+	InheritanceFlags   : None
+	PropagationFlags   : None
+	AuditFlags         : None
+
+=================================================================================
+
+[Read]->Group (Default) = 
+      [Read]->Group
+    + [ReadPhoneAndMailOptions]->Group
+
+	AccessMaskNames    : GenericExecute, ReadProperty
+	BinaryLength       : 36
+	AceQualifier       : AccessAllowed
+	IsCallback         : False
+	OpaqueLength       : 0
+	AccessMask         : 131092
+	SecurityIdentifier : S-1-5-21-[...]
+	AceType            : AccessAllowed
+	AceFlags           : None
+	IsInherited        : False
+	InheritanceFlags   : None
+	PropagationFlags   : None
+	AuditFlags         : None
+
+=================================================================================
+
+[Write]->Group = 
+      [Write]->Group
+    + [Add/RemoveSelfAsMember]->Group
+    + [WritePhoneAndMailOptions]->Group
+
+	AccessMaskNames    : WriteProperty, Self
+	BinaryLength       : 36
+	AceQualifier       : AccessAllowed
+	IsCallback         : False
+	OpaqueLength       : 0
+	AccessMask         : 40
+	SecurityIdentifier : S-1-5-21-[...]
+	AceType            : AccessAllowed
+	AceFlags           : None
+	IsInherited        : False
+	InheritanceFlags   : None
+	PropagationFlags   : None
+	AuditFlags         : None
+
+=================================================================================
+
+[CreateAllChildObjects]->Group
+
+	AccessMaskNames    : CreateChild
+	BinaryLength       : 36
+	AceQualifier       : AccessAllowed
+	IsCallback         : False
+	OpaqueLength       : 0
+	AccessMask         : 1
+	SecurityIdentifier : S-1-5-21-[...]
+	AceType            : AccessAllowed
+	AceFlags           : None
+	IsInherited        : False
+	InheritanceFlags   : None
+	PropagationFlags   : None
+	AuditFlags         : None
+
+=================================================================================
+
+[DeleteAllChildObjects]->Group
+
+	AccessMaskNames    : DeleteChild
+	BinaryLength       : 36
+	AceQualifier       : AccessAllowed
+	IsCallback         : False
+	OpaqueLength       : 0
+	AccessMask         : 2
+	SecurityIdentifier : S-1-5-21-[...]
+	AceType            : AccessAllowed
+	AceFlags           : None
+	IsInherited        : False
+	InheritanceFlags   : None
+	PropagationFlags   : None
+	AuditFlags         : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Self-Membership
+
+[Add/RemoveSelfAsMember]->Group
+
+	ObjectAceTypeName      : Self-Membership
+	AccessMaskNames        : Self
+	ObjectAceFlags         : ObjectAceTypePresent
+	ObjectAceType          : bf9679c0-0de6-11d0-a285-00aa003049e2
+	InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+	BinaryLength           : 56
+	AceQualifier           : AccessAllowed
+	IsCallback             : False
+	OpaqueLength           : 0
+	AccessMask             : 8
+	SecurityIdentifier     : S-1-5-21-[...]
+	AceType                : AccessAllowedObject
+	AceFlags               : None
+	IsInherited            : False
+	InheritanceFlags       : None
+	PropagationFlags       : None
+	AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Send-To
+
+[SendTo]->Group
+
+	ObjectAceTypeName      : Send-To
+	AccessMaskNames        : ExtendedRight
+	ObjectAceFlags         : ObjectAceTypePresent
+	ObjectAceType          : ab721a55-1e2f-11d0-9819-00aa0040529b
+	InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+	BinaryLength           : 56
+	AceQualifier           : AccessAllowed
+	IsCallback             : False
+	OpaqueLength           : 0
+	AccessMask             : 256
+	SecurityIdentifier     : S-1-5-21-[...]
+	AceType                : AccessAllowedObject
+	AceFlags               : None
+	IsInherited            : False
+	InheritanceFlags       : None
+	PropagationFlags       : None
+	AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Email-Information
+
+[ReadPhoneAndMailOptions]->Group
+
+	ObjectAceTypeName      : Email-Information
+	AccessMaskNames        : ReadProperty
+	ObjectAceFlags         : ObjectAceTypePresent
+	ObjectAceType          : e45795b2-9455-11d1-aebd-0000f80367c1
+	InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+	BinaryLength           : 56
+	AceQualifier           : AccessAllowed
+	IsCallback             : False
+	OpaqueLength           : 0
+	AccessMask             : 16
+	SecurityIdentifier     : S-1-5-21-[...]
+	AceType                : AccessAllowedObject
+	AceFlags               : None
+	IsInherited            : False
+	InheritanceFlags       : None
+	PropagationFlags       : None
+	AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Email-Information
+
+[WritePhoneAndMailOptions]->Group
+
+	ObjectAceTypeName      : Email-Information
+	AccessMaskNames        : WriteProperty
+	ObjectAceFlags         : ObjectAceTypePresent
+	ObjectAceType          : e45795b2-9455-11d1-aebd-0000f80367c1
+	InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+	BinaryLength           : 56
+	AceQualifier           : AccessAllowed
+	IsCallback             : False
+	OpaqueLength           : 0
+	AccessMask             : 32
+	SecurityIdentifier     : S-1-5-21-[...]
+	AceType                : AccessAllowedObject
+	AceFlags               : None
+	IsInherited            : False
+	InheritanceFlags       : None
+	PropagationFlags       : None
+	AuditFlags             : None
+
+=================================================================================

@@ -1,0 +1,32 @@
+; https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/certreq_1
+; INF config file to request a certificate as `Administrator` in the `ADLAB.LOCAL` domain
+
+[Version]
+Signature="$Windows NT$"
+
+[NewRequest]
+Subject="CN=Administrator,CN=Users,DC=ADLAB,DC=LOCAL"
+Exportable = TRUE
+ExportableEncrypted = TRUE
+HashAlgorithm = SHA256
+KeyAlgorithm = RSA
+KeyLength = 2048
+KeySpec = 1
+KeyUsage = CERT_DIGITAL_SIGNATURE_KEY_USAGE | CERT_KEY_ENCIPHERMENT_KEY_USAGE
+MachineKeySet = FALSE ; FALSE for Users
+ProviderName = "Microsoft RSA SChannel Cryptographic Provider"
+RequestType = PKCS10
+ProviderType = 1
+AlternateSignatureAlgorithm = FALSE
+
+[Extensions]
+2.5.29.17 = "{text}"
+_continue_ = "UPN=Administrator@ADLAB.LOCAL"
+
+[RequestAttributes]
+CertificateTemplate = User
+
+[EnhancedKeyUsageExtension]
+OID = 1.3.6.1.5.5.7.3.2         ; Client Authentication
+OID = 1.3.6.1.4.1.311.10.3.4    ; Encrypting File System
+OID = 1.3.6.1.5.5.7.3.4         ; Secure Email

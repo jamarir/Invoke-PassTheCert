@@ -1,0 +1,674 @@
+
+=================================================================================
+
+[FullControl]->Domain
+
+    AccessMaskNames    : GenericAll
+    BinaryLength       : 36
+    AceQualifier       : AccessAllowed
+    IsCallback         : False
+    OpaqueLength       : 0
+    AccessMask         : 983551
+    SecurityIdentifier : S-1-5-21-[...]
+    AceType            : AccessAllowed
+    AceFlags           : None
+    IsInherited        : False
+    InheritanceFlags   : None
+    PropagationFlags   : None
+    AuditFlags         : None
+
+=================================================================================
+
+[Read]->Domain (Default) = 
+      [Read]->Domain
+    + [ReadDomainPassword&LockoutPolicies]->Domain
+    + [ReadOtherDomainParameters(ForUseBySAM)]->Domain
+
+    AccessMaskNames    : GenericExecute, ReadProperty
+    BinaryLength       : 36
+    AceQualifier       : AccessAllowed
+    IsCallback         : False
+    OpaqueLength       : 0
+    AccessMask         : 131092
+    SecurityIdentifier : S-1-5-21-[...]
+    AceType            : AccessAllowed
+    AceFlags           : None
+    IsInherited        : False
+    InheritanceFlags   : None
+    PropagationFlags   : None
+    AuditFlags         : None
+
+=================================================================================
+
+[Write]->Domain = 
+      [Write]->Domain
+    + [WriteDomainPassword&LockoutPolicies]->Domain
+    + [WriteOtherDomainParameters(ForUseBySAM)]->Domain
+
+    AccessMaskNames    : WriteProperty, Self
+    BinaryLength       : 36
+    AceQualifier       : AccessAllowed
+    IsCallback         : False
+    OpaqueLength       : 0
+    AccessMask         : 40
+    SecurityIdentifier : S-1-5-21-[...]
+    AceType            : AccessAllowed
+    AceFlags           : None
+    IsInherited        : False
+    InheritanceFlags   : None
+    PropagationFlags   : None
+    AuditFlags         : None
+
+=================================================================================
+
+[CreateAllChildObjects]->Domain
+
+    AccessMaskNames    : CreateChild
+    BinaryLength       : 36
+    AceQualifier       : AccessAllowed
+    IsCallback         : False
+    OpaqueLength       : 0
+    AccessMask         : 1
+    SecurityIdentifier : S-1-5-21-[...]
+    AceType            : AccessAllowed
+    AceFlags           : None
+    IsInherited        : False
+    InheritanceFlags   : None
+    PropagationFlags   : None
+    AuditFlags         : None
+
+=================================================================================
+
+[DeleteAllChildObjects]->Domain
+
+    AccessMaskNames    : DeleteChild
+    BinaryLength       : 36
+    AceQualifier       : AccessAllowed
+    IsCallback         : False
+    OpaqueLength       : 0
+    AccessMask         : 2
+    SecurityIdentifier : S-1-5-21-[...]
+    AceType            : AccessAllowed
+    AceFlags           : None
+    IsInherited        : False
+    InheritanceFlags   : None
+    PropagationFlags   : None
+    AuditFlags         : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Add-GUID
+
+[AddGUID]->Domain
+
+    ObjectAceTypeName      : Add-GUID
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 440820ad-65b4-11d1-a3da-0000f875ae0d
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-DS-Install-Replica
+
+[Add/RemoveReplicaInDomain]->Domain
+
+    ObjectAceTypeName      : DS-Install-Replica
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 9923a32a-3607-11d2-b9be-0000f87a36b2
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-DS-Clone-Domain-Controller
+
+[AllowADCRoCreateACloneOfItself]->Domain
+
+    ObjectAceTypeName      : DS-Clone-Domain-Controller
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 3e0f7e18-2c7a-4c10-ba82-4d926db99a3e
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Change-PDC
+
+[ChangePDC]->Domain
+
+    ObjectAceTypeName      : Change-PDC
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : bae50096-4752-11d1-9052-00c04fc2d4cf
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Create-Inbound-Forest-Trust
+
+[CreateInboundForestTrust]->Domain
+
+    ObjectAceTypeName      : Create-Inbound-Forest-Trust
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : e2a36dc9-ae17-47c3-b58b-be34c55ba633
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Enable-Per-User-Reversibly-Encrypted-Password
+
+[EnablePerUserReversiblyEncryptedPassword]->Domain
+
+    ObjectAceTypeName      : Enable-Per-User-Reversibly-Encrypted-Password
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 05c74c5e-4deb-43b4-bd9f-86664c2a7fd5
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Generate-RSoP-Logging
+
+[GenerateResultantSetOfPolicy(Logging)]->Domain
+
+    ObjectAceTypeName      : Generate-RSoP-Logging
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : b7b1b3de-ab09-4242-9e30-9980e5d322f7
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Generate-RSoP-Planning
+
+[GenerateResultantSetOfPolicy(Planning)]->Domain
+
+    ObjectAceTypeName      : Generate-RSoP-Planning
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : b7b1b3dd-ab09-4242-9e30-9980e5d322f7
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-DS-Replication-Manage-Topology
+
+[ManageReplicationTopology]->Domain
+
+    ObjectAceTypeName      : DS-Replication-Manage-Topology
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 1131f6ac-9c07-11d1-f79f-00c04fc2dcd2
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Migrate-SID-History
+
+[MigrateSIDHistory]->Domain
+
+    ObjectAceTypeName      : Migrate-SID-History
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : ba33815a-4f93-4c76-87f3-57574bff8109
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-DS-Replication-Monitor-Topology
+
+[MonitorActiveDirectoryReplication]->Domain
+
+    ObjectAceTypeName      : DS-Replication-Monitor-Topology
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : f98340fb-7c5b-4cdb-a00b-2ebdfa115a96
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Read-Only-Replication-Secret-Synchronization
+
+[ReadOnlyReplicationSecretSynchronization]->Domain
+
+    ObjectAceTypeName      : Read-Only-Replication-Secret-Synchronization
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 1131f6ae-9c07-11d1-f79f-00c04fc2dcd2
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Reanimate-Tombstones
+
+[ReanimateTombstones]->Domain
+
+    ObjectAceTypeName      : Reanimate-Tombstones
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 45ec5156-db7e-47bb-b53f-dbeb2d03c40f
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-DS-Replication-Get-Changes
+
+[ReplicatingDirectoryChanges]->Domain
+
+    ObjectAceTypeName      : DS-Replication-Get-Changes
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 1131f6aa-9c07-11d1-f79f-00c04fc2dcd2
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-DS-Replication-Get-Changes-All
+
+[ReplicatingDirectoryChangesAll]->Domain
+
+    ObjectAceTypeName      : DS-Replication-Get-Changes-All
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 1131f6ad-9c07-11d1-f79f-00c04fc2dcd2
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-DS-Replication-Get-Changes-In-Filtered-Set
+
+[ReplicatingDirectoryChangesInFilteredSet]->Domain
+
+    ObjectAceTypeName      : DS-Replication-Get-Changes-In-Filtered-Set
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 89e95b76-444d-4c62-991a-0facbeda640c
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-DS-Replication-Synchronize
+
+[ReplicationSynchronization]->Domain
+
+    ObjectAceTypeName      : DS-Replication-Synchronize
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 1131f6ab-9c07-11d1-f79f-00c04fc2dcd2
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Run-Protect-Admin-Groups-Task
+
+[RunProtectAdminGroupsTask]->Domain
+
+    ObjectAceTypeName      : Run-Protect-Admin-Groups-Task
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 7726b9d5-a4b4-4288-a6b2-dce952e80a7f
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Unexpire-Password
+
+[UnexpirePassword]->Domain
+
+    ObjectAceTypeName      : Unexpire-Password
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : ccc2dc7d-a6ad-4a7a-8846-c04e3cc53501
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Update-Password-Not-Required-Bit
+
+[UpdatePasswordNotRequiredBit]->Domain
+
+    ObjectAceTypeName      : Update-Password-Not-Required-Bit
+    AccessMaskNames        : ExtendedRight
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : 280f369c-67c7-438e-ae98-1d46f3c6f541
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 256
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Domain-Password
+
+[ReadDomainPassword&LockoutPolicies]->Domain
+
+    ObjectAceTypeName      : Domain-Password
+    AccessMaskNames        : ReadProperty
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : c7407360-20bf-11d0-a768-00aa006e0529
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 16
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Domain-Password
+
+[WriteDomainPassword&LockoutPolicies]->Domain
+
+    ObjectAceTypeName      : Domain-Password
+    AccessMaskNames        : WriteProperty
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : c7407360-20bf-11d0-a768-00aa006e0529
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 32
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Domain-Other-Parameters
+
+[ReadOtherDomainParameters(ForUseBySAM)]->Domain
+
+    ObjectAceTypeName      : Domain-Other-Parameters
+    AccessMaskNames        : ReadProperty
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : b8119fd0-04f6-4762-ab7a-4986c76b3f9a
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 16
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
+
+https://learn.microsoft.com/en-us/windows/win32/adschema/r-Domain-Other-Parameters
+
+[WriteOtherDomainParameters(ForUseBySAM)]->Domain
+
+    ObjectAceTypeName      : Domain-Other-Parameters
+    AccessMaskNames        : WriteProperty
+    ObjectAceFlags         : ObjectAceTypePresent
+    ObjectAceType          : b8119fd0-04f6-4762-ab7a-4986c76b3f9a
+    InheritedObjectAceType : 00000000-0000-0000-0000-000000000000
+    BinaryLength           : 56
+    AceQualifier           : AccessAllowed
+    IsCallback             : False
+    OpaqueLength           : 0
+    AccessMask             : 32
+    SecurityIdentifier     : S-1-5-21-[...]
+    AceType                : AccessAllowedObject
+    AceFlags               : None
+    IsInherited            : False
+    InheritanceFlags       : None
+    PropagationFlags       : None
+    AuditFlags             : None
+
+=================================================================================
