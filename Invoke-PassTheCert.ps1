@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______|                  "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|                           "
     Write-Host -ForegroundColor Red     "                                                            "
-    Write-Host -ForegroundColor Red     "   v1.0.0                                                   "
+    Write-Host -ForegroundColor Red     "   v1.0.1                                                   "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _      "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |     "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_    "
@@ -42,7 +42,6 @@ function _ShowBanner {
     Write-Host                          ""
 
     Write-Host -ForegroundColor Blue    "  Pure PowerShell Tool To Authenticate To An LDAP/S Server With A Certificate Through Schannel  "
-    Write-Host -ForegroundColor Blue    "                  https://github.com/The-Viper-One/Invoke-PassTheCert                           "
     
     Write-Host                          ""
 }
@@ -126,10 +125,9 @@ function _Helper-ShowHelpOfFunction {
         if (-not $PSCommandPath) { $ScriptPath = $MyInvocation.MyCommand.Path } else { $ScriptPath = $PSCommandPath }
     }
 
+    # Extract text of the function's definition through a multi-line mode (?ms) ReGEX, i.e. the text in the script matching '(function $FunctionName {.*?})'
     $Pattern = "(?ms)^(\s*function\s+$FunctionName\s+\{.*?\})\s+function"
     Write-Verbose "[*] Trying To Extract The Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script Using The Multiline ReGEX: $Pattern"
-
-    # Extract text of the function's definition through a multi-line mode (?ms) ReGEX, i.e. the text in the script matching '(function $FunctionName {.*?})'
     $FunctionMatch = ([regex]::Match((Get-Content -Path $ScriptPath -Raw), $Pattern)).Groups[1];
 
     if ($FunctionMatch.Success) {
@@ -160,14 +158,13 @@ function _Helper-ShowHelpOfFunction {
             Write-Verbose "[+] Successfully Stripped irrelevant 'REMARKS' Section Of Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script As:`r`n==========================================`r`n$($FunctionHelpString)`r`n====================================================";
         }
 
-        # Each function's description contains its own way of executing itself. However, these are mostly private helper functions (prefixed '_').
-        # For these private functions to be reliable documentation, they should either be executed manually (e.g. copy-pasted into the powershell process), or executed using the context of 'Invoke-PassTheCert'.
+        # Each function's description contains its own way of executing itself. However, these are mostly *private* helper functions (prefixed '_').
+        # For these functions to be reliable documentation, they should either be executed manually (e.g. copy-pasted into the powershell process), or executed using the context of 'Invoke-PassTheCert'.
         # For example, one example of the '_AddGroupMember' function, for action 'AddGroupMember', might be:
         #   _AddGroupMember -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -GroupDN 'CN=KindaGroupy,CN=Builtin,DC=X'
 
         # However, calling it requires either to manually import it into the the current PowerShell process (copy-pasting the code), or to use any of the two following 'Invoke-PassTheCert' syntax:
-        #   $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '192.168.56.202' -Certificate 'Administrator.pfx' [-CertificatePassword 'P@ssw0rd123!']; Invoke-PassTheCert -LdapConnection $LdapConnection -Action 'AddGroupMember' -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -GroupDN 'CN=KindaGroupy,CN=Builtin,DC=X'
-        #   Invoke-PassTheCert -Server 192.168.56.202 -Certificate 'Administrator.pfx' -Action 'AddGroupMember' -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -GroupDN 'CN=KindaGroupy,CN=Builtin,DC=X'
+        #   Invoke-PassTheCert -LdapConnection $LdapConnection -Action 'AddGroupMember' -Identity 'CN=John JD. DOE,CN=Users,DC=X' -GroupDN 'CN=KindaGroupy,CN=Builtin,DC=X'
 
         # Therefore, we'll make the substitution for the user to conveniently get the right way of executing the action from 'Invoke-PassTheCert' if $TranslateToInvokePassTheCertSyntax is set ($true by default).
         if ($TranslateToInvokePassTheCertSyntax) {
@@ -192,7 +189,7 @@ function _Helper-ShowParametersOfFunction {
     
         .SYNOPSIS
 
-            Verbose'ly shows the function' name and parameters' [key, value] pairs
+            Verbose'ly shows the function's name and parameters' [key, value] pairs
 
         .PARAMETER FunctionName
 
@@ -364,7 +361,7 @@ function _Helper-GetDomainDNFromDN {
     
         .SYNOPSIS
 
-            Returns the Domain's Distinguished Name (i.e. after `from DC=*`) extracted from an arbitrary Distinguished Name.
+            Returns the Domain's Distinguished Name (i.e. from `DC=*`) extracted from an arbitrary Distinguished Name.
 
         .PARAMETER DN
 
@@ -665,9 +662,9 @@ function _Helper-GetTypeOfIdentityString {
     elseif ($IdentityString -match '^S-(\d-){2}\d+.*') {
         $Result = 'SID';
     }
-    # If the Identity String is like '12345678-1234-1234-1234-123456789012', it's a GUID.
+    # If the Identity String is like 'a2345678-A234-b234-B234-c23456789012', it's a GUID.
     # This CAN'T edge-case with sAMAccountName, as it is limited to 20 characters MAXIMUM.
-    elseif ($IdentityString -match '\d{8}-(\d{4}-){3}\d{12}') {
+    elseif ($IdentityString -match '[a-zA-Z0-9]{8}-([a-zA-Z0-9]{4}-){3}[a-zA-Z0-9]{12}') {
         $Result = 'GUID';
     }
     # Otherwise, the Identity String is a sAMAccountName if it is 20 characters MAXIMUM, and DOES NOT contain any of the followings: " / \ [ ] : ; | = , + * ? < >
@@ -777,7 +774,7 @@ function _Helper-GetACEAccessRightsArray {
 
         .SYNOPSIS
 
-            Returns the Array of all possible ObjectAceType
+            Returns the Array of all possible ObjectAceType (Control Access Rights ONLY)
 
         .LINK
 
@@ -879,13 +876,7 @@ function _Helper-GetLDAPAttributesArray {
 
         .SYNOPSIS
 
-            Returns the Array of all possible LDAP Attributes
-
-        .OUTPUTS
-
-            [System.Int32] 
-            
-            The Array of all possible LDAP Attributes
+            Returns the Array of all possible ObjectAceType (LDAP Attributes ONLY)
 
         .LINK
 
@@ -5434,9 +5425,6 @@ function _Helper-GetGUIDOfACEAccessRightName {
             - Returns an empty GUID (i.e. [Guid]::Empty) if not found, to deal with ACEs that doesn't have `ObjectAceType` attribute (e.g. `[AccessMask='GenericAll', ObjectAceType=NULL]`), hence being set to None.
             - You may see such ACE entries into `PrincipalTo*.txt`, where `ObjectAceType` is unset (i.e. set no None).
 
-            - Whenever this function is used to GRANT an ACE WITHOUT `ObjectAceType`, then the ObjectAceType's GUID MUST be set to an empty GUID (i.e. `[Guid]::Empty`).
-            - Whenever this function is used to GET an ACE WITHOUT `ObjectAceType`, then the ObjectAceType's GUID MUST be set to an empty STRING (i.e. `''`). This should be handled by the caller function (e.g. you may check the function: _GetIndexOfInboundACEFromIdentityToTarget).
-
         .LINK
 
             https://learn.microsoft.com/en-us/windows/win32/secauthz/access-control-entries
@@ -5468,7 +5456,7 @@ function _Helper-GetGUIDOfACEAccessRightName {
 
     foreach ($ACEAccessRight in $ACEAccessRights.GetEnumerator()) {
         if ($ACEAccessRight.Key.ToUpper() -eq $AccessRightName.Trim().ToUpper()) {
-            Write-Verbose "[+] Successfully Retrieved '$($ACEAccessRight.Value)' Name Associated With Access Right Name (i.e. ObjectAceType) '$AccessRightName' !"
+            #Write-Verbose "[+] Successfully Retrieved '$($ACEAccessRight.Value)' Name Associated With Access Right Name (i.e. ObjectAceType) '$AccessRightName' !"
             return $ACEAccessRight.Value;
         }
     }
@@ -5627,7 +5615,7 @@ function _Helper-GetGUIDOfLDAPAttributeName {
 
     foreach ($LDAPAttribute in $LDAPAttributes.GetEnumerator()) {
         if ($LDAPAttribute.Key.ToUpper() -eq $LDAPAttributeName.Trim().ToUpper()) {
-            Write-Verbose "[+] Successfully Retrieved '$($LDAPAttribute.Value)' Name Associated With lDAPDisplayName '$LDAPAttributeName' !"
+            #Write-Verbose "[+] Successfully Retrieved '$($LDAPAttribute.Value)' Name Associated With lDAPDisplayName '$LDAPAttributeName' !"
             return $LDAPAttribute.Value;
         }
     }
@@ -5958,9 +5946,9 @@ function _Helper-GetDNOfIdentityString {
 
         .EXAMPLE
 
-            _Helper-GetDNOfIdentityString -LdapConnection $LdapConnection -IdentityString 'cdf625ce-d871-3b48-a77e-c9821b9f3bf8' -IdentityDomain 'X.LOCAL'
+            _Helper-GetDNOfIdentityString -LdapConnection $LdapConnection -IdentityString '7a329ed9-c6e3-f440-af31-69879d5eb26d' -IdentityDomain 'X.LOCAL'
 
-            Returns the Distinguished Name of the object whose GUID is 'cdf625ce-d871-3b48-a77e-c9821b9f3bf8' in the domain `X.LOCAL`
+            Returns the Distinguished Name of the object whose GUID is '7a329ed9-c6e3-f440-af31-69879d5eb26d' in the domain `X.LOCAL`
 
         .EXAMPLE
 
@@ -7580,9 +7568,9 @@ function _CreateInboundACE {
 
             _CreateInboundACE -LdapConnection $LdapConnection -IdentityDN 'CN=Whut WZ. ZAT,CN=Users,DC=X' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '12345678-1234-1234-1234-123456789012' -TargetDN 'OU=Trach TK. KOLEKTOR,DC=X'
 
-            Creates the inbound ACE `[AceQualifier='AccessAllowed', AccessMasks='ExtendedRight', ObjectAceType='12345678-1234-1234-1234-123456789012' (?¿PS_Whut_SP¿?)]` provided to the principal `Whut WZ. ZAT` towards the Organizational Unit target object `Trach TK. KOLEKTOR` (as per... WHUT?!). In other words, principal `Whut WZ. ZAT` will be granted `?¿Special Permissions¿?` (Whut?!) rights over the OU target object `Trach TK. KOLEKTOR`
+            Creates the inbound ACE `[AceQualifier='AccessAllowed', AccessMasks='ExtendedRight', ObjectAceType='12345678-1234-1234-1234-123456789012' (?¿Whut¿?)]` provided to the principal `Whut WZ. ZAT` towards the Organizational Unit target object `Trach TK. KOLEKTOR` (as per... WHUT?!). In other words, principal `Whut WZ. ZAT` will be granted `?¿Special Permissions¿?` (Whut?!) rights over the OU target object `Trach TK. KOLEKTOR`
 
-            - As per `PrincipalTo....txt`, I mean... WHUT?!
+            - As per `PrincipalTo...`, I mean... WHUT?!
 
         .LINK
 
@@ -7643,11 +7631,11 @@ function _CreateInboundACE {
         $AccessRightGUID = _Helper-GetGUIDOfACEAccessRightName -AccessRightName $AccessRightName;
     }
     # ?! ThE uSeR mAnUaLlY prOvIdEd An InVaLiD (?) aCeEsS riGhT gUiD !?
-    elseif ((_Helper-GetNameOfACEAccessRightGUID $AccessRightGUID) -eq $null) {
+    elseif ((_Helper-GetNameOfACEAccessRightGUID $AccessRightGUID) -eq $null -and (_Helper-GetNameOfLDAPAttributeGUID -LDAPAttributeGUID $AccessRightGUID) -eq $null) {
         # If we're here, it means that the user had manually specify a hand-crafted, while INVALID (? at least, unrecognized...), GUID for the ObjectAceType in its command, via the '-AccessRightGUID' parameter. 
-        # We won't be here if that parameter was legitimate  (? at least, such as '1131f6ad-9c07-11d1-f79f-00c04fc2dcd2', i.e. 'DS-Replication-Get-Changes-All'...).
+        # We won't be here if that parameter was legitimate  (? at least, such as '1131f6ad-9c07-11d1-f79f-00c04fc2dcd2', i.e. 'DS-Replication-Get-Changes-All', or ' 	a8df73ef-c5ea-11d1-bbcb-0080c76670c0', i.e. 'Employee-Number'...).
         # Therefore, what can happen, given that the provided GUID is invalid, such as '12345678-1234-1234-1234-123456789012' ? ¯\_(*_*)_/¯
-        Write-Host "[!] ?¿PS_Whut_SP¿? [!]"
+        Write-Host "[!] ?¿Whut¿? [!]"
         $WhutIsGoingOn = $true
     } 
     # =============================================================================
@@ -7663,7 +7651,7 @@ function _CreateInboundACE {
         $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType=NULL]"
     } elseif ($WhutIsGoingOn) {
         # ?! ThE uSeR mAnUaLlY prOvIdEd An InVaLiD (?) aCeEsS riGhT gUiD !?
-        $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightGUID' (?¿PS_Whut_SP¿?)]"
+        $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightGUID' (?¿Whut¿?)]"
     } elseif ($AccessRightGUID) {
         $AceString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightGUID']"
     } else {
@@ -7844,9 +7832,9 @@ function _DeleteInboundACE {
 
             _DeleteInboundACE -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. ERUT,CN=Users,DC=X' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '12345678-1234-1234-1234-123456789012' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=X'
 
-            Deletes the inbound ACE `[AceQualifier='AccessAllowed', AccessMasks='ExtendedRight', ObjectAceType='12345678-1234-1234-1234-123456789012' (?¿PS_Whut_SP¿?)]` provided to the principal `Wanha BE. ERUT` towards the user target object `Smart SC. CARDY` (as per `PrincipalToUser.txt`). In other words, `Wanha BE. ERUT` will no longer have `?¿Special Permissions¿?` (?¿PS_Whut_SP¿?) rights over the target `CN=Smart SC. CARDY,CN=Users,DC=X`
+            Deletes the inbound ACE `[AceQualifier='AccessAllowed', AccessMasks='ExtendedRight', ObjectAceType='12345678-1234-1234-1234-123456789012' (?¿Whut¿?)]` provided to the principal `Wanha BE. ERUT` towards the user target object `Smart SC. CARDY` (as per `PrincipalToUser.txt`). In other words, `Wanha BE. ERUT` will no longer have `?¿Special Permissions¿?` (?¿Whut¿?) rights over the target `CN=Smart SC. CARDY,CN=Users,DC=X`
 
-            - As per `PrincipalTo....txt`, I mean... WHUT?!
+            - As per `PrincipalTo...`, I mean... WHUT?!
 
         .LINK
 
@@ -8069,9 +8057,9 @@ function _CreateInboundSDDL {
 
             [System.String] 
             
-            The Right(s) of the SDDL entry to be created, among `RC`, `SD`, `WD`, `WO`, `RP`, `WP`, `CC`, `DC`, `LC`, `SW`, `LO`, `DT` (comma-separated, if multiple) (Optional). For instance, to create an SDDL entry like `O:BAD:(A;CI;RCSDWDWORPWPCCDCLCSWLODT;;;S-1-1-0)`, this parameter MUST be set to `RPWP` (i.e. `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`).
+            The Right(s) of the SDDL entry to be created, among `RC`, `SD`, `WD`, `WO`, `RP`, `WP`, `CC`, `DC`, `LC`, `SW`, `LO`, `DT` (comma-separated, if multiple) (Optional). For instance, to create an SDDL entry like `O:BAD:(OA;CI;RCSDWDWORPWPCCDCLCSWLODT;;;S-1-1-0)`, this parameter MUST be set to `RCSDWDWORPWPCCDCLCSWLODT` (i.e. `SDDL_READ_CONTROL`, `SDDL_STANDARD_DELETE`, `SDDL_WRITE_DAC`, `SDDL_WRITE_OWNER`, `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`, `SDDL_CREATE_CHILD`, `SDDL_DELETE_CHILD`, `SDDL_LIST_CHILDREN `SDDL_SELF_WRITE`, `SDDL_LIST_OBJECT`, `SDDL_DELETE_TREE`).
 
-            - If not specified, this parameter is set to `RCSDWDWORPWPCCDCLCSWLODT` (i.e. `SDDL_READ_CONTROL`, `SDDL_STANDARD_DELETE`, `SDDL_WRITE_DAC`, `SDDL_WRITE_OWNER`, `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`, `SDDL_CREATE_CHILD`, `SDDL_DELETE_CHILD`, `SDDL_LIST_CHILDREN `SDDL_SELF_WRITE`, `SDDL_LIST_OBJECT`, `SDDL_DELETE_TREE`)
+            - If not specified, this parameter is set to `RPWP` (i.e. `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`)
 
         .PARAMETER IdentityDN
 
@@ -8103,11 +8091,11 @@ function _CreateInboundSDDL {
 
             _CreateInboundSDDL -LdapConnection $LdapConnection -IdentityDN 'CN=J0hn JR. RIPP3R,CN=Users,DC=X' -TargetDN 'CN=SVC SU. USER,CN=Users,DC=X' -Attribute 'serviceprincipalname'
 
-            Creates an SDDL ACE entry allowing (default) the principal `J0hn JR. RIPP3R` the following ACE Rights against the `SVC SU. USER`:`serviceprincipalname` attribute: `ReadProperty`, `WriteProperty` (default)
+            Creates an SDDL ACE entry allowing (default) the principal `J0hn JR. RIPP3R` the following ACE Rights against the `SVC SU. USER`:`serviceprincipalname` attribute: `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY` (default)
 
         .EXAMPLE
 
-            _CreateInboundSDDL -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -TargetDN 'CN=COMPUTATOR,CN=Computers,DC=X' -SDDLACEType 'OA' -SDDLACERights 'RCSDWDWORPWPCCDCLCSWLODT'
+            _CreateInboundSDDL -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. EDMIN,CN=Users,DC=X' -TargetDN 'CN=COMPUTATOR,CN=Computers,DC=X' -SDDLACEType 'OA' -SDDLACERights 'RCSDWDWORPWPCCDCLCSWLODT'
 
             Creates an SDDL ACE entry allowing the principal `Wanha BE. EDMIN` the following ACE Rights against the `COMPUTATOR$` object: `RCSDWDWORPWPCCDCLCSWLODT` (i.e. `SDDL_READ_CONTROL`, `SDDL_STANDARD_DELETE`, `SDDL_WRITE_DAC`, `SDDL_WRITE_OWNER`, `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`, `SDDL_CREATE_CHILD`, `SDDL_DELETE_CHILD`, `SDDL_LIST_CHILDREN `SDDL_SELF_WRITE`, `SDDL_LIST_OBJECT`, `SDDL_DELETE_TREE`)
 
@@ -8115,7 +8103,7 @@ function _CreateInboundSDDL {
 
             _CreateInboundSDDL -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. Y4,CN=Users,DC=X' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=X' -Attribute 'msDS-KeyCredentialLink' -SDDLACEType 'OA' -SDDLACERights 'RPWP'
 
-            Creates an SDDL ACE entry allowing the principal `Wanha BE. Y4` the following ACE Right against the `Smart SC. CARDY`:`msDS-KeyCredentialLink` attribute: `ReadProperty`, `WriteProperty`
+            Creates an SDDL ACE entry allowing the principal `Wanha BE. Y4` the following ACE Right against the `Smart SC. CARDY`:`msDS-KeyCredentialLink` attribute: `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`
 
         .LINK
 
@@ -8165,7 +8153,7 @@ function _CreateInboundSDDL {
         [ValidateNotNullorEmpty()]
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
-        [Parameter(Position=1, Mandatory=$false, HelpMessage="Enter the Type of the SDDL entry to create (i.e. 'OA' or 'OD', for 'Allow' or 'Denied', respectively)")]
+        [Parameter(Position=1, Mandatory=$false, HelpMessage="Enter the Type of the SDDL entry to create (e.g. 'OA' or 'OD', for 'SDDL_OBJECT_ACCESS_ALLOWED' or 'SDDL_OBJECT_ACCESS_DENIED', respectively)")]
         [System.String]$SDDLACEType,
 
         [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the Right(s) of the SDDL entry to create")]
