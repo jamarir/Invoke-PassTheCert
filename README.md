@@ -1,10 +1,9 @@
 # Invoke-PassTheCert
 
-<center>
 
-![alt text](logo.png)
-
-</center>
+<div align="center">
+<img src="logo.png" />
+</div>
 
 ## Description
 
@@ -16,7 +15,7 @@ Sometimes, Domain Controllers do not support PKINIT. This can be because their c
 
 ## Changelog
 
-This pull request alters [the initial code](https://github.com/The-Viper-One/Invoke-PassTheCert/tree/24eaa20b9ac15a589f294ee4e80be345c994c90d) as follows:
+This fork alters [the initial code](https://github.com/The-Viper-One/Invoke-PassTheCert/tree/24eaa20b9ac15a589f294ee4e80be345c994c90d) as follows:
 
 - Commands can be run from a computer not joined to the domain (inspired from [the PowerView's Get-DomainSearcher](https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1#L3264-L3542)).
 
@@ -46,16 +45,16 @@ Otherwise, assuming a compromised user (resp. computer) has `Enrollment Rights` 
 Using [`certipy-ad`](https://github.com/ly4k/Certipy/tree/c1d84d7ee752e574d2e90e79a5088961bf8f7567):
 
 ```powershell
-jamarir@kali:~$ sudo apt install -y certipy-ad
-jamarir@kali:~$ certipy-ad find -u '<user>@<domain>' -p '<password>' -enabled -stdout [-ns <dns_ip>] [-dc-ip <dc_ip>]
-jamarir@kali:~$ certipy-ad req -u '<user>@<domain>' -p '<password>' -target '<dc_fqdn>' -ca '<ca_name>' -template 'User' [-ns <dns_ip>] [-dc-ip <dc_ip>] [-dc-host '<dc_host>']
+$ sudo apt install -y certipy-ad
+$ certipy-ad find -u '<user>@<domain>' -p '<password>' -enabled -stdout [-ns <dns_ip>] [-dc-ip <dc_ip>]
+$ certipy-ad req -u '<user>@<domain>' -p '<password>' -target '<dc_fqdn>' -ca '<ca_name>' -template 'User' [-ns <dns_ip>] [-dc-ip <dc_ip>] [-dc-host '<dc_host>']
 ```
 
 ### From Windows (certreq)
 
 Using [`certreq`](https://github.com/GhostPack/Certify/issues/13#issuecomment-3622538862)
 
-#### Run a PowerShell Prompt as a domain user:
+#### Run a PowerShell Prompt as a domain user
 
 ```powershell
 PS > runas /netonly /user:<domain>\<user> powershell.exe
@@ -151,7 +150,7 @@ PS > .\Invoke-PassTheCert.ps1 -?
 > Each function's Get-Help documentation (helpers excluded) is partially shown below.
 
 ```bash
-jamarir@kali:~$ grep -A10 -P '^\s*function.*' Invoke-PassTheCert.ps1 |grep -vP '^(\s*|\s*<#\s*|\s+\.[A-Z]+.*|\s+(\[.*?\]|_.*)\s*)$' |sed 's/function _\?\(.*\)[[:space:]]*{/\1:/;s/^\s\+/    /' |xsel -b
+$ grep -A10 -P '^\s*function.*' Invoke-PassTheCert.ps1 |grep -vP '^(\s*|\s*<#\s*|\s+\.[A-Z]+.*|\s+(\[.*?\]|_.*)\s*)$' |sed 's/function _\?\(.*\)[[:space:]]*{/\1:/;s/^\s\+/    /' |xsel -b
 ```
 
 ```

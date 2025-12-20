@@ -3,8 +3,8 @@
 > Any `Invoke-PassTheCert` command requires an `-LdapConnection` Parameter, establishing the LDAP/S connection. Such variable can be grabbed with a valid certificate:
 
 ```powershell
-PS C:\Invoke-PassTheCert> Import-Module .\Invoke-PassTheCert.ps1
-PS C:\Invoke-PassTheCert> $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<USER.pfx>'
+PS > Import-Module .\Invoke-PassTheCert.ps1
+PS > $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<USER.pfx>'
 ```
 
 ## Getting Th4' Correctly Formatted Inbound ACEs
@@ -73,11 +73,11 @@ jamarir@kali:~$ dacledit.py jamad.local/'User':'USR_P@ssw0rd123!'  -dc-ip '192.1
 2. Or the following [`RSAT` commands](https://learn.microsoft.com/en-us/troubleshoot/windows-server/system-management-components/remote-server-administration-tools). For instance, we may look for allowed inbound ACEs targeting `DC=JAMAD,DC=LOCAL` granting an `ObjectAceType` matching the following pattern: `DS-Replication-Get-Changes*`:
 
 ```powershell
-PS C:\Invoke-PassTheCert> $Domain = 'JAMAD.LOCAL'; $Username = 'User'; $Password = 'USR_P@ssw0rd123!'; $dc = '192.168.56.202'
-PS C:\Invoke-PassTheCert> $c = New-Object System.Management.Automation.PSCredential("$Domain\$Username",(ConvertTo-SecureString "$Password" -AsPlainText -Force))
-PS C:\Invoke-PassTheCert> $er = .\Get-ExtendedRights.ps1 -Server $dc -Domain $Domain -Username $Username -Password $Password
-PS C:\Invoke-PassTheCert> New-PSDrive -Name AD1337 -PSProvider ActiveDirectory -root "//RootDSE/" -Server $dc -Credential $c
-PS C:\Invoke-PassTheCert> (Get-Acl -Path "AD1337:DC=$(($Domain -split '\.') -join ',DC=')").Access |%{$ot = $_.ObjectType; $_ |Add-Member -Force -NotePropertyName 'ObjectTypeName' -NotePropertyValue $er.where{$_.rightsGuid -match $ot}.name; $_} |?{$_.AccessControlType -like 'Allow*' -and ($_.ObjectTypeName -like 'DS-Replication-Get-Changes*')}
+PS > $Domain = 'JAMAD.LOCAL'; $Username = 'User'; $Password = 'USR_P@ssw0rd123!'; $dc = '192.168.56.202'
+PS > $c = New-Object System.Management.Automation.PSCredential("$Domain\$Username",(ConvertTo-SecureString "$Password" -AsPlainText -Force))
+PS > $er = .\Get-ExtendedRights.ps1 -Server $dc -Domain $Domain -Username $Username -Password $Password
+PS > New-PSDrive -Name AD1337 -PSProvider ActiveDirectory -root "//RootDSE/" -Server $dc -Credential $c
+PS > (Get-Acl -Path "AD1337:DC=$(($Domain -split '\.') -join ',DC=')").Access |%{$ot = $_.ObjectType; $_ |Add-Member -Force -NotePropertyName 'ObjectTypeName' -NotePropertyValue $er.where{$_.rightsGuid -match $ot}.name; $_} |?{$_.AccessControlType -like 'Allow*' -and ($_.ObjectTypeName -like 'DS-Replication-Get-Changes*')}
 [...]
 ObjectTypeName        : DS-Replication-Get-Changes
 ActiveDirectoryRights : ExtendedRight
@@ -103,7 +103,7 @@ IsInherited           : False
 InheritanceFlags      : None
 PropagationFlags      : None
 [...]
-PS C:\Invoke-PassTheCert> Remove-PSDrive -Name AD1337
+PS > Remove-PSDrive -Name AD1337
 ```
 
 
@@ -114,7 +114,7 @@ PS C:\Invoke-PassTheCert> Remove-PSDrive -Name AD1337
 To get an *exhaustive* list of the ACE ObjectAceTypes' GUIDs (i.e. `DS-Replication-Get-Changes-All`, `User-Change-Password`, ...), we may refer to [[MS-ADTS]: 5.1.3.2.1 Control Access Rights](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/1522b774-6464-41a3-87a5-1e5633c3fbbb), and complete that list using the provided `Get-ExtendedRights.ps1` PowerShell script:
 
 ```powershell
-PS C:\Invoke-PassTheCert> .\Get-ExtendedRights.ps1 -Server 192.168.56.202 -Domain 'JAMAD.LOCAL' -Username 'User' -Password 'USR_P@ssw0rd123!'
+PS > .\Get-ExtendedRights.ps1 -Server 192.168.56.202 -Domain 'JAMAD.LOCAL' -Username 'User' -Password 'USR_P@ssw0rd123!'
 
 name                                          distinguishedname                                                                                      rightsguid
 ----                                          -----------------                                                                                      ----------
@@ -250,7 +250,7 @@ Here, the principal `S-1-5-21-[...]` was given `AccessAllowed` permission agains
 For instance, the following allows principal `Wanha BE. ERUT` to have DCSync rights over the target domain `JAMAD.LOCAL` (creating an allowance inbound ACE into the `JAMAD.LOCAL`'s `nTSecurityDescriptor` attribute):
 
 ```powershell
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightName 'DS-Replication-Get-Changes-All' -TargetDN 'DC=JAMAD,DC=LOCAL'
+PS > Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -Identity 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightName 'DS-Replication-Get-Changes-All' -Target 'DC=JAMAD,DC=LOCAL'
 [...]
 ObjectAceTypeName      : DS-Replication-Get-Changes-All
 AccessMaskNames        : ExtendedRight
@@ -301,7 +301,7 @@ As yet another example, if we want to provide a principal with `GenericAll` righ
 For instance, the following allows principal `Yure YM. MINE` to have Full Control rights over the target computer `KINDAOWNED$` (creating an allowance inbound ACE into the `KINDAOWNED$`'s `nTSecurityDescriptor` attribute):
 
 ```powershell
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -IdentityDN 'CN=Yure YM. MINE,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'GenericAll' -TargetDN 'CN=KINDAOWNED,CN=Computer,DC=JAMAD,DC=LOCAL'
+PS > Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -Identity 'CN=Yure YM. MINE,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'GenericAll' -Target 'CN=KINDAOWNED,CN=Computer,DC=JAMAD,DC=LOCAL'
 [...]
 [+] Successfully Created Inbound ACE [AceQualifier='AccessAllowed', AccessMasks='GenericAll', ObjectAceType=NULL] Provided To Account 'CN=Yure YM. MINE,CN=Users,DC=JAMAD,DC=LOCAL' Towards 'CN=KINDAOWNED,CN=Computers,DC=JAMAD,DC=LOCAL' !
 [...]
@@ -348,9 +348,9 @@ https://learn.microsoft.com/en-us/windows/win32/adschema/r-Self-Membership
 For instance, the following allows principal `Lukin LF. FURMATES` to add itself as a member over the target group `KindaGroupy` (creating an allowance inbound ACE into the `KindaGroupy`'s `nTSecurityDescriptor` attribute):
 
 ```powershell
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -IdentityDN 'CN=Lukin LF. FURMATES,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'Self' -AccessRightName 'Self-Membership' -TargetDN 'CN=KindaGroupy,CN=Builtin,DC=JAMAD,DC=LOCAL'
+PS > Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -Identity 'CN=Lukin LF. FURMATES,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'Self' -AccessRightName 'Self-Membership' -Target 'CN=KindaGroupy,CN=Builtin,DC=JAMAD,DC=LOCAL'
 [...]
-[+] Successfully Created Inbound ACE [AceQualifier='AccessAllowed', AccessMasks='Self', ObjectAceType='Self-Membership'] Provided To Account 'CN=J0hn JR. RIPP3R,CN=Users,DC=JAMAD,DC=LOCAL' Towards 'CN=KindaGroupy,CN=Builtin,DC=JAMAD,DC=LOCAL' !
+[+] Successfully Created Inbound ACE [AceQualifier='AccessAllowed', AccessMasks='Self', ObjectAceType='Self-Membership'] Provided To Account 'CN=Lukin LF. FURMATES,CN=Users,DC=JAMAD,DC=LOCAL' Towards 'CN=KindaGroupy,CN=Builtin,DC=JAMAD,DC=LOCAL' !
 [...]
 ```
 
@@ -394,8 +394,8 @@ https://learn.microsoft.com/en-us/windows/win32/adschema/r-User-Force-Change-Pas
 Note that because its `ObjectAceType`'s GUID is `00299570-246d-11d0-a768-00aa006e0529`, we could, alternatively, manually set the GUID instead of the `User-Force-Change-Password` name. For instance, the followings allow principal `Wanha BE. EMOVEMENTED` to change the password of `Smart SC. CARDY` (i.e. creating an allowance inbound ACE into the `Smart SC. CARDY`'s `nTSecurityDescriptor` attribute):
 
 ```powershell
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. EMOVEMENTED,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightName 'User-Force-Change-Password' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. EMOVEMENTED,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '00299570-246d-11d0-a768-00aa006e0529' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
+PS > Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -Identity 'CN=Wanha BE. EMOVEMENTED,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightName 'User-Force-Change-Password' -Target 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
+PS > Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -Identity 'CN=Wanha BE. EMOVEMENTED,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '00299570-246d-11d0-a768-00aa006e0529' -Target 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
 [...]
 [+] Successfully Created Inbound ACE [AceQualifier='AccessAllowed', AccessMasks='ExtendedRight', ObjectAceType='00299570-246d-11d0-a768-00aa006e0529'] Provided To Account 'CN=Wanha BE. EMOVEMENTED,CN=Users,DC=JAMAD,DC=LOCAL' Towards 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL' !
 [...]
@@ -411,7 +411,7 @@ jamarir@kali:~$ ldeep ldap -d 'jamad.local' -s 192.168.56.202 -u 'wemovemented' 
 As we saw ealier, the following `GenericAll` is legitimate, as it grants the principal `Wanha BE. ERUT` rights to change the password of `Smart SC. CARDY`:
 
 ```powershell
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha WE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'GenericAll' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
+PS > Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -Identity 'CN=Wanha WE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'GenericAll' -Target 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
 [...]
 [+] Successfully Created Inbound ACE [AceQualifier='AccessAllowed', AccessMasks='GenericAll', ObjectAceType=NULL] Provided To Account 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' Towards 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL' !
 ```
@@ -428,7 +428,7 @@ jamarir@kali:~$ ldeep ldap -d 'jamad.local' -s 192.168.56.202 -u 'werut' -p 'WE_
 However, if we execute the exact same command, but with an arbitrary `ObjectAceType` GUID, no permission is granted anymore:
 
 ```powershell
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'GenericAll' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL' -AccessRightGUID '12345678-1234-1234-1234-123456789012'
+PS > Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -Identity 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'GenericAll' -Target 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL' -AccessRightGUID '12345678-1234-1234-1234-123456789012'
 [...]
 [+] Successfully Created Inbound ACE [AceQualifier='AccessAllowed', AccessMasks='GenericAll', ObjectAceType='12345678-1234-1234-1234-123456789012' (?¿PS_Whut_SP¿?)] Provided To Account 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' Towards 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL' !
 
@@ -466,7 +466,7 @@ Last (but definitely not least?), it's *may* be possible to create arbitrary and
 Below, the `ObjectAceType` with GUID `12345678-1234-1234-1234-123456789012` definitely doesn't exist (at least, as per [the documentation](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/1522b774-6464-41a3-87a5-1e5633c3fbbb)), but may be created as follows, if we manually set the `-AccessRightGUID` parameter (instead of conveniently using the `AccessRightName` option):
 
 ```powershell
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '12345678-1234-1234-1234-123456789012' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
+PS > Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -Identity 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '12345678-1234-1234-1234-123456789012' -Target 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
 [...]
 [+] Successfully Created Inbound ACE [AceQualifier='AccessAllowed', AccessMasks='ExtendedRight', ObjectAceType='12345678-1234-1234-1234-123456789012' (?¿PS_Whut_SP¿?)] Provided To Account 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' Towards 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL' !
 
@@ -493,7 +493,7 @@ AuditFlags             : None
 We may confirm it has indeed been created, as trying to re-provide it errors-out with `Inbound ACE [...] Already Exists !`:
 
 ```powershell
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '12345678-1234-1234-1234-123456789012' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
+PS > Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection $LdapConnection -Identity 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '12345678-1234-1234-1234-123456789012' -Target 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
 [...]
 [!] Inbound ACE [AceQualifier='AccessAllowed', AccessMasks='ExtendedRight', ObjectAceType='12345678-1234-1234-1234-123456789012' (?¿PS_Whut_SP¿?)] Provided To Account 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' Towards 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL' Already Exists !
 ```
@@ -502,7 +502,7 @@ PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'CreateInboundACE' -LdapCon
 We may confirm, yet again, it has indeed been created, as looking fot `Smart SC. CARDY`'s inbound ACEs shows the created ACE entry:
 
 ```powershell
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection $LdapConnection -IdentityDN 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL' |?{$_.ObjectAceType -eq '12345678-1234-1234-1234-123456789012'}
+PS > Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection $LdapConnection -Identity 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL' |?{$_.ObjectAceType -eq '12345678-1234-1234-1234-123456789012'}
 [...]
 ObjectAceTypeName      :
 AccessMaskNames        : ExtendedRight
@@ -567,7 +567,7 @@ iscallbak:              False
 We may confirm, yet again, trying to delete it, which works:
 
 ```powershell
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '12345678-1234-1234-1234-123456789012' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
+PS > Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection $LdapConnection -Identity 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '12345678-1234-1234-1234-123456789012' -Target 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
 [...]
 [+] Successfully Deleted Inbound ACE [AceQualifier='AccessAllowed', AccessMasks='ExtendedRight', ObjectAceType='12345678-1234-1234-1234-123456789012'] Provided To Account 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' Towards 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL' !
 ```
@@ -575,7 +575,7 @@ PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapCon
 We may confirm, yet again, it has been deleted, as trying to re-delete it errors-out with `Inbound ACE [...] Doesn't Exist !`:
 
 ```powershell
-PS C:\Invoke-PassTheCert> Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '12345678-1234-1234-1234-123456789012' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
+PS > Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection $LdapConnection -Identity 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID '12345678-1234-1234-1234-123456789012' -Target 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL'
 [...]
 [!] Inbound ACE [AceQualifier='AccessAllowed', AccessMasks='ExtendedRight', ObjectAceType='12345678-1234-1234-1234-123456789012'] Provided To Account 'CN=Wanha BE. ERUT,CN=Users,DC=JAMAD,DC=LOCAL' Towards 'CN=Smart SC. CARDY,CN=Users,DC=JAMAD,DC=LOCAL' Doesn't Exist !
 ``` 
@@ -601,11 +601,9 @@ But one question remains: What if we only want to grant a principal rights again
 Exactly pin-pointing which principal have which access against a targeted object's attribute can be done through the GUI in the DC, in the `Active Directory Users and Computers > Security > Advanced > Permissions` menu.
 Here, we may exactly pin-point which principal have which right against the targeted object.
 
-<center>
-
-![alt text](image-1.png)
-
-</center>
+<div align="center">
+<img src="image-1.png" />
+</div>
 
 For instance, let's consider a brand new `John JD. DOE` user, with the following inbound ACEs set (i.e. it's the target of the ACEs):
 
@@ -667,17 +665,13 @@ In other words, if that SDDL entry was to be defined in the `nTSecurityDescripto
 
 Our previous giant SDDL String may be converted in a human-readable format using the [SDDL-Converter](https://github.com/canix1/SDDL-Converter) tool. Both images below show the same converted SDDL String as above, either from a non-domain-joined computer (thus UNABLE to translate ACEs accordingly), or a domain-joined computer (thus ABLE to translate ACEs accordingly (here, the DC)), respectively:
 
-<center>
+<div align="center">
+<img src="image.png" />
+</div>
 
-![alt text](image.png)
-
-</center>
-
-<center>
-
-![alt text](image-4.png)
-
-</center>
+<div align="center">
+<img src="image-4.png" />
+</div>
 
 ## Adding Permissions Over A Specific Attribute ?
 
@@ -685,11 +679,9 @@ Our previous giant SDDL String may be converted in a human-readable format using
 
 Now, say we wanna grant `Des DC. CRYPTATOR` ONLY ONE WRITE permission over the `description` attribute of the targeted object `John JD. DOE`. Then, we can add that WRITE permission ONLY in the `Active Directory Users and Computers > John JD. DOE > Security > Advanced > Permissions` menu, checking the `Write Description` box for principal `Des DC. CRYPTATOR` (fortunately, there's a `Clear all` button at the bottom to clear all default checkboxes...).
 
-<center>
-
-![alt text](image-3.png)
-
-</center>
+<div align="center">
+<img src="image-3.png" />
+</div>
 
 Granting that WRITE permission ALONE to `Des DC. CRYPTATOR` results in the following newly defined SDDL string in the `John JD. DOE`'s `nTSecurityDescriptor`:
 
@@ -715,11 +707,9 @@ If we do the same for another user (i.e. grant WRITE permission ONLY against the
 Last (but definitely not least!), we know for sure that the previously *unknown* Access Right GUIDs (i.e. `ObjectAceType` GUIDs) were these advanced grantable permissions. Basically, the `ObjectAceType` with GUID `bf967950-0de6-11d0-a285-00aa003049e2` is the one pin-pointing the `description` attribute, EXACTLY.
 Indeed, if we look at the WRITE permissions of `Des DC. CRYPTATOR` against the target `John JD. DOE`, we see it has no privileges, EXCEPT our previously set WRITE permission over `description`, shown as *Special*:
 
-<center>
-
-![alt text](image-2.png)
-
-</center>
+<div align="center">
+<img src="image-2.png" />
+</div>
 
 Therefore, we can now update this attribute ONLY:
 
@@ -755,11 +745,9 @@ GG WP !
 Note, however, that some WRITE permissions, even if checked (hence granted) to a principal from the GUI, won't be writable. 
 For instance, if we grant `Nam NA. ATOR` WRITE privilege against the `John JD. DOE`:`name` attribute (The lowercase one...):
 
-<center>
-
-![alt text](image-5.png)
-
-</center>
+<div align="center">
+<img src="image-5.png" />
+</div>
 
 The following ACE entry is added into the SDDL string, as we already analyzed:
 
@@ -777,11 +765,9 @@ badldap.commons.exceptions.LDAPModifyException: notAllowedOnRDN for CN=John JD. 
 
 And the same behavior can be seen when granting EVERY right against EVERY attribute:
 
-<center>
-
-![alt text](image-6.png)
-
-</center>
+<div align="center">
+<img src="image-6.png" />
+</div>
 
 Therefore, it sounds that not every attribute can be written.
 
@@ -817,7 +803,7 @@ DACLREAD    192.168.56.202  389    DC02                 Trustee (SID)           
 - Or [Invoke-PassTheCert](http://localhost:1337/):
 
 ```powershell
-PS > Invoke-PassTheCert -NoBanner -Action 'GetInboundACEs' -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=JAMAD,DC=LOCAL' |?{$_.AceQualifier -eq 'AccessAllowed' -and $_.ObjectAceType -eq 'bf967950-0de6-11d0-a285-00aa003049e2'}
+PS > Invoke-PassTheCert -NoBanner -Action 'GetInboundACEs' -LdapConnection $LdapConnection -Identity 'CN=John JD. DOE,CN=Users,DC=JAMAD,DC=LOCAL' |?{$_.AceQualifier -eq 'AccessAllowed' -and $_.ObjectAceType -eq 'bf967950-0de6-11d0-a285-00aa003049e2'}
 [...]
 ObjectAceTypeName      :
 AccessMaskNames        : ReadProperty
@@ -848,14 +834,12 @@ GG WP !
 Finally, we may see how is the SDDL String's ACE formated whenever every right (except `FullControl`, as we already saw previously it corresponds to `GenericAll`) is provided.
 Once provided:
 
-<center>
-
-![alt text](image-15.png)
-
-</center>
+<div align="center">
+<img src="image-15.png" />
+</div>
 
 ```powershell
-PS > Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=JAMAD,DC=LOCAL' |?{$_.AceQualifier -eq 'AccessAllowed' -and $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}1447'}
+PS > Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection $LdapConnection -Identity 'CN=John JD. DOE,CN=Users,DC=JAMAD,DC=LOCAL' |?{$_.AceQualifier -eq 'AccessAllowed' -and $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}1447'}
 [...]
 AccessMaskNames    : WriteOwner, WriteDacl, GenericRead, Delete, ListObject, DeleteTree, WriteProperty, Self, DeleteChild, CreateChild
 BinaryLength       : 36
@@ -897,11 +881,9 @@ Indeed, [as NetExec links](https://github.com/Pennyw0rth/NetExec/blob/652fc12253
 
 > Note that the the link DOES NOT contain the [Extended Rights](https://learn.microsoft.com/en-us/windows/win32/adschema/control-access-rights) we saw earlier, such as [Validated-SPN](https://learn.microsoft.com/en-us/windows/win32/adschema/validated-writes), or [`DS-Replication-Get-Changes-All`](https://learn.microsoft.com/en-us/windows/win32/adschema/extended-rights)
 
-<center>
-
-![alt text](image-7.png)
-
-</center>
+<div align="center">
+<img src="image-7.png" />
+</div>
 
 Hopefully, [Bastien Perez](https://itpro-tips.com/liste-des-guid-du-schema-active-directory/) did the painful parsing for us, in a CSV format (provided here into `ADAttributeGUIDs.csv`).
 
@@ -912,25 +894,19 @@ Hopefully, [Bastien Perez](https://itpro-tips.com/liste-des-guid-du-schema-activ
 
 Now, if we try to grant every per-LDAP Attribute right, without checking the `all properties` boxes:
 
-<center>
-
-![alt text](image-14.png)
-
-</center>
+<div align="center">
+<img src="image-14.png" />
+</div>
 
 We'd have a prompt warning us that the `John JD. DOE`'s `nTSecurityDescriptor` would HUGELY be populated (as we're granting each and every right independently):
 
-<center>
+<div align="center">
+<img src="image-13.png" />
+</div>
 
-![alt text](image-13.png)
-
-</center>
-
-<center>
-
-![alt text](image-12.png)
-
-</center>
+<div align="center">
+<img src="image-12.png" />
+</div>
 
 Resulting in QUITE NUMEROUS ACEs !!
 
