@@ -262,4 +262,5 @@ Invoke-PassTheCert :
 - `CreateObject`: Implement creation of objects other than `User` or `Computer`.
 - `LDAPEnum`: Implement more LDAP enumerations.
 - `LDAPExploit`: Implement more LDAP attacks (LDAP interactive Shell, etc.).
+- `LDAPExploit:ShadowCreds`: Check whether not specifying [`CustomKeyInfo` and `LastLogonTime`](https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredential.cs#L459-L475) in `msDS-KeyCredentialLink` is *always* fine (i.e. we still can authenticate with the populated certificate entry).
 - `LDAPExtendedOperationPasswordModify`: Implement the `Password Modify` LDAP Extended Operation. *Alternatively, `UpdatePasswordOfIdentity` can be used, where the identity is the LDAP Connection Instance's account.*

