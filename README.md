@@ -29,7 +29,7 @@ This fork alters [the initial code](https://github.com/The-Viper-One/Invoke-Pass
 
 - Usage of LDAP Paging Control to avoid [`The size limit was exceeded` errors](https://www.openldap.org/doc/admin26/limits.html).
 
-- Added Shadow Credentials Attacks (i.e. granting Write privileges against a target's `msds-KeyCredentialLink` attribute).
+- Added Shadow Credentials Enumeration and Exploitation.
 
 - Added a `_TODO` function to build a custom action.
 
