@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______|                  "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|                           "
     Write-Host -ForegroundColor Red     "                                                            "
-    Write-Host -ForegroundColor Red     "   v1.0.3                                                   "
+    Write-Host -ForegroundColor Red     "   v1.0.4                                                   "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _      "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |     "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_    "
@@ -727,9 +727,74 @@ function _Helper-GetBinaryFromHexString {
 }
 
 
-# ========================================================
-# ===  Helper Functions (UAC, Access Mask, ACE, SDDL)  ===
-# ========================================================
+# =====================================================================================
+# ===  Helper Functions (UAC, Access Mask, ACE, SDDL, sAMAccountType, Group Types)  ===
+# =====================================================================================
+
+
+function _Helper-GetsAMAccountTypesArray {
+
+    <#
+
+        .SYNOPSIS
+
+            Returns the Array of all possible sAMAccountTypes
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-samr/e742be45-665d-4576-b872-0bc99d1e1fbe
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/windows/win32/adschema/a-samaccounttype
+
+    #>
+
+    return @{
+        "SAM_DOMAIN_OBJECT" = 0x0;
+        "SAM_GROUP_OBJECT" = 0x10000000;
+        "SAM_NON_SECURITY_GROUP_OBJECT" = 0x10000001;
+        "SAM_ALIAS_OBJECT" = 0x20000000;
+        "SAM_NON_SECURITY_ALIAS_OBJECT" = 0x20000001;
+        "SAM_USER_OBJECT" = 0x30000000;
+        "SAM_NORMAL_USER_ACCOUNT" = 0x30000000;
+        "SAM_MACHINE_ACCOUNT" = 0x30000001;
+        "SAM_TRUST_ACCOUNT" = 0x30000002;
+        "SAM_APP_BASIC_GROUP" = 0x40000000;
+        "SAM_APP_QUERY_GROUP" = 0x40000001;
+        "SAM_ACCOUNT_TYPE_MAX" = 0x7fffffff;
+    }
+}
+
+
+function _Helper-GetGroupTypesArray {
+
+    <#
+
+        .SYNOPSIS
+
+            Returns the Array of all possible Group Types
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-samr/1f8d7ea1-fcc1-4833-839a-f94d67c08fcd
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/windows/win32/adschema/a-grouptype
+
+    #>
+
+    return @{
+        "GROUP_TYPE_ACCOUNT_GROUP" = 0x00000002;
+        "GROUP_TYPE_RESOURCE_GROUP" = 0x00000004;
+        "GROUP_TYPE_UNIVERSAL_GROUP" = 0x00000008;
+        "GROUP_TYPE_SECURITY_ENABLED" = 0x80000000;
+        "GROUP_TYPE_SECURITY_ACCOUNT" = 0x80000002;
+        "GROUP_TYPE_SECURITY_RESOURCE" = 0x80000004;
+        "GROUP_TYPE_SECURITY_UNIVERSAL" = 0x80000008;
+    }
+}
 
 
 function _Helper-GetUACFlagsArray {
@@ -5149,6 +5214,123 @@ function _Helper-GetLDAPAttributesArray {
 }
 
 
+function _Helper-GetNamesOfSAMAccountTypeValue {
+
+    <#
+
+        .SYNOPSIS
+
+            Returns the Name(s) (comma-separated, if multiple) associated with the specified sAMAccountType value.
+
+        .PARAMETER Value
+
+            [System.Int32]
+
+            The samAccountType value to translate.
+
+        .EXAMPLE
+
+            _Helper-GetNamesOfSAMAccountTypeValue -Value "$(0x30000000)"
+
+            Returns `SAM_DOMAIN_OBJECT,SAM_USER_OBJECT`
+
+        .OUTPUTS
+
+            [System.String] 
+            
+            The Name(s) (comma-separated, if multiple) associated with the specified sAMAccountType value.
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-samr/e742be45-665d-4576-b872-0bc99d1e1fbe
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/windows/win32/adschema/a-samaccounttype
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the sAMAccountType Value to translate into names (comma-separated, if multiple)")]
+        [System.Int32]$Value
+    )
+
+    #Write-Verbose "[*] Retrieving Name(s) Associated With sAMAccountType Value '$Value'..."
+    $sAMAccountTypes = _Helper-GetsAMAccountTypesArray
+
+    $Sum = $Value;
+    # Removing each sAMAccountType from the total value starting from the highest one
+    while ($Sum -gt 0) {
+        foreach ($key in $sAMAccountTypes.Keys | Sort-Object { -$sAMAccountTypes[$_] }) {
+            if ($sAMAccountTypes[$key] -le $Sum) {
+                $Result += "$key, ";
+                $Sum -= $sAMAccountTypes[$key];
+            }
+        }
+    }
+    $Result = $Result.TrimEnd(', ');
+    #Write-Verbose "[+] Successfully Retrieved '$Result' Name(s) Associated With sAMAccountType Value '$Value' !"
+    return $Result;
+}
+
+
+function _Helper-GetNameOfGroupTypeValue {
+
+    <#
+
+        .SYNOPSIS
+
+            Returns the Name associated with the specified GroupType value.
+
+        .PARAMETER Value
+
+            [System.Int32]
+
+            The GroupType value to translate.
+
+        .EXAMPLE
+
+            _Helper-GetNameOfGroupTypeValue -Value "$(0x80000002)"
+
+            Returns `GROUP_TYPE_SECURITY_ACCOUNT`
+
+        .OUTPUTS
+
+            [System.String] 
+            
+            The Name associated with the specified GroupType value.
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-samr/1f8d7ea1-fcc1-4833-839a-f94d67c08fcd
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/windows/win32/adschema/a-grouptype
+            
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the GroupType Value to translate into name")]
+        [System.Int32]$Value
+    )
+
+    $GroupTypes = _Helper-GetGroupTypesArray
+
+    foreach ($GroupType in $GroupTypes.GetEnumerator()) {
+        if ($GroupType.Value -eq $Value) {
+            #Write-Verbose "[+] Successfully Retrieved '$($GroupType.Key)' Name Associated With GroupType Value '$Value' !"
+            return $GroupType.Key;
+        }
+    }
+
+    # If not found, returning an empty string
+    #Write-Verbose "[!] GroupType Associated With Value '$Value' Not Found ! Returning Empty String..."
+    return '';
+}
+
+
 function _Helper-GetValueOfUACFlags {
     
     <#
@@ -5227,7 +5409,7 @@ function _Helper-GetUACFlagsOfValue {
 
             Returns the UAC Flag(s) (comma-separated, if multiple) associated with the specified UAC Value.
         
-        .PARAMETER UACValue
+        .PARAMETER Value
 
             [System.Int32] 
             
@@ -5235,13 +5417,13 @@ function _Helper-GetUACFlagsOfValue {
 
         .EXAMPLE
 
-            _Helper-GetUACFlagsOfValue -UACValue 4194304
+            _Helper-GetUACFlagsOfValue -Value 4194304
 
             Returns `DONT_REQ_PREAUTH`
 
         .EXAMPLE
 
-            _Helper-GetValueOfUACFlags -UACFlags $(0x0002+0x0010)
+            _Helper-GetUACFlagsOfValue -Value $(0x0002+0x0010)
 
             Returns `ACCOUNTDISABLE,LOCKOUT`
 
@@ -5264,16 +5446,16 @@ function _Helper-GetUACFlagsOfValue {
     [CmdletBinding()]
     param(
         [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the UAC Value to translate into UAC Flags (comma-separated, if multiple)")]
-        [System.Int32]$UACValue
+        [System.Int32]$Value
     )
 
-    #Write-Verbose "[*] Retrieving UAC Flag(s) Associated With UAC Value '$UACValue'..."
+    #Write-Verbose "[*] Retrieving UAC Flag(s) Associated With UAC Value '$Value'..."
 
     $UACs = _Helper-GetUACFlagsArray
 
     $Result = '';
     $UACs.GetEnumerator() | Sort-Object -Property Value |ForEach-Object {
-        if (($_.Value -band $UACValue) -ne 0) {
+        if (($_.Value -band $Value) -ne 0) {
             $Result += "$($_.Key),"
         }
     }
@@ -5283,7 +5465,7 @@ function _Helper-GetUACFlagsOfValue {
     } else {
         # Removing extra comma
         $Result = $Result.Substring(0, $Result.Length - 1)
-        #Write-Verbose "[+] Successfully Retrieved UAC Flag(s) '$Result' Associated With UAC Value $UACValue !"
+        #Write-Verbose "[+] Successfully Retrieved UAC Flag(s) '$Result' Associated With UAC Value $Value !"
     }
 
     return $Result;
@@ -5366,7 +5548,7 @@ function _Helper-GetNamesOfACEAccessMaskValue {
 
             Returns the Name(s) (comma-separated, if multiple) associated with the specified ACE Value.
         
-        .PARAMETER AccessMaskValue
+        .PARAMETER Value
 
             [System.String] 
             
@@ -5374,13 +5556,13 @@ function _Helper-GetNamesOfACEAccessMaskValue {
 
         .EXAMPLE
 
-            _Helper-GetNamesOfACEAccessMaskValue -AccessMaskValue 983551
+            _Helper-GetNamesOfACEAccessMaskValue -Value 983551
 
             Returns `GenericAll`
 
         .EXAMPLE
 
-            _Helper-GetNamesOfACEAccessMaskValue -AccessMaskValue $(16+32)
+            _Helper-GetNamesOfACEAccessMaskValue -Value $(16+32)
 
             Returns `WriteProperty, ReadProperty`
 
@@ -5389,8 +5571,6 @@ function _Helper-GetNamesOfACEAccessMaskValue {
             [System.String] 
             
             The Name(s) (comma-separated, if multiple) associated with the specified ACE Value.
-
-            
 
         .LINK
 
@@ -5404,14 +5584,14 @@ function _Helper-GetNamesOfACEAccessMaskValue {
     
     [CmdletBinding()]
     param(
-        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the additionned Access Mask Value of the ACE to translate into Name(s) (will be comma-separated, if multiple)")]
-        [System.Int32]$AccessMaskValue
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the additionned Access Mask Value of the ACE to translate into Name(s) (comma-separated, if multiple)")]
+        [System.Int32]$Value
     )
 
-    #Write-Verbose "[*] Retrieving Name(s) Associated With ACE AccessMask Value '$AccessMaskValue'..."
+    #Write-Verbose "[*] Retrieving Name(s) Associated With ACE AccessMask Value '$Value'..."
     $AccessMasks = _Helper-GetAccessMasksArray
 
-    $Sum = $AccessMaskValue;
+    $Sum = $Value;
     # Removing each Access Mask from the total value starting from the highest one
     while ($Sum -gt 0) {
         foreach ($key in $AccessMasks.Keys | Sort-Object { -$AccessMasks[$_] }) {
@@ -5422,7 +5602,7 @@ function _Helper-GetNamesOfACEAccessMaskValue {
         }
     }
     $Result = $Result.TrimEnd(', ');
-    #Write-Verbose "[+] Successfully Retrieved '$Result' Name(s) Associated With ACE AccessMask Value '$AccessMaskValue' !"
+    #Write-Verbose "[+] Successfully Retrieved '$Result' Name(s) Associated With ACE AccessMask Value '$Value' !"
     return $Result;
 }
 
@@ -6603,6 +6783,7 @@ function _Helper-GetReadableValueOfBytes {
 
 }
 
+
 function _GetAttributeOfObject {
     
     <#
@@ -7452,18 +7633,71 @@ function _Filter {
     } else {
         # For each result object, translate attributes, if applicable.
         return $ResultObjects |%{ 
-            # Translate UAC Values, if any, into UAC Flags (comma-separacted, if multiple)
-            if ($_.useraccountcontrol) { $_ |Add-Member -Force -NotePropertyName 'useraccountcontrolnames' -NotePropertyValue (_Helper-GetUACFlagsOfValue $_.useraccountcontrol) }; 
-            # Some attributes CANNOT be converted, as they don't hold byte data (e.g. SID of some builtin groups). Therefore, these cases (triggering conversion errors) are NOT translated, and left as is.
-            try {
-                # Translate ObjectSID bytes, if any, into a human-readable string
-                if ($_.objectsid) { $_ |Add-Member -Force -NotePropertyName 'objectsid' -NotePropertyValue (_Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $_.objectsid) };
-            } catch {}
-            try {
-                # Translate ObjectGUID bytes, if any, into a human-readable string
-                if ($_.objectguid) { $_ |Add-Member -Force -NotePropertyName 'objectguid' -NotePropertyValue (_Helper-GetReadableValueOfBytes -Type 'objectguid' -ArrayOfBytes $_.objectguid) };
-            } catch {}
+
+            # Translate the attribute accordingly, if any
+            foreach ($Property in $_.PSObject.Properties) {
+                $AddMember = $false
+                
+                switch ($Property.Name) {
+                    
+                    'samaccounttype' { $AddMember = $true; $NewMember = _Helper-GetNamesOfSAMAccountTypeValue -Value $Property.Value }
+                    
+                    'useraccountcontrol' { $AddMember = $true; $NewMember = _Helper-GetUACFlagsOfValue -Value $Property.Value }
+                    
+                    'objectsid' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value }
+                    
+                    'objectguid' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectguid' -ArrayOfBytes $Property.Value }
+                    
+                    'grouptype' { $AddMember = $true; $NewMember = _Helper-GetNameOfGroupTypeValue -Value $Property.Value }
+                    
+                    'accountexpires' { 
+                        $AddMember = $true; 
+                        # https://learn.microsoft.com/en-us/windows/win32/adschema/a-accountexpires
+                        if ($Property.Value -in @('0', '9223372036854775807')) { $NewMember = 'Never Expires'}
+                        else { $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
+                    }
+                    
+                    'whencreated' { 
+                        $AddMember = $true; 
+                        $NewMember = [DateTime]::ParseExact(
+                            $Property.Value,
+                            'yyyyMMddHHmmss.0Z',
+                            [System.Globalization.CultureInfo]::InvariantCulture,
+                            [System.Globalization.DateTimeStyles]::AssumeUniversal
+                        ) 
+                    }
+                    
+                    'whenchanged' { 
+                        $AddMember = $true; 
+                        $NewMember = [DateTime]::ParseExact(
+                            $Property.Value,
+                            'yyyyMMddHHmmss.0Z',
+                            [System.Globalization.CultureInfo]::InvariantCulture,
+                            [System.Globalization.DateTimeStyles]::AssumeUniversal
+                        ) 
+                    }
+                    
+                    'creationtime' { $AddMember = $true; $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
+                    
+                    'pwdlastset' { $AddMember = $true; $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
+                    
+                    'lastlogontimestamp' { $AddMember = $true; $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
+                    
+                    'lastlogon' { $AddMember = $true; $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
+
+                    'badpasswordtime' { $AddMember = $true; $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
+
+                }
+
+                # Some attributes CANNOT be converted, as they don't hold byte data (e.g. SID of some builtin groups). Therefore, these cases (triggering conversion errors) are NOT translated, and left as is.
+                if ($AddMember) {
+                    try { $_ |Add-Member -Force -NotePropertyName $Property.Name -NotePropertyValue $NewMember } catch {}
+                }
+
+            }
+            
             $_
+
         }
     }
 }
@@ -8032,7 +8266,7 @@ function _GetInboundACEs {
         }
         # If the ACE has an AccessMask, add its name into the result object
         if ($ResultObject.AccessMask) {
-            $ResultObject = $ResultObject | Add-Member -PassThru -Force -NotePropertyName "AccessMaskNames" -NotePropertyValue (_Helper-GetNamesOfACEAccessMaskValue -AccessMaskValue ($ResultObject.AccessMask));
+            $ResultObject = $ResultObject | Add-Member -PassThru -Force -NotePropertyName "AccessMaskNames" -NotePropertyValue (_Helper-GetNamesOfACEAccessMaskValue -Value ($ResultObject.AccessMask));
         }
         # If the ACE has a Security Identifier (should always be true to define the inbound ACE), add its name into the result object
         if ($ResultObject.SecurityIdentifier) {
@@ -8274,10 +8508,10 @@ function _CreateInboundACE {
             # Writing the Check / Restoration texts for convenience
             if ($AccessRightGUID -eq [Guid]::Empty) {
                 Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -ObjectDN '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-                Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue $AccessMaskValue)'"
+                Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
             } else {
                 Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -ObjectDN '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-                Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
+                Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
             }
             return $null
         }
@@ -8333,10 +8567,10 @@ function _CreateInboundACE {
     # Writing the Check / Restoration texts for convenience
     if ($AccessRightGUID -eq [Guid]::Empty) {
         Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -ObjectDN '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue $AccessMaskValue)'"
+        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
     } else {
         Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -ObjectDN '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
+        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
     }
 }
 
@@ -8808,7 +9042,7 @@ function _CreateInboundSDDL {
 
     # Converting SDDL format to Access Mask format. E.g.: 'RPWP' becomes 'ReadProperty,WriteProperty'
     $SDDLACERightsAccessMasks = ($SDDLACERights -split '([A-Z]{2})' |?{ $_ -match '[A-Z]+'} |%{ $SDDLAccessMasks[$_] }) -join ','
-    $AccessMaskValue = _Helper-GetValueOfACEAccessMaskNames $SDDLACERightsAccessMasks
+    $AccessMaskValue = _Helper-GetValueOfACEAccessMaskNames -AccessMaskNames $SDDLACERightsAccessMasks
     
     $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor'
     $SD.DiscretionaryAcl.InsertAce(
@@ -8841,9 +9075,9 @@ function _CreateInboundSDDL {
 
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundSDDLs' -LdapConnection `$LdapConnection -ObjectDN '$TargetDN' |%{(`$_ -replace '\(',`"``n  `" -replace '\)','').Split(`"``n`") } |Select-String -Pattern '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")`$'"
     if ($Attribute) {
-        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue $AccessMaskValue)' -AccessRightGUID '$SDDLObjectAceType'"
+        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$SDDLObjectAceType'"
     } else {
-        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue $AccessMaskValue)'"
+        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
     }
     return
 }
@@ -10029,11 +10263,13 @@ function _LDAPEnum {
 
             Returns the owner of the 'John JD. DOE' object in the LDAP/S Server's Domain (default SearchBase).
 
-        .OUTPUTS
+        .EXAMPLE
 
-            [PSCustomObject[]]
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'Creator' -ObjectDN 'CN=John JD. DOE,CN=Users,DC=X'
 
-            Enumerated LDAP objects
+            Returns the SID of the creator of the 'John JD. DOE' object in the LDAP/S Server's Domain (default SearchBase).
+
+            - The `mS-DS-CreatorSID` attribute of an object MAY be populated. If a `null` error is returned, then it means the creator's attribute IS NOT populated.
 
         .LINK
 
@@ -10361,7 +10597,14 @@ function _LDAPEnum {
         'Owner' {
             if (-not (_Helper-IsEveryValueOfArrayDefined @($ObjectDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
-            return (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'nTSecurityDescriptor').Owner
+            return (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'nTSecurityDescriptor').Owner.Value
+        }
+
+        'Creator' {
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($ObjectDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+
+            $CreatorSIDBytes = [byte[]](_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'mS-DS-CreatorSID')
+            return (New-Object System.Security.Principal.SecurityIdentifier($CreatorSIDBytes, 0)).Value
         }
 
         Default { Write-Host "[!] LDAP Enumeration '$Enum' Not Recognized !"; return }
