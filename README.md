@@ -23,7 +23,7 @@ This fork alters [the initial code](https://github.com/The-Viper-One/Invoke-Pass
 
 - Get-Manual sections for each function added, providing detailed synopsis, syntax, parameters, examples, expected outputs, and reference links.
 
-- Support of different types of Identity/Target, namely: `DistinguishedName`, `SID`, `GUID`, `sAMAccountName` (*not specifying a distinguishedName within `-Identity` (resp. `-Target`) implies `-IdentityDomain` (resp. `-TargetDomain`) becomes required*).
+- Support of different types of Identity/Target, namely: `DistinguishedName`, `SID`, `GUID`, `sAMAccountName` (*not specifying a distinguishedName within `-Identity` (resp. `-Target`, `-Object`) implies `-IdentityDomain` (resp. `-TargetDomain`, `-ObjectDomain`) becomes required*).
 
 - Added multiple LDAP Building Blocks functions (i.e. core LDAP functions upon which extra features could be implemented). These functions may *easily* be exported (especially the Helpers ones) as standalones in other projects.
 
