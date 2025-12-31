@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.1.0 "
+    Write-Host -ForegroundColor Red     "   v1.2.1 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -7947,7 +7947,7 @@ function _CreateObject {
 
             - The object MUST NOT already exist.
             - (Computers) The LDAP Connection Instance's account MUST NOT have already created an MAQ (ms-DS-MachineAccountQuota) number of computers (defaults to 10 maximum per account).
-            - (Users/Computers) The `sAMAccountName` MUST be UNIQUE.
+            - (Users/Computers/Groups) The `sAMAccountName` MUST be UNIQUE.
 
         .PARAMETER LdapConnection
 
@@ -7978,7 +7978,7 @@ function _CreateObject {
 
             [System.String] 
             
-            The Type of the object to create (among 'User', 'Computer', 'OU').
+            The Type of the object to create (among 'User', 'Computer', 'OU', 'Group').
 
         .PARAMETER NewPassword
 
@@ -8011,6 +8011,7 @@ function _CreateObject {
 
             - The `sAMAccountName` MUST be 20 characters MAXIMUM
             - (Computers) Defaults to `<CN>$`, where `<CN>` is the first `CN` part of the DN (e.g. `DC137337$` if the specified DN is `CN=DC137337,CN=Computers,DC=X` (yeah... yet another DC...))
+            - (Groups) Defaults to `<CN>`, where `<CN>` is the first `CN` part of the DN (e.g. `Group733731` if the specified DN is `CN=Group733731,CN=Builtin,DC=X` (yeah... yet another group...))
 
         .EXAMPLE
 
@@ -8102,6 +8103,24 @@ function _CreateObject {
 
             Creates the computer account `WANHADELEG` with `sAMAccountName` `WANHADELEG$` (i.e. CN $-suffixed by default) in the `KindaDelegaty` Organizational Unit of domain `X`, with UAC Flags `WORKSTATION_TRUST_ACCOUNT, TRUSTED_TO_AUTH_FOR_DELEGATION`, and whose password is `NewP@ssw0rd123!` (4r3n't y4 lO0k1n' 4 C0$tR41n3d D31eG4t10n ?!)
 
+        .EXAMPLE
+
+            _CreateObject -LdapConnection $LdapConnection -ObjectType 'OU' -ObjectDN 'OU=OrganizedUnity,DC=X'
+
+            Creates the Organizational Unit `OrganizedUnity` in the domain `X`, with the "Protect object from accidental deletion" option set.
+
+        .EXAMPLE
+
+            _CreateObject -LdapConnection $LdapConnection -ObjectType 'Group' -ObjectDN 'CN=Groupation,CN=Builtin,DC=X'
+
+            Creates the Security Group `Groupation` in the `Builtin` container of domain `X`, with sAMAccountName `Groupation` (default)
+
+        .EXAMPLE
+
+            _CreateObject -LdapConnection $LdapConnection -ObjectType 'Group' -ObjectDN 'CN=Groupation,CN=Builtin,DC=X' -sAMAccountName '1234'
+
+            Creates the Security Group `Groupation` in the `Builtin` container of domain `X`, with sAMAccountName `1234`.
+
         .LINK
 
             https://learn.microsoft.com/en-us/dotnet/api/system.directoryservices.protocols.ldapconnection
@@ -8154,8 +8173,8 @@ function _CreateObject {
         [ValidateNotNullorEmpty()]
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
-        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the Type of the object to create (i.e. 'User', 'Computer', 'OU')")]
-        [ValidateSet('User', 'Computer', 'OU')]
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the Type of the object to create (i.e. 'User', 'Computer', 'OU', 'Group')")]
+        [ValidateSet('User', 'Computer', 'OU', 'Group')]
         [System.String]$ObjectType,
 
         [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the Distinguished Name of the object to create")]
@@ -8178,6 +8197,8 @@ function _CreateObject {
     
     $AddRequest = New-Object -TypeName System.DirectoryServices.Protocols.AddRequest
 
+    Write-Verbose "[*] Trying to Create Object Of Type '$ObjectType' With Distinguished Name '$ObjectDN'...";
+
     # Object DN
     Write-Verbose "[*] Trying To Add Attribute DistinguishedName '$ObjectDN' Into The Object...";
     $AddRequest.DistinguishedName = $ObjectDN;        
@@ -8188,16 +8209,15 @@ function _CreateObject {
         'User' { $ObjectClass = 'user' }
         'Computer' { $ObjectClass = 'computer' }
         'OU' { $ObjectClass = 'organizationalUnit' }
+        'Group' { $ObjectClass = 'group' }
     }
     Write-Verbose "[*] Trying To Add Attribute objectClass '$ObjectClass' Into The Object...";
     $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'objectClass', "$ObjectClass")) |Out-Null;
     Write-Verbose "[+] Successfully Added Attribute objectClass '$ObjectClass' Into The Object !";
     
-    # (?) Only users, or computers (?)...
-    $AccountTypes = @('User', 'Computer')
-    if ($ObjectType -in $AccountTypes) {
-    # Password Stuff
-    # (?)... can have a Password (?)...
+    # User/Computer Specific Attributes
+    if ($ObjectType -in @('User', 'Computer')) {
+        # Password Stuff
         # If the '-NewPassword' parameter is specifically set to '' by the user, then it means we want an empty password.
         if ($NewPassword -eq '') { 
             $Passwordless = $true; 
@@ -8210,79 +8230,80 @@ function _CreateObject {
             $PasswordString = "And With Password: $NewPassword"
         }
 
-    # UAC Stuff
-    # UAC Flags provided by the user
-    if ($UACFlags) { $UACString = "With UAC Flag(s) '$UACFlags'"; }
-    # (?)... Or can have UAC Flag(s) (?)...
-        else {
-        # Otherwise, use typical default UAC Flag(s) for accounts: https://learn.microsoft.com/en-us/troubleshoot/windows-server/active-directory/useraccountcontrol-manipulate-account-properties#useraccountcontrol-values
-        if ($ObjectType -eq 'Computer') { $UACFlags = 'WORKSTATION_TRUST_ACCOUNT'; $UACString = "With UAC Flag(s) '$UACFlags'"; }
-        elseif ($ObjectType -eq 'User') { $UACFlags = 'NORMAL_ACCOUNT'; $UACString = "With UAC Flag(s) '$UACFlags'" }
-    }
+        if (-not $Passwordless) {
+            Write-Verbose "[*] Trying To Add Attribute unicodePwd Into The Object Associated With Password: $NewPassword";
+            $UnicodePwd = [byte[]][System.Text.Encoding]::Unicode.GetBytes("`"$NewPassword`"")
+            $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'unicodePwd', $UnicodePwd)) |Out-Null;
+            Write-Host "[+] Successfully Added Attribute unicodePwd Into The Object Associated With Password: $NewPassword";
+        }
+
+        # UAC Flags provided by the user
+        if ($UACFlags) { 
+            $UACString = "With UAC Flag(s) '$UACFlags'"; 
+        } else {
+            # Otherwise, use typical default UAC Flag(s) for accounts: https://learn.microsoft.com/en-us/troubleshoot/windows-server/active-directory/useraccountcontrol-manipulate-account-properties#useraccountcontrol-values
+            if ($ObjectType -eq 'Computer') { $UACFlags = 'WORKSTATION_TRUST_ACCOUNT'; $UACString = "With UAC Flag(s) '$UACFlags'"; }
+            elseif ($ObjectType -eq 'User') { $UACFlags = 'NORMAL_ACCOUNT'; $UACString = "With UAC Flag(s) '$UACFlags'" }
+        }
 
         Write-Verbose "[*] Creating Object With Distinguished Name '$ObjectDN', $UACString, $PasswordString"
-
-    # sAMAccountName is mandatory for users...
-    if ($ObjectType -eq 'User' -and -not $sAMAccountName) {
-        return "[!] sAMAccountName Is Required For Users !"
-    }
-    # ...And $-suffixed from CN for computers by default
-    elseif ($ObjectType -eq 'Computer' -and -not $sAMAccountName) {
-        $sAMAccountName = "$(_Helper-GetCNFromDN -DN $ObjectDN)$"
-    }
-
-    # Attributes specific to accounts
-    # (?)... Or can have the following attributes (?)...
-        Write-Verbose "[*] Trying To Add Attribute sAMAccountName '$sAMAccountName' Into The Object...";
-        $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'sAMAccountName', "$sAMAccountName")) |Out-Null;
-        Write-Verbose "[+] Successfully Added Attribute sAMAccountName '$sAMAccountName' Into The Object !";
         
         Write-Verbose "[*] Trying To Add Attribute userAccountControl '$UACFlags' Into The Object...";
         $UACValue = $(_Helper-GetValueOfUACFlags -UACFlags $UACFlags)
         $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'userAccountControl', "$UACValue")) |Out-Null;
         Write-Verbose "[+] Successfully Added Attribute userAccountControl '$UACValue' Into The Object !";
-
-        if (-not $Passwordless) {
-            Write-Verbose "[*] Trying To Add Attribute unicodePwd Into The Object Associated With Password: $NewPassword";
-            $UnicodePwd = [byte[]][System.Text.Encoding]::Unicode.GetBytes("`"$NewPassword`"")
-            $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'unicodePwd', $UnicodePwd)) |Out-Null;
-            Write-Verbose "[+] Successfully Added Attribute unicodePwd Into The Object Associated With Password: $NewPassword";
-    }
     
-    # Attributes specific to computers
-    if ($ObjectType -eq 'Computer') {
-        $Domain = _Helper-GetDomainNameFromDN -DN $ObjectDN;
-        $ComputerHostname = _Helper-GetCNFromDN -DN $ObjectDN;
-        $SPNs = @("HOST/$ComputerHostname", "HOST/$ComputerHostname.$Domain", "RestrictedKrbHost/$ComputerHostname", "RestrictedKrbHost/$ComputerHostname.$Domain");
+        # Attributes specific to computers
+        if ($ObjectType -eq 'Computer') {
+            $Domain = _Helper-GetDomainNameFromDN -DN $ObjectDN;
+            $ComputerHostname = _Helper-GetCNFromDN -DN $ObjectDN;
+            $SPNs = @("HOST/$ComputerHostname", "HOST/$ComputerHostname.$Domain", "RestrictedKrbHost/$ComputerHostname", "RestrictedKrbHost/$ComputerHostname.$Domain");
 
             Write-Verbose "[*] Trying To Add Attribute dNSHostName '$ComputerHostname.$Domain' Into The Object...";
-        $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'dNSHostName', "$ComputerHostname.$Domain")) |Out-Null;
+            $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'dNSHostName', "$ComputerHostname.$Domain")) |Out-Null;
             Write-Verbose "[+] Successfully Added Attribute dNSHostName '$ComputerHostname.$Domain' Into The Object !";
-        
+
             Write-Verbose "[*] Trying To Add Attribute ServicePrincipalName '$SPNs' Into The Object...";
-        $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'ServicePrincipalName', $SPNs)) |Out-Null;
+            $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'ServicePrincipalName', $SPNs)) |Out-Null;
             Write-Verbose "[+] Successfully Added Attribute ServicePrincipalName '$SPNs' Into The Object !";
         }
     } elseif ($ObjectType -eq 'OU') {
         $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'ou', "$(_Helper-GetCNFromDN -DN $ObjectDN)")) |Out-Null;
     }
 
+    # sAMAccountName 
+    if ($ObjectType -in @('User', 'Computer', 'Group')) {
+        # sAMAccountName is mandatory for users...
+        if ($ObjectType -eq 'User' -and -not $sAMAccountName) {
+            return "[!] sAMAccountName Is Required For Users !"
+        }
+        # ...And $-suffixed from CN for computers by default
+        elseif ($ObjectType -eq 'Computer' -and -not $sAMAccountName) {
+            $sAMAccountName = "$(_Helper-GetCNFromDN -DN $ObjectDN)$"
+        }
+        # ...And CN for Groups
+        elseif ($ObjectType -eq 'Group' -and -not $sAMAccountName) {
+            $sAMAccountName = "$(_Helper-GetCNFromDN -DN $ObjectDN)"
+        }
+
+        # Attributes specific to accounts
+        Write-Verbose "[*] Trying To Add Attribute sAMAccountName '$sAMAccountName' Into The Object...";
+        $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'sAMAccountName', "$sAMAccountName")) |Out-Null;
+        Write-Verbose "[+] Successfully Added Attribute sAMAccountName '$sAMAccountName' Into The Object !";
+    }
+
+    # Creating the object
     $LdapConnection.SendRequest($AddRequest) |Out-Null;
+
+    Write-Host "[+] Successfully Created Object Of Class '$ObjectClass' With Distinguished Name '$ObjectDN' !";
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base"
+    Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteObject' -LdapConnection `$LdapConnection -Object '$ObjectDN'"
 
     if ($ObjectType -eq 'OU') {
         # Set the "Protect object from accidental deletion" attribute (default on OUs).
         # Empirically, "D;;DTSD;;;WD" SDDL ACE is populated when the protection is defined, where "WD" is "Everyone" SID.
         _CreateInboundSDDL -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -TargetDN $ObjectDN -SDDLACEType 'D' -SDDLACERights 'DTSD'
     }
-
-    if ($ObjectType -in $AccountTypes) {
-        Write-Host "[+] Successfully Created Object With Distinguished Name '$ObjectDN', With sAMAccountName '$sAMAccountName', $UACString, $PasswordString";
-    } else {
-        Write-Host "[+] Successfully Created Object With Distinguished Name '$ObjectDN'";
-    }
-
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base
-    "
 }
 
 
