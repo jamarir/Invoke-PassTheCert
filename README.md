@@ -170,7 +170,7 @@ CreateObject :
     Creates an LDAP object.
     - The object MUST NOT already exist.
     - (Computers) The LDAP Connection Instance's account MUST NOT have already created an MAQ (ms-DS-MachineAccountQuota) number of computers (defaults to 10 maximum per account).
-    - (Users/Computers) The `sAMAccountName` MUST be UNIQUE.
+    - (Users/Computers/Groups) The `sAMAccountName` MUST be UNIQUE.
 --
 DeleteObject :
     Deletes a specified object.
@@ -259,8 +259,8 @@ Invoke-PassTheCert :
 
 - Support for Start TLS.
 - `GetInboundACEs`: Investigate why translating the SID to a `sAMAccountName` makes the execution extremely slower.
-- `CreateObject`: Implement more suported types.
-- `_Helper-GetSIDTokensArray`: Make the function dynamic (i.e. replacing `<machine>`, `<domain>`, `<root-domain>`) with valid values.
+- `CreateObject`: Implement more supported types.
+- `_Helper-GetSIDTokensArray`: Make the function dynamic (i.e. replacing `<machine>`, `<domain>`, `<root-domain>` with valid values).
 - `Invoke-PassTheCert`: Add handling of identity parameters that are NOT tied to a domain (e.g. to delete an inbound SDDL set to `EVERYONE`, with SID `S-1-1-0`, WITHOUT specifying the `-IdentityDomain` parameter).
 - `LDAPEnum`: Implement more LDAP enumerations.
 - `LDAPExploit`: Implement more LDAP attacks.
