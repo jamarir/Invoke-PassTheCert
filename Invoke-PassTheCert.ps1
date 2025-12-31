@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.0.6  "
+    Write-Host -ForegroundColor Red     "   v1.1.0 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -5214,6 +5214,98 @@ function _Helper-GetLDAPAttributesArray {
 }
 
 
+function _Helper-GetSIDTokensArray {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the Array of all Well-Known SID Tokens used within SDDL ACEs.
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/f4296d69-1c0f-491f-9587-a960b292d070
+        
+        .LINK 
+
+            https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/manage/understand-security-groups
+        
+        .LINK 
+
+            https://learn.microsoft.com/en-us/windows/win32/secauthz/well-known-sids
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/81d92bba-d22b-4a8c-908a-554ab29148ab
+
+    #>
+    
+    return @{
+        "DA" = "S-1-5-21-<domain>-512";
+        "DG" = "S-1-5-21-<domain>-514";
+        "DU" = "S-1-5-21-<domain>-513";
+        "ED" = "S-1-5-9";
+        "DD" = "S-1-5-21-<domain>-516";
+        "DC" = "S-1-5-21-<domain>-515";
+        "BA" = "S-1-5-32-544";
+        "BG" = "S-1-5-32-546";
+        "BU" = "S-1-5-32-545";
+        "LA" = "S-1-5-21-<machine>-500";
+        "LG" = "S-1-5-21-<machine>-501";
+        "AO" = "S-1-5-32-548";
+        "BO" = "S-1-5-32-551";
+        "PO" = "S-1-5-32-550";
+        "SO" = "S-1-5-32-549";
+        "AU" = "S-1-5-11";
+        "PS" = "S-1-5-10";
+        "CO" = "S-1-3-0";
+        "CG" = "S-1-3-1";
+        "SY" = "S-1-5-18";
+        "PU" = "S-1-5-32-547";
+        "WD" = "S-1-1-0";
+        "RE" = "S-1-5-32-552";
+        "IU" = "S-1-5-4";
+        "NU" = "S-1-5-2";
+        "SU" = "S-1-5-6";
+        "RC" = "S-1-5-12";
+        "WR" = "S-1-5-33";
+        "AN" = "S-1-5-7";
+        "SA" = "S-1-5-21-<root-domain>-518";
+        "CA" = "S-1-5-21-<domain>-517";
+        "RS" = "S-1-5-21-<domain>-553";
+        "EA" = "S-1-5-21-<root-domain>-519";
+        "PA" = "S-1-5-21-<domain>-520";
+        "RU" = "S-1-5-32-554";
+        "LS" = "S-1-5-19";
+        "NS" = "S-1-5-20";
+        "RD" = "S-1-5-32-555";
+        "NO" = "S-1-5-32-556";
+        "MU" = "S-1-5-32-558";
+        "LU" = "S-1-5-32-559";
+        "IS" = "S-1-5-32-568";
+        "CY" = "S-1-5-32-569";
+        "OW" = "S-1-3-4";
+        "ER" = "S-1-5-32-573";
+        "RO" = "S-1-5-21-<domain>-521";
+        "CD" = "S-1-5-32-574";
+        "AC" = "S-1-15-2-1";
+        "RA" = "S-1-5-32-575";
+        "ES" = "S-1-5-32-576";
+        "MS" = "S-1-5-32-577";
+        "UD" = "S-1-5-84-0-0-0-0-0";
+        "HA" = "S-1-5-32-578";
+        "CN" = "S-1-5-21-<domain>-522";
+        "AA" = "S-1-5-32-579";
+        "RM" = "S-1-5-32-580";
+        "LW" = "S-1-16-4096";
+        "ME" = "S-1-16-8192";
+        "MP" = "S-1-16-8448";
+        "HI" = "S-1-16-12288";
+        "SI" = "S-1-16-16384";
+    }
+}
+
+
 function _Helper-GetNamesOfSAMAccountTypeValue {
 
     <#
@@ -5922,6 +6014,73 @@ function _Helper-GetNameOfLDAPAttributeGUID {
 
     # If not found, returning $null...
     #Write-Verbose "[!] Couldn't Find Any Name Associated With LDAP Attribute GUID '$LDAPAttributeGUID' ! Returning `$null..."
+    return $null;
+}
+
+
+function _Helper-GetSIDTokenOfSID {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the SID Token (i.e. Abbreviated Name) (e.g. 'WD') associated with the specified SID (e.g. 'S-1-1-0').
+
+        .PARAMETER SID
+
+            [System.String] 
+            
+            The SID to be converted into an abbreaviated name (e.g. 'S-1-1-0')
+    
+        .EXAMPLE
+
+            _Helper-GetSIDTokenOfSID -SID 'S-1-1-0'
+
+            Returns `WD` (i.e. `EVERYONE`'s SID Token)
+
+        .OUTPUTS
+
+            [System.String]
+            
+            The SID Token (i.e. Abbreviated Name) (e.g. 'WD') associated with the specified SID (e.g. 'S-1-1-0').
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/f4296d69-1c0f-491f-9587-a960b292d070
+        
+        .LINK 
+
+            https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/manage/understand-security-groups
+        
+        .LINK 
+
+            https://learn.microsoft.com/en-us/windows/win32/secauthz/well-known-sids
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/81d92bba-d22b-4a8c-908a-554ab29148ab
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the SID to translate into SID Token (i.e. Abbreviated Name)")]
+        [System.String]$SID
+    )
+
+    #Write-Verbose "[*] Retrieving SID Token Associated With SID '$SID'..."
+
+    $SIDTokens = _Helper-GetSIDTokensArray
+    
+    foreach ($SIDToken in $SIDTokens.GetEnumerator()) {
+        if ($SIDToken.Value.ToUpper() -eq $SID.Trim().ToUpper()) {
+            #Write-Verbose "[+] Successfully Retrieved '$($SIDToken.Key)' SID Token Associated With SID '$SID' !"
+            return $SIDToken.Key;
+        }
+    }
+
+    # If not found, returning $null...
+    #Write-Verbose "[!] Couldn't Find Any SID Token Associated With SID '$SID' ! Returning `$null..."
     return $null;
 }
 
@@ -7819,7 +7978,7 @@ function _CreateObject {
 
             [System.String] 
             
-            The Type of the object to create (i.e. 'User', 'Computer')
+            The Type of the object to create (among 'User', 'Computer', 'OU').
 
         .PARAMETER NewPassword
 
@@ -7995,8 +8154,8 @@ function _CreateObject {
         [ValidateNotNullorEmpty()]
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
-        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the Type of the object to create (i.e. 'User', or 'Computer')")]
-        [ValidateSet('User', 'Computer')]
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the Type of the object to create (i.e. 'User', 'Computer', 'OU')")]
+        [ValidateSet('User', 'Computer', 'OU')]
         [System.String]$ObjectType,
 
         [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the Distinguished Name of the object to create")]
@@ -8017,12 +8176,28 @@ function _CreateObject {
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
     
+    $AddRequest = New-Object -TypeName System.DirectoryServices.Protocols.AddRequest
+
+    # Object DN
+    Write-Verbose "[*] Trying To Add Attribute DistinguishedName '$ObjectDN' Into The Object...";
+    $AddRequest.DistinguishedName = $ObjectDN;        
+    Write-Verbose "[+] Successfully Added Attribute DistinguishedName '$ObjectDN' Into The Object !";
+
+    # Object Class
+    switch ($ObjectType) {
+        'User' { $ObjectClass = 'user' }
+        'Computer' { $ObjectClass = 'computer' }
+        'OU' { $ObjectClass = 'organizationalUnit' }
+    }
+    Write-Verbose "[*] Trying To Add Attribute objectClass '$ObjectClass' Into The Object...";
+    $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'objectClass', "$ObjectClass")) |Out-Null;
+    Write-Verbose "[+] Successfully Added Attribute objectClass '$ObjectClass' Into The Object !";
+    
     # (?) Only users, or computers (?)...
     $AccountTypes = @('User', 'Computer')
-
+    if ($ObjectType -in $AccountTypes) {
     # Password Stuff
     # (?)... can have a Password (?)...
-    if ($ObjectType -in $AccountTypes) {
         # If the '-NewPassword' parameter is specifically set to '' by the user, then it means we want an empty password.
         if ($NewPassword -eq '') { 
             $Passwordless = $true; 
@@ -8034,24 +8209,18 @@ function _CreateObject {
             $Passwordless = $false;
             $PasswordString = "And With Password: $NewPassword"
         }
-    }
-    # (?) Otherwise, the object has no password attribute (?)
-    else { $Passwordless = $true; $PasswordString = "And With NO Password Attribute"; }
 
     # UAC Stuff
     # UAC Flags provided by the user
     if ($UACFlags) { $UACString = "With UAC Flag(s) '$UACFlags'"; }
     # (?)... Or can have UAC Flag(s) (?)...
-    elseif ($ObjectType -in $AccountTypes) {
+        else {
         # Otherwise, use typical default UAC Flag(s) for accounts: https://learn.microsoft.com/en-us/troubleshoot/windows-server/active-directory/useraccountcontrol-manipulate-account-properties#useraccountcontrol-values
         if ($ObjectType -eq 'Computer') { $UACFlags = 'WORKSTATION_TRUST_ACCOUNT'; $UACString = "With UAC Flag(s) '$UACFlags'"; }
         elseif ($ObjectType -eq 'User') { $UACFlags = 'NORMAL_ACCOUNT'; $UACString = "With UAC Flag(s) '$UACFlags'" }
     }
-    else { $UACString = "With NO UAC Flag Attribute" }
 
-    Write-Verbose "[*] Creating Object Of Type '$ObjectType' With Distinguished Name '$ObjectDN', $UACString, $PasswordString"
-
-    $AddRequest = New-Object -TypeName System.DirectoryServices.Protocols.AddRequest
+        Write-Verbose "[*] Creating Object With Distinguished Name '$ObjectDN', $UACString, $PasswordString"
 
     # sAMAccountName is mandatory for users...
     if ($ObjectType -eq 'User' -and -not $sAMAccountName) {
@@ -8064,30 +8233,20 @@ function _CreateObject {
 
     # Attributes specific to accounts
     # (?)... Or can have the following attributes (?)...
-    if ($ObjectType -in $AccountTypes) {
-        Write-Verbose "[*] Trying To Add Attribute DistinguishedName '$ObjectDN' Into The Object Of Type '$ObjectType'...";
-        $AddRequest.DistinguishedName = $ObjectDN;        
-        Write-Verbose "[+] Successfully Added Attribute DistinguishedName '$ObjectDN' Into The Object Of Type '$ObjectType' !";
-
-        Write-Verbose "[*] Trying To Add Attribute objectClass '$ObjectType' Into The Object Of Type '$ObjectType'...";
-        $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'objectClass', "$ObjectType")) |Out-Null;
-        Write-Verbose "[+] Successfully Added Attribute objectClass '$ObjectType' Into The Object Of Type '$ObjectType' !";
-        
-        Write-Verbose "[*] Trying To Add Attribute sAMAccountName '$sAMAccountName' Into The Object Of Type '$ObjectType'...";
+        Write-Verbose "[*] Trying To Add Attribute sAMAccountName '$sAMAccountName' Into The Object...";
         $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'sAMAccountName', "$sAMAccountName")) |Out-Null;
-        Write-Verbose "[+] Successfully Added Attribute sAMAccountName '$sAMAccountName' Into The Object Of Type '$ObjectType' !";
+        Write-Verbose "[+] Successfully Added Attribute sAMAccountName '$sAMAccountName' Into The Object !";
         
-        Write-Verbose "[*] Trying To Add Attribute userAccountControl '$UACFlags' Into The Object Of Type '$ObjectType'...";
+        Write-Verbose "[*] Trying To Add Attribute userAccountControl '$UACFlags' Into The Object...";
         $UACValue = $(_Helper-GetValueOfUACFlags -UACFlags $UACFlags)
         $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'userAccountControl', "$UACValue")) |Out-Null;
-        Write-Verbose "[+] Successfully Added Attribute userAccountControl '$UACValue' Into The Object Of Type '$ObjectType' !";
+        Write-Verbose "[+] Successfully Added Attribute userAccountControl '$UACValue' Into The Object !";
 
         if (-not $Passwordless) {
             Write-Verbose "[*] Trying To Add Attribute unicodePwd Into The Object Associated With Password: $NewPassword";
             $UnicodePwd = [byte[]][System.Text.Encoding]::Unicode.GetBytes("`"$NewPassword`"")
             $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'unicodePwd', $UnicodePwd)) |Out-Null;
             Write-Verbose "[+] Successfully Added Attribute unicodePwd Into The Object Associated With Password: $NewPassword";
-        }
     }
     
     # Attributes specific to computers
@@ -8096,25 +8255,33 @@ function _CreateObject {
         $ComputerHostname = _Helper-GetCNFromDN -DN $ObjectDN;
         $SPNs = @("HOST/$ComputerHostname", "HOST/$ComputerHostname.$Domain", "RestrictedKrbHost/$ComputerHostname", "RestrictedKrbHost/$ComputerHostname.$Domain");
 
-        Write-Verbose "[*] Trying To Add Attribute dNSHostName '$ComputerHostname.$Domain' Into The Object Of Type '$ObjectType'...";
+            Write-Verbose "[*] Trying To Add Attribute dNSHostName '$ComputerHostname.$Domain' Into The Object...";
         $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'dNSHostName', "$ComputerHostname.$Domain")) |Out-Null;
-        Write-Verbose "[+] Successfully Added Attribute dNSHostName '$ComputerHostname.$Domain' Into The Object Of Type '$ObjectType' !";
+            Write-Verbose "[+] Successfully Added Attribute dNSHostName '$ComputerHostname.$Domain' Into The Object !";
         
-        Write-Verbose "[*] Trying To Add Attribute ServicePrincipalName '$SPNs' Into The Object Of Type '$ObjectType'...";
+            Write-Verbose "[*] Trying To Add Attribute ServicePrincipalName '$SPNs' Into The Object...";
         $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'ServicePrincipalName', $SPNs)) |Out-Null;
-        Write-Verbose "[+] Successfully Added Attribute ServicePrincipalName '$SPNs' Into The Object Of Type '$ObjectType' !";
+            Write-Verbose "[+] Successfully Added Attribute ServicePrincipalName '$SPNs' Into The Object !";
+        }
+    } elseif ($ObjectType -eq 'OU') {
+        $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'ou', "$(_Helper-GetCNFromDN -DN $ObjectDN)")) |Out-Null;
     }
 
     $LdapConnection.SendRequest($AddRequest) |Out-Null;
 
-    # (?)... Or can have a sAMAccountName (?)...
-    if ($ObjectType -in $AccountTypes) {
-        Write-Host "[+] Successfully Created Object Of Type '$ObjectType' With Distinguished Name '$ObjectDN', With sAMAccountName '$sAMAccountName', $UACString, $PasswordString";
-    } else{
-        Write-Host "[+] Successfully Created Object Of Type '$ObjectType' With Distinguished Name '$ObjectDN', $UACString, $PasswordString";
+    if ($ObjectType -eq 'OU') {
+        # Set the "Protect object from accidental deletion" attribute (default on OUs).
+        # Empirically, "D;;DTSD;;;WD" SDDL ACE is populated when the protection is defined, where "WD" is "Everyone" SID.
+        _CreateInboundSDDL -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -TargetDN $ObjectDN -SDDLACEType 'D' -SDDLACERights 'DTSD'
     }
 
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope 'Base'
+    if ($ObjectType -in $AccountTypes) {
+        Write-Host "[+] Successfully Created Object With Distinguished Name '$ObjectDN', With sAMAccountName '$sAMAccountName', $UACString, $PasswordString";
+    } else {
+        Write-Host "[+] Successfully Created Object With Distinguished Name '$ObjectDN'";
+    }
+
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base
     "
 }
 
@@ -8983,6 +9150,14 @@ function _CreateInboundSDDL {
 
             - If not specified, the created ACE entry won't have an `ObjectAceType` GUID.
 
+        .PARAMETER IdentitySID
+
+            [System.String] 
+            
+            The identity of the principal to be provided the SDDL ACE entry (Optional)
+
+            - This parameter is NOT required if -IdentityDN is specified.
+
         .EXAMPLE
 
             $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
@@ -9061,14 +9236,17 @@ function _CreateInboundSDDL {
         [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the Right(s) of the SDDL entry to create")]
         [System.String]$SDDLACERights,
 
-        [Parameter(Position=3, Mandatory=$true, HelpMessage="Enter the source principal's identity of the SDDL entry to create (i.e. principal granted / denied with the SDDL)")]
+        [Parameter(Position=3, Mandatory=$false, HelpMessage="Enter the source principal's identity of the SDDL entry to create (i.e. principal granted / denied with the SDDL)")]
         [System.String]$IdentityDN,
 
         [Parameter(Position=4, Mandatory=$true, HelpMessage="Enter the destination object's identity of the SDDL entry to create (i.e. targeted object against which the SDDL applies)")]
         [System.String]$TargetDN,
 
         [Parameter(Position=5, Mandatory=$false, HelpMessage="Enter the attribute's lDAPDsiplayName (as per 'ADAttributeGUIDs.csv') of the destination object's identity of the SDDL entry to create (i.e. attribute of the targeted object against which the SDDL applies)")]
-        [System.String]$Attribute
+        [System.String]$Attribute,
+
+        [Parameter(Position=6, Mandatory=$false, HelpMessage="Enter the source principal's identity (SID format) of the SDDL entry to create (i.e. principal granted / denied with the SDDL). If this parameter is not specified, the SID is retrieved from the 'objectSid' LDAP attribute of the principal in `$IdentityDN.")]
+        [System.String]$IdentitySID
     )
     
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
@@ -9095,25 +9273,35 @@ function _CreateInboundSDDL {
     if (-not $SDDLACEType) { $SDDLACEType = 'OA' } # SDDL_OBJECT_ACCESS_ALLOWED
     if (-not $SDDLACERights) { $SDDLACERights = 'RPWP' } # SDDL_READ_PROPERTY, SDDL_WRITE_PROPERTY
     
+    if (-not $IdentitySID) {
     $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'objectSid'
+    }
+
+    # Some SIDs are automatically converted into their respective SID Token (i.e. abreviated names) into the SDDL's ACE entry (e.g. 'S-1-1-0' is actually shown as "WD"). Here, we deal with such cases, if any.
+    $SIDToken = _Helper-GetSIDTokenOfSID -SID $IdentitySID
+    if ($SIDToken) {
+        $SIDString = $SIDToken
+    } else {
+        $SIDString = $IdentitySID
+    }
 
     # Without the LDAP attribute specified, the ACE entry has no ObjectAceType
     if ($Attribute) {
         $SDDLObjectAceType = _Helper-GetGUIDOfLDAPAttributeName -LDAPAttributeName $Attribute
         $ObjectAceFlags = [System.Security.AccessControl.ObjectAceFlags]::ObjectAceTypePresent
-        $ACEString = "($($SDDLACEType);;$($SDDLACERights);$SDDLObjectAceType;;$($IdentitySID))"
+        $ACEString = "($($SDDLACEType);;$($SDDLACERights);$SDDLObjectAceType;;$($SIDString))"
         $TargetString = "'$TargetDN':'$Attribute'"
     } else {
         $SDDLObjectAceType = [Guid]::Empty
         $ObjectAceFlags = [System.Security.AccessControl.ObjectAceFlags]::None
-        $ACEString = "($($SDDLACEType);;$($SDDLACERights);;;$($IdentitySID))"
+        $ACEString = "($($SDDLACEType);;$($SDDLACERights);;;$($SIDString))"
         $TargetString = "'$TargetDN'"
     }
 
-    Write-Verbose "[*] Inserting SDDL ACE String '$ACEString' For Principal '$IdentityDN', Targeting $TargetString..."
+    Write-Verbose "[*] Inserting SDDL ACE String '$ACEString' For Principal '$IdentitySID', Targeting $TargetString..."
 
-    if ($SDDLACEType -eq 'OA') { $NewAceQualifier = [System.Security.AccessControl.AceQualifier]::AccessAllowed; $ACETypeString = 'AccessAllowed' }
-    elseif ($SDDLACEType -eq 'OD') { $NewAceQualifier = $NewAceQualifier = [System.Security.AccessControl.AceQualifier]::AccessDenied; $ACETypeString = 'AccessDenied' }
+    if ($SDDLACEType -in @('OA', 'A')) { $NewAceQualifier = [System.Security.AccessControl.AceQualifier]::AccessAllowed; $ACETypeString = 'AccessAllowed' }
+    elseif ($SDDLACEType -in @('OD', 'D')) { $NewAceQualifier = $NewAceQualifier = [System.Security.AccessControl.AceQualifier]::AccessDenied; $ACETypeString = 'AccessDenied' }
 
     # Converting SDDL format to Access Mask format. E.g.: 'RPWP' becomes 'ReadProperty,WriteProperty'
     $SDDLACERightsAccessMasks = ($SDDLACERights -split '([A-Z]{2})' |?{ $_ -match '[A-Z]+'} |%{ $SDDLAccessMasks[$_] }) -join ','
@@ -9146,13 +9334,13 @@ function _CreateInboundSDDL {
         ))
     ) |Out-Null
 
-    Write-Host "[+] Successfully Inserted SDDL ACE String '$ACEString' For Principal '$IdentityDN', Targeting $TargetString !"
+    Write-Host "[+] Successfully Inserted SDDL ACE String '$ACEString' For Principal '$IdentitySID', Targeting $TargetString !"
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundSDDLs' -LdapConnection `$LdapConnection -Object '$TargetDN' |%{(`$_ -replace '\(',`"``n  `" -replace '\)','').Split(`"``n`") } |Select-String -Pattern '$SIDString`$'"
 
-    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundSDDLs' -LdapConnection `$LdapConnection -Object '$TargetDN' |%{(`$_ -replace '\(',`"``n  `" -replace '\)','').Split(`"``n`") } |Select-String -Pattern '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")`$'"
     if ($Attribute) {
-        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$SDDLObjectAceType'"
+        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentitySID' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$SDDLObjectAceType'"
     } else {
-        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
+        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentitySID' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
     }
     return
 }
@@ -11839,7 +12027,7 @@ function Invoke-PassTheCert {
                 $Result = _GetInboundSDDLs -LdapConnection $LdapConnection -ObjectDN $ObjectDN
             }
             "CreateInboundSDDL" { 
-                $Result = _CreateInboundSDDL -LdapConnection $LdapConnection -IdentityDN $IdentityDN -TargetDN $TargetDN -Attribute $Attribute -SDDLACEType $SDDLACEType -SDDLACERights $SDDLACERights;
+                $Result = _CreateInboundSDDL -LdapConnection $LdapConnection -IdentityDN $IdentityDN -TargetDN $TargetDN -Attribute $Attribute -SDDLACEType $SDDLACEType -SDDLACERights $SDDLACERights -IdentitySID $IdentitySID;
             }
             "UpdatePasswordOfIdentity" { 
                 $Result = _UpdatePasswordOfIdentity -LdapConnection $LdapConnection -IdentityDN $IdentityDN -NewPassword $NewPassword;
