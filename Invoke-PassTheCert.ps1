@@ -23,20 +23,20 @@ function _ShowBanner {
 
     Write-Host ""
     
-    Write-Host -ForegroundColor Red     "   _____                _                                   "
-    Write-Host -ForegroundColor Red     "  |_   _|              | |                                  "
-    Write-Host -ForegroundColor Red     "    | | _ ____   _____ | | _____                            "
-    Write-Host -ForegroundColor Red     "    | ||  _ \ \ / / _ \| |/ / _ \  ______                   "
-    Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______|                  "
-    Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|                           "
-    Write-Host -ForegroundColor Red     "                                                            "
-    Write-Host -ForegroundColor Red     "   v1.0.5                                                   "
-    Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _      "
-    Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |     "
-    Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_    "
+    Write-Host -ForegroundColor Red     "   _____                _                  "
+    Write-Host -ForegroundColor Red     "  |_   _|              | |                 "
+    Write-Host -ForegroundColor Red     "    | | _ ____   _____ | | _____           "
+    Write-Host -ForegroundColor Red     "    | ||  _ \ \ / / _ \| |/ / _ \  ______  "
+    Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
+    Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
+    Write-Host -ForegroundColor Red     ""
+    Write-Host -ForegroundColor Red     "   v1.0.6  "
+    Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
+    Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
+    Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
     Write-Host -ForegroundColor Red     "  |  __/ _ / __/ __/ | | |  _ \ / _ \ |    / _ \ '__| __|  "
-    Write-Host -ForegroundColor Red     "  | | | (_| \__ \__ \| | | | | |  __/ \__/\  __/ |  | |_    "
-    Write-Host -ForegroundColor Red     "  \_|  \___ /___/___/\_/ |_| |_|\___|\____/\___|_|   \__|   "
+    Write-Host -ForegroundColor Red     "  | | | (_| \__ \__ \| | | | | |  __/ \__/\  __/ |  | |_   "
+    Write-Host -ForegroundColor Red     "  \_|  \___ /___/___/\_/ |_| |_|\___|\____/\___|_|   \__|  "
 
     Write-Host                          ""
     Write-Host                          ""
@@ -7819,7 +7819,7 @@ function _CreateObject {
 
             [System.String] 
             
-            The Type of the object to create (i.e. `User`, `Computer`)
+            The Type of the object to create (i.e. 'User', 'Computer')
 
         .PARAMETER NewPassword
 
@@ -8951,9 +8951,9 @@ function _CreateInboundSDDL {
 
             [System.String] 
             
-            The ACE type of the SDDL entry to be created (e.g. `OA` or `OD`) (Optional). For instance, to create an SDDL entry like `O:BAD:(OA;CI;RPWP;bf967915-0de6-11d0-a285-00aa003049e2;;S-1-1-0)`, this parameter MUST be set to `OA` (i.e. `SDDL_OBJECT_ACCESS_ALLOWED`).
+            The ACE type of the SDDL entry to be created (e.g. `OA` or `OD`) (Optional). For instance, to create an SDDL entry like `O:BAD:(OA;CI;RPWP;bf967915-0de6-11d0-a285-00aa003049e2;;S-1-1-0)`, this parameter MUST be set to 'OA' (i.e. `SDDL_OBJECT_ACCESS_ALLOWED`).
 
-            - If not specified, this parameter is set to `OA` (i.e. `SDDL_OBJECT_ACCESS_ALLOWED`)
+            - If not specified, this parameter is set to 'OA' (i.e. `SDDL_OBJECT_ACCESS_ALLOWED`)
 
         .PARAMETER SDDLACERights
 
@@ -9394,7 +9394,7 @@ function _AddValueInAttribute {
 
             _AddValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Ash AC. C4T,CN=Users,DC=X' -Attribute 'serviceprincipalname' -Value 'CIFS/SRV01'
 
-            Adds the value `HTTP/GETH4HSH` from the attribute `serviceprincipalname` of object `Ash AC. C4T`. Being a multi-valued attribute, if `serviceprincipalname` was set to `[CIFS/SRV01, LDAP/SRV01]`, then this would leave it to `[CIFS/SRV01, LDAP/SRV01], HTTP/GETH4HSH]`
+            Adds the value `HTTP/GETH4HSH` to attribute `serviceprincipalname` of object `Ash AC. C4T`. Being a multi-valued attribute, if `serviceprincipalname` was set to `[CIFS/SRV01, LDAP/SRV01]`, then this would leave it to `[CIFS/SRV01, LDAP/SRV01, HTTP/GETH4HSH]`
 
         .LINK
 
@@ -9487,19 +9487,19 @@ function _RemoveValueInAttribute {
 
             _RemoveValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Kobalt KS. STRIKE,CN=Users,DC=X' -Attribute 'description' -Value 'Cat&Ctrl'
 
-            Removes the value `Cat&Ctrl` of attribute `description` of object `Kobalt KS. STRIKE`, only if the attribute's value was already set to `Cat&Ctrl`. Being a single-valued attribute, then this would leave it empty.
+            Removes the value `Cat&Ctrl` from attribute `description` of object `Kobalt KS. STRIKE`, only if the attribute's value was already set to `Cat&Ctrl`. Being a single-valued attribute, then this would leave it empty.
 
         .EXAMPLE
 
             _RemoveValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Shelled SE. EMPIRE,CN=Users,DC=X' -Attribute 'serviceprincipalname' -Value 'CIFS/LEGIT'
 
-            Removes the value `CIFS/LEGIT` from the attribute `serviceprincipalname` of object `Shelled SE. EMPIRE`, only if one of the attribute's value(s) was already set to `CIFS/LEGIT`. Being a multi-valued attribute, if `serviceprincipalname` was set to `[CIFS/LEGIT, LDAP/SRV01]`, then this would leave it to `[LDAP/SRV01]`
+            Removes the value `CIFS/LEGIT` from attribute `serviceprincipalname` of object `Shelled SE. EMPIRE`, only if one of the attribute's value(s) was already set to `CIFS/LEGIT`. Being a multi-valued attribute, if `serviceprincipalname` was set to `[CIFS/LEGIT, LDAP/SRV01]`, then this would leave it to `[LDAP/SRV01]`
 
         .EXAMPLE
 
             _RemoveValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Met AS. SPLOYT,CN=Users,DC=X' -Attribute 'displayName' -Value 'Sp10ytin'Th3m4LL!'
 
-            Removes the value `Sp10ytin'Th3m4LL!` of attribute `displayName` of object `Met AS. SPLOYT`, only if the attribute's value was already set to `Sp10ytin'Th3m4LL!`. Being a single-valued attribute, then this would leave it empty.
+            Removes the value `Sp10ytin'Th3m4LL!` from attribute `displayName` of object `Met AS. SPLOYT`, only if the attribute's value was already set to `Sp10ytin'Th3m4LL!`. Being a single-valued attribute, then this would leave it empty.
 
         .LINK
 
@@ -10265,9 +10265,11 @@ function _LDAPEnum {
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'Kerberoasting'
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'Kerberoasting' |fl
 
             Returns all kerberoastable accounts (krbtgt excluded)
+
+            - Suffixing the command with `|fl` pipe allows to print the multi-valued attributes conveniently, i.e. separated by new lines (e.g. `serviceprincipalename`, `memberof`) (no more "...").
 
         .EXAMPLE
 
@@ -10390,7 +10392,7 @@ function _LDAPEnum {
     if (-not ($Enum -in @('GroupMembers', 'OUMembers'))) {
         Write-Host ""
         Write-Host "`t`t[*] ============================================================== [*]"
-        Write-Host "`t`t`t`t`tEnumerating '$Enum'                                             "
+        Write-Host "`t`t`t`t`tEnumerating '$Enum'"
         Write-Host "`t`t[*] ============================================================== [*]"
         Write-Host ""
     }
@@ -10403,55 +10405,55 @@ function _LDAPEnum {
     switch ($Enum) {
 
         'RootDSE' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base
         }
 
         'DCs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=Computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))' |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=Computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))'
         }
 
         'Groups' {            
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=group)' |Select distinguishedname,samaccountname,objectSid,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=group)' |Select distinguishedname,samaccountname,objectSid,objectcategory
         }
 
         'Descriptions' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(description=*)' |Select-Object distinguishedName,description |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(description=*)' |Select-Object distinguishedName,description
         }
 
         'Users' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user))' |Select-Object distinguishedName,sAMAccountName,useraccountcontrol,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user))' |Select-Object distinguishedName,sAMAccountName,useraccountcontrol,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,objectcategory
         }
 
         'Computers' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |Select-Object distinguishedName,sAMAccountName,dnshostname,useraccountcontrol,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,operatingsystem,operatingsystemversion,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |Select-Object distinguishedName,sAMAccountName,dnshostname,useraccountcontrol,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,operatingsystem,operatingsystemversion,objectcategory
         }
 
         'OSs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |?{ $_.operatingSystem -ne $null -or $_.operatingSytemVersion -ne $null } |Select distinguishedName,sAMAccountName,operatingSystem,operatingSytemVersion |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |?{ $_.operatingSystem -ne $null -or $_.operatingSytemVersion -ne $null } |Select distinguishedName,sAMAccountName,operatingSystem,operatingSytemVersion
         }
 
         'MAQ' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -Properties 'distinguishedName,ms-DS-MachineAccountQuota' -LDAPFilter '(objectClass=domain)' |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -Properties 'distinguishedName,ms-DS-MachineAccountQuota' -LDAPFilter '(objectClass=domain)'
         }
 
         'LAPS' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(|(ms-Mcs-AdmPwd=*)(ms-Mcs-AdmPwdExpirationTime=*)(msLAPS-PasswordExpirationTime=*))' |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(|(ms-Mcs-AdmPwd=*)(ms-Mcs-AdmPwdExpirationTime=*)(msLAPS-PasswordExpirationTime=*))'
         }
 
         'OUs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=organizationalUnit)'  |Select distinguishedName,ou,description,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=organizationalUnit)'  |Select distinguishedName,ou,description,objectcategory
         }
 
         'Sites' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=site)' |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=site)'
         }
 
         'GPOs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=groupPolicyContainer)' |Select distinguishedname,displayname,gpcfilesyspath,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=groupPolicyContainer)' |Select distinguishedname,displayname,gpcfilesyspath,objectcategory
         }
 
         'GPLinks' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(gPLink=*)(name=*))' |Select distinguishedName,name,gPLink,objectGUID,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(gPLink=*)(name=*))' |Select distinguishedName,name,gPLink,objectGUID,objectcategory
         }
 
         'Printers' {
@@ -10459,51 +10461,51 @@ function _LDAPEnum {
         }
 
         'LogonScripts' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(scriptPath=*)(msTSTnitialProgram=*))' |Select distinguishedName,scriptPath,msTSTnitialProgram,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(scriptPath=*)(msTSTnitialProgram=*))' |Select distinguishedName,scriptPath,msTSTnitialProgram,objectcategory
         }
 
         'CAs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKIEnrollmentService)' |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKIEnrollmentService)'
         }
 
         'CertificateTemplates' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKICertificateTemplate)' |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKICertificateTemplate)'
         }
 
         'gMSAs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-GroupManagedServiceAccount)' |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-GroupManagedServiceAccount)'
         }
 
         'sMSAs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-ManagedServiceAccount)' |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-ManagedServiceAccount)'
         }
 
         'Trusts' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=trustedDomain)' |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=trustedDomain)'
         }
 
         'admins' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectClass=person)(admincount=1))' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectClass=person)(admincount=1))' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'DAs' {
-            return _LDAPEnum -LdapConnection $LdapConnection -Enum 'GroupMembers' -Name 'Domain Admins' |fl
+            return _LDAPEnum -LdapConnection $LdapConnection -Enum 'GroupMembers' -Name 'Domain Admins'
         }
 
         'DONT_EXPIRE_PASSWORD' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'DONT_EXPIRE_PASSWORD' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'DONT_EXPIRE_PASSWORD' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'PASSWD_NOTREQD' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'PASSWD_NOTREQD' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'PASSWD_NOTREQD' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'Kerberoasting' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*/*)(!(sAMAccountName=krbtgt)))' |Select distinguishedName,sAMAccountName,serviceprincipalname,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*/*)(!(sAMAccountName=krbtgt)))' |Select distinguishedName,sAMAccountName,serviceprincipalname,objectcategory
         }
 
         'ASREPRoasting' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=4194304)' |Select distinguishedName,sAMAccountName,useraccountcontrol,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=4194304)' |Select distinguishedName,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'ShadowCreds' {
@@ -10576,15 +10578,15 @@ function _LDAPEnum {
         }
 
         'Unconstrained' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=524288)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=524288)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'Constrained' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-AllowedToDelegateTo=*)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory,msds-allowedtodelegateto |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-AllowedToDelegateTo=*)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory,msds-allowedtodelegateto
         }
 
         'RBCD' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-AllowedToActOnBehalfOfOtherIdentity=*)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory,msds-allowedtoactonbehalfofotheridentity |fl
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-AllowedToActOnBehalfOfOtherIdentity=*)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory,msds-allowedtoactonbehalfofotheridentity
         }
 
         'WritePrincipal' {
@@ -10622,7 +10624,7 @@ function _LDAPEnum {
         'All' {
             # Executing only the enumeration modules with the strict minimum number of mandatory parameters. For instance, we won't run OUMembers, or GroupMembers, as they require a specific parameter.
             foreach ($Enum in @('RootDSE', 'DCs', 'admins', 'DAs', 'Groups', 'Descriptions', 'Users', 'Computers', 'OSs', 'MAQ', 'LAPS', 'OUs', 'Sites', 'GPOs', 'GPLinks', 'Printers', 'LogonScripts', 'CAs', 'CertificateTemplates', 'gMSAs', 'sMSAs', 'Trusts', 'DONT_EXPIRE_PASSWORD', 'PASSWD_NOTREQD', 'Kerberoasting', 'ASREPRoasting', 'ShadowCreds', 'Unconstrained', 'Constrained', 'RBCD', 'DCSync', 'PassPol')) {
-                _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope |fl
+                _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope
             }
         }
 
@@ -10659,7 +10661,7 @@ function _LDAPEnum {
 
             $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -SIDFilter (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'nTSecurityDescriptor').Owner.Value
 
-            return $Result |Select distinguishedName,objectSid |fl
+            return $Result |Select distinguishedName,objectSid
         }
 
         'Creator' {
@@ -10667,7 +10669,7 @@ function _LDAPEnum {
 
             $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -SIDFilter (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'mS-DS-CreatorSID')
 
-            return $Result |Select distinguishedName,objectSid |fl
+            return $Result |Select distinguishedName,objectSid
         }
 
         Default { Write-Host "[!] LDAP Enumeration '$Enum' Not Recognized !"; return }
