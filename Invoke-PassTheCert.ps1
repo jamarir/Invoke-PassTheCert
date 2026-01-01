@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.2.1 "
+    Write-Host -ForegroundColor Red     "   v1.3.1 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -6916,7 +6916,7 @@ function _Helper-GetReadableValueOfBytes {
         $ArrayOfBytes
     )
 
-    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+    #_Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
     Write-Verbose "[*] Converting Array Of Bytes Of Type '$Type' Into A Human-Readable Form..."
 
@@ -7084,7 +7084,7 @@ function _GetAttributeOfObject {
 }
 
 
-function _GetIndexOfInboundACEFromIdentityToTarget {
+function _GetIndexOfInboundACE {
     
     <#
 
@@ -7101,7 +7101,7 @@ function _GetIndexOfInboundACEFromIdentityToTarget {
             
             The established LDAP Connection Instance.
 
-        .PARAMETER IdentityDN
+        .PARAMETER IdentitySID
 
             [System.String]
             
@@ -7139,27 +7139,26 @@ function _GetIndexOfInboundACEFromIdentityToTarget {
 
         .EXAMPLE
 
-            _GetIndexOfInboundACEFromIdentityToTarget -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -AceQualifier 'AccessAllowed' -AccessMaskNames 'GenericAll' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=X'
+            _GetIndexOfInboundACE -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -AceQualifier 'AccessAllowed' -AccessMaskNames 'GenericAll' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=X'
 
-            Returns the Index of the ALLOWED `GenericAll` ACE provided to principal `John JD. DOE` against the targeted object `Smart SC. CARDY` (-1 if not found)
-
-        .EXAMPLE
-
-            _GetIndexOfInboundACEFromIdentityToTarget -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -AceQualifier 'AccessDenied' -AccessMaskNames 'GenericAll' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=X'
-
-            Returns the Index of the DENIED `GenericAll` ACE provided to principal `John JD. DOE` against the targeted object `Smart SC. CARDY` (-1 if not found)
+            Returns the Index of the ALLOWED `GenericAll` ACE provided to principal `S-1-1-0` against the targeted object `Smart SC. CARDY` (-1 if not found)
 
         .EXAMPLE
 
-            _GetIndexOfInboundACEFromIdentityToTarget -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightName 'User-Change-Password' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=X'
-
-            Returns the Index of the ALLOWED `User-Change-Password` ACE provided to principal `John JD. DOE` with `AccessAllowed` against the targeted object `Smart SC. CARDY` (-1 if not found)
+            _GetIndexOfInboundACE -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -AceQualifier 'AccessDenied' -AccessMaskNames 'GenericAll' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=X'
+            Returns the Index of the DENIED `GenericAll` ACE provided to principal `S-1-1-0` against the targeted object `Smart SC. CARDY` (-1 if not found)
 
         .EXAMPLE
 
-            _GetIndexOfInboundACEFromIdentityToTarget -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID 'ab721a53-1e2f-11d0-9819-00aa0040529b' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=X'
+            _GetIndexOfInboundACE -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightName 'User-Change-Password' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=X'
 
-            Returns the Index of the ALLOWED `User-Change-Password` (whose GUID is `ab721a53-1e2f-11d0-9819-00aa0040529b`) ACE provided to principal `John JD. DOE` with `AccessAllowed` against the targeted object `Smart SC. CARDY` (-1 if not found)
+            Returns the Index of the ALLOWED `User-Change-Password` ACE provided to principal `S-1-1-0` with `AccessAllowed` against the targeted object `Smart SC. CARDY` (-1 if not found)
+
+        .EXAMPLE
+
+            _GetIndexOfInboundACE -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -AceQualifier 'AccessAllowed' -AccessMaskNames 'ExtendedRight' -AccessRightGUID 'ab721a53-1e2f-11d0-9819-00aa0040529b' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=X'
+
+            Returns the Index of the ALLOWED `User-Change-Password` (whose GUID is `ab721a53-1e2f-11d0-9819-00aa0040529b`) ACE provided to principal `S-1-1-0` with `AccessAllowed` against the targeted object `Smart SC. CARDY` (-1 if not found)
 
         .OUTPUTS
 
@@ -7180,7 +7179,7 @@ function _GetIndexOfInboundACEFromIdentityToTarget {
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
         [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the source principal's identity of the ACE to search (i.e. principal granted / denied with the ACE)")]
-        [System.String]$IdentityDN,
+        [System.String]$IdentitySID,
 
         [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the Qualifier of the ACE to search (i.e. 'AccessAllowed', 'AccessDenied', 'SystemAudit', or 'SystemAlarm')")]
         [ValidateSet('AccessAllowed', 'AccessDenied', 'SystemAudit', 'SystemAlarm')]
@@ -7206,35 +7205,36 @@ function _GetIndexOfInboundACEFromIdentityToTarget {
     $AccessMaskValue = _Helper-GetValueOfACEAccessMaskNames -AccessMaskNames $AccessMaskNames
     # If the user provided its own AccessRightGUID, we won't look for a match with the name (i.e. the following condition becomes false, hence not executed)
     if (-not $AccessRightGUID) { $AccessRightGUID = _Helper-GetGUIDOfACEAccessRightName -AccessRightName $AccessRightName }
-    $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'objectSid'
 
-    # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
-    if ($AccessRightName -eq $null) {
-        $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType=NULL]"
+    if ($AccessRightGUID -in @('', $null, [Guid]::Empty)) {
+        $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames']"
     } else {
-        $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightName']"
+        $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightGUID']"
     }
 
-    Write-Verbose "[*] Retrieving Index Of Inbound ACE $ACEString Provided To Principal '$IdentityDN' Towards '$TargetDN'..."
+    Write-Verbose "[*] Retrieving Index Of Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN'..."
 
     $i = 0
     foreach ($ACE in _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $TargetDN) {
-        # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
-        if ($AccessRightGUID -eq [Guid]::Empty) {
-            if ($ACE.SecurityIdentifier -eq $IdentitySID -and $ACE.AceQualifier -eq $AceQualifier -and $ACE.AccessMaskNames -eq $AccessMaskNames -and $ACE.ObjectAceType -eq $null) {
-                Write-Verbose "[+] Successfully Retrieved Index '$i' Of Inbound ACE $ACEString Provided To Principal '$IdentityDN' Towards '$TargetDN' !"
-                return $i
-            }
+        # Some ACEs don't have ObjectAceType (i.e. AccessRightGUID), and can be $null. Dealing with such edge-cases by simply not comparing the ACE's ObjectAceType.
+        if ($ACE.ObjectAceType -and -not $ACE.ObjectAceType -in @('', $null, [Guid]::Empty)) {
+            Write-Verbose "[*] Comparing Inbound ACE (At Index $i) [AceQualifier='$($ACE.AceQualifier)', AccessMasks='$($ACE.AccessMaskNames)', ObjectAceType='$($ACE.ObjectAceType)'] With $ACEString ..."
         } else {
-            if ($ACE.SecurityIdentifier -eq $IdentitySID -and $ACE.AceQualifier -eq $AceQualifier -and $ACE.AccessMaskNames -eq $AccessMaskNames -and $ACE.ObjectAceType -eq $AccessRightGUID) {
-                Write-Verbose "[+] Successfully Retrieved Index '$i' Of Inbound ACE $ACEString Provided To Principal '$IdentityDN' Towards '$TargetDN' !"
+            Write-Verbose "[*] Comparing Inbound ACE (At Index $i) [AceQualifier='$($ACE.AceQualifier)', AccessMasks='$($ACE.AccessMaskNames)'] With $ACEString ..."
+        }
+
+        # If the ACE matches the specified parameters
+        if ($ACE.SecurityIdentifier -eq $IdentitySID -and $ACE.AceQualifier -eq $AceQualifier -and ($ACE.AccessMaskNames.Trim() -replace ' ','') -eq ($AccessMaskNames.Trim() -replace ' ','')) {
+            # Where the ACE's ObjectAceType MAY need to match the specified parameter, if any.
+            if ($ACE.ObjectAceType -eq $AccessRightGUID -or $AccessRightGUID -in @('', $null, [Guid]::Empty)) {
+                Write-Verbose "[+] Successfully Retrieved Index '$i' Of Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' !"
                 return $i
             }
-        }
+        } 
         $i++
     }
-    
-    Write-Verbose "[!] Could Find Inbound ACE $ACEString Provided To Principal '$IdentityDN' Towards '$TargetDN' ! Returning -1..."
+
+    Write-Verbose "[!] Could Find Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' ! Returning -1..."
     return -1;
 }
 
@@ -8565,6 +8565,7 @@ function _CreateInboundACE {
 
             - You may manually check any `PrincipalTo*.txt` file, to get a glance of possible ACEs.
             - The inbound ACE to create MUST NOT already exist in the target's inbound ACEs (i.e. in its `nTSecurityDescriptor`).
+            - IdentitySID can be used instead of IdentityDN, for well-known SIDs, especially when such SIDs can't be looked up domain-wise (e.g. 'S-1-1-0' for `Everyone`).
 
         .PARAMETER LdapConnection
 
@@ -8576,7 +8577,17 @@ function _CreateInboundACE {
 
             [System.String] 
 
-            The source principal's identity of the ACE to create (i.e. principal to be granted / denied with the ACE)
+            The source principal's identity of the ACE to create (i.e. principal to be granted / denied with the ACE).
+            
+            - REQUIRED if -IdentitySID is NOT specified.
+
+        .PARAMETER IdentitySID
+
+            [System.String] 
+
+            The source principal's identity of the ACE to create (i.e. principal to be granted / denied with the ACE).
+
+            - REQUIRED if -IdentityDN is NOT specified.
 
         .PARAMETER AceQualifier
 
@@ -8662,6 +8673,14 @@ function _CreateInboundACE {
 
             - As per `PrincipalTo...`, I mean... WHUT?!
 
+        .EXAMPLE
+
+            _CreateInboundACE -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -AceQualifier 'AccessDenied' -AccessMaskNames 'Delete,DeleteTree' -TargetDN 'OU=Unity,DC=X'
+
+            Creates the inbound ACE `[AceQualifier='AccessDenied', AccessMasks='Delete,DeleteTree', ObjectAceType=NULL]` provided to the principal `Everyone`. In other words, `Everyone` will have `AccessDenied` restrictions against `OU=Unity,DC=X`
+
+            - Given that the principal is provided via its SID, no lookup is performed, and the ACE is created with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via an DN, and must be specified by its SID directly.
+
         .LINK
 
             https://learn.microsoft.com/en-us/dotnet/api/system.directoryservices.protocols.ldapconnection
@@ -8686,24 +8705,27 @@ function _CreateInboundACE {
         [ValidateNotNullorEmpty()]
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
-        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the source principal's identity of the ACE to create (i.e. principal to grant / deny with the ACE)")]
+        [Parameter(Position=1, Mandatory=$false, HelpMessage="Enter the source principal's identity of the ACE to create (i.e. principal to grant / deny with the ACE). REQUIRED if -IdentitySID is not specified.")]
         [System.String]$IdentityDN,
 
-        [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the Qualifier of the ACE to create (i.e. 'AccessAllowed', 'AccessDenied', 'SystemAudit', or 'SystemAlarm')")]
+        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the source principal's identity of the ACE to create (i.e. principal to grant / deny with the ACE). REQUIRED if -IdentityDN is not specified.")]
+        [System.String]$IdentitySID,
+
+        [Parameter(Position=3, Mandatory=$true, HelpMessage="Enter the Qualifier of the ACE to create (i.e. 'AccessAllowed', 'AccessDenied', 'SystemAudit', or 'SystemAlarm')")]
         [ValidateSet('AccessAllowed', 'AccessDenied', 'SystemAudit', 'SystemAlarm')]
         [System.String]$AceQualifier,
 
-        [Parameter(Position=3, Mandatory=$true, HelpMessage="Enter the Access Mask Name(s) (comma-separated, if multiple) of the ACE to create (among 'CreateChild', 'DeleteChild', 'ListChildren', 'Self', 'ReadProperty', 'WriteProperty', 'DeleteTree', 'ListObject', 'ExtendedRight', 'Delete', 'ReadControl', 'GenericExecute', 'GenericWrite', 'GenericRead', 'WriteDacl', 'WriteOwner', 'GenericAll', 'Synchronize', and 'AccessSystemSecurity')")]
+        [Parameter(Position=4, Mandatory=$true, HelpMessage="Enter the Access Mask Name(s) (comma-separated, if multiple) of the ACE to create (among 'CreateChild', 'DeleteChild', 'ListChildren', 'Self', 'ReadProperty', 'WriteProperty', 'DeleteTree', 'ListObject', 'ExtendedRight', 'Delete', 'ReadControl', 'GenericExecute', 'GenericWrite', 'GenericRead', 'WriteDacl', 'WriteOwner', 'GenericAll', 'Synchronize', and 'AccessSystemSecurity')")]
         [System.String]$AccessMaskNames,
 
-        [Parameter(Position=4, Mandatory=$false, HelpMessage="Enter the Access Right Name (i.e. ObjectAceType) of the ACE to create (refer to '[MS-ADTS]: 5.1.3.2.1 Control Access Rights', and 'PrincipalTo*.txt')")]
+        [Parameter(Position=5, Mandatory=$false, HelpMessage="Enter the Access Right Name (i.e. ObjectAceType) of the ACE to create (refer to '[MS-ADTS]: 5.1.3.2.1 Control Access Rights', and 'PrincipalTo*.txt')")]
         [PSDefaultValue(Help="Empty string to handle ACEs without ObjectAceType (i.e. with access mask(s) only, such as 'GenericAll')")]
         [System.String]$AccessRightName = '',
 
-        [Parameter(Position=5, Mandatory=$true, HelpMessage="Enter the destination object's identity of the ACE to create (i.e. targeted object against which the ACE applies)")]
+        [Parameter(Position=6, Mandatory=$true, HelpMessage="Enter the destination object's identity of the ACE to create (i.e. targeted object against which the ACE applies)")]
         [System.String]$TargetDN,
 
-        [Parameter(Position=6, Mandatory=$false, HelpMessage="Enter the Access Right GUID (i.e. ObjectAceType) of the ACE to create (you may refer to '[MS-ADTS]: 5.1.3.2.1 Control Access Rights', and 'PrincipalTo*.txt'). (... ¿ do you really need to specify it, as you may conveniently use -AccessRightName instead ? ...)")]
+        [Parameter(Position=7, Mandatory=$false, HelpMessage="Enter the Access Right GUID (i.e. ObjectAceType) of the ACE to create (you may refer to '[MS-ADTS]: 5.1.3.2.1 Control Access Rights', and 'PrincipalTo*.txt'). (... ¿ do you really need to specify it, as you may conveniently use -AccessRightName instead ? ...)")]
         [PSDefaultValue(Help="Empty string by default if not specified. Can specifying INVALID GUIDs (e.g. '12345678-1234-1234-1234-123456789012') have side effects ? ¯\_(*_*)_/¯")]
         [System.String]$AccessRightGUID = ''
     )
@@ -8717,12 +8739,12 @@ function _CreateInboundACE {
     # =============================================================================
     $WhutIsGoingOn = $false
     if (-not $AccessRightGUID) {
-        # We should always be here, as the user is providing the Access Right Name (e.g. ObjectAceType's Name), and NOT the GUID.
+        # If the user provided the ObjectAceType by its name, convert it into GUID
         $AccessRightGUID = _Helper-GetGUIDOfACEAccessRightName -AccessRightName $AccessRightName;
     }
     # ?! ThE uSeR mAnUaLlY prOvIdEd An InVaLiD (?) aCeEsS riGhT gUiD !?
     elseif ((_Helper-GetNameOfACEAccessRightGUID $AccessRightGUID) -eq $null -and (_Helper-GetNameOfLDAPAttributeGUID -LDAPAttributeGUID $AccessRightGUID) -eq $null) {
-        # If we're here, it means that the user had manually specify a hand-crafted, while INVALID (? at least, unrecognized...), GUID for the ObjectAceType in its command, via the '-AccessRightGUID' parameter. 
+        # If we're here, it means that the user had manually specified a hand-crafted, while INVALID (? at least, unrecognized...), GUID for the ObjectAceType in its command, via the '-AccessRightGUID' parameter. 
         # We won't be here if that parameter was legitimate  (? at least, such as '1131f6ad-9c07-11d1-f79f-00c04fc2dcd2', i.e. 'DS-Replication-Get-Changes-All', or ' 	a8df73ef-c5ea-11d1-bbcb-0080c76670c0', i.e. 'Employee-Number'...).
         # Therefore, what can happen, given that the provided GUID is invalid, such as '12345678-1234-1234-1234-123456789012' ? ¯\_(*_*)_/¯
         Write-Host "[!] ?¿Whut¿? [!]"
@@ -8740,15 +8762,13 @@ function _CreateInboundACE {
         }
         $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType=NULL]"
     } elseif ($WhutIsGoingOn) {
-        # ?! ThE uSeR mAnUaLlY prOvIdEd An InVaLiD (?) aCeEsS riGhT gUiD !?
+        # ?! ThE uSeR mAnUaLlY prOvIdEd An InVaLiD (?) OBjEcTACeTYpE gUiD !?
         $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightGUID' (?¿Whut¿?)]"
-    } elseif ($AccessRightGUID) {
-        $AceString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightGUID']"
-    } else {
+    } elseif ($AccessRightName) {
         $AceString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightName']"
+    } else {
+        $AceString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightGUID']"
     }
-
-    Write-Verbose "[*] Creating Inbound ACE $ACEString Provided To Principal '$IdentityDN' Towards '$TargetDN'..."
 
     if ($AceQualifier -eq 'AccessAllowed') {
         $NewAceQualifier = [System.Security.AccessControl.AceQualifier]::AccessAllowed;
@@ -8760,80 +8780,94 @@ function _CreateInboundACE {
         $NewAceQualifier = [System.Security.AccessControl.AceQualifier]::SystemAlarm;
     }
     
-    $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid"
-    $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute "nTSecurityDescriptor"
-
-    # First checking whether the ACE is already in the DACL SD. If so, exit.
-    foreach ($ACE in _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $TargetDN) { 
-        if ($ACE.SecurityIdentifier -eq $IdentitySID -and $ACE.AceQualifier -eq $AceQualifier -and $ACE.AccessMaskNames -eq $AccessMaskNames -and $ACE.ObjectAceType -eq $AccessRightGUID) {
-            Write-Host "[!] Inbound ACE $ACEString Provided To Principal '$IdentityDN' Towards '$TargetDN' Already Exists !"
-            # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
-            # Writing the Check / Restoration texts for convenience
-            if ($AccessRightGUID -eq [Guid]::Empty) {
-                Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-                Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
-            } else {
-                Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-                Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
-            }
-            return $null
+    if (-not $IdentitySID) {
+        if (-not $IdentityDN) {
+            Write-Host "[!] Either -IdentityDN Or -IdentitySID Must Be Provided !"
+            return
         }
+        $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid"
     }
 
-    Write-Verbose "[*] Inserting The New ACE Into The Target's 'nTSecurityDescriptor'..."
-
-    # ACEs:                   https://learn.microsoft.com/en-us/windows/win32/secauthz/access-control-entries
-        # AceFlags:               https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.aceflags
-        # AceQualifier:           https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.acequalifier
-        # AccessMask:             https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.accessmask
-        # ObjectAceFlags:         https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.objectaceflags
-        # ObjectAceType:          https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/1522b774-6464-41a3-87a5-1e5633c3fbbb
-        # InheritedObjectAceType: https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.objectace.inheritedobjectacetype
+    Write-Verbose "[*] Creating Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN'..."
     
-    # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
-    if ($AccessRightGUID -eq [Guid]::Empty) {
-        $ObjectAceTypePresent = [System.Security.AccessControl.ObjectAceFlags]::None;
+    $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor'
+
+    # Create the inbound ACE only if it's NOT found among the target's inbound ACEs.
+    $ACEIndex = _GetIndexOfInboundACE -LdapConnection $LdapConnection -IdentitySID $IdentitySID -AceQualifier $AceQualifier -AccessMaskNames $AccessMaskNames -AccessRightGUID $AccessRightGUID -TargetDN $TargetDN
+
+    if ($ACEIndex -ne -1) {
+
+        Write-Host "[!] Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' Already Exists !"
+
+        # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
+        # Writing the Check / Restoration texts for convenience
+        if ($AccessRightGUID -eq [Guid]::Empty) {
+            Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
+            Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
+        } else {
+            Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
+            Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
+        }
+
+        return $null
+
     } else {
-        $ObjectAceTypePresent = [System.Security.AccessControl.ObjectAceFlags]::ObjectAceTypePresent;
-    }
-    
-    $SD.DiscretionaryAcl.InsertAce(
-        0,
-        (New-Object System.Security.AccessControl.ObjectAce(
-            [System.Security.AccessControl.AceFlags]::None,                         # AceFlags (Inherited, ContainerInherit, etc.)
-            [System.Security.AccessControl.AceQualifier]$NewAceQualifier,           # AceQualifier (AccessAllowed, AccessDenied, SystemAudit, SystemAlarm)
-            [System.Int32]$AccessMaskValue,                                         # AccessMask (GenericAll, ReadProperty, WriteProperty, etc.)
-            [System.Security.Principal.SecurityIdentifier]$IdentitySID,             # SecurityIdentifier (Trustee's SID)
-            [System.Security.AccessControl.ObjectAceFlags]$ObjectAceTypePresent,    # ObjectAceFlags (None, ObjectAceTypePresent, InheritedObjectAceTypePresent)
-            [Guid]$AccessRightGUID,                                                 # ObjectAceType (Access Right's GUID)
-            [Guid]::Empty,                                                          # InheritedObjectAceType (Inherited Right's GUID)
-            [bool]$false,                                                           # isCallback
-            [byte[]]$null                                                           # opaque
-        ))
-    )
-    
-    $NewSD = New-Object byte[] $SD.BinaryLength
-    $SD.GetBinaryForm($NewSD, 0)
 
-    $LdapConnection.SendRequest(
-        (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-            $TargetDN, 
-            [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace, 
-            "nTSecurityDescriptor", 
-            $NewSD
-        ))
-    ) |Out-Null
+        Write-Verbose "[*] Inserting The New ACE Into The Target's 'nTSecurityDescriptor'..."
 
-    Write-Host "[+] Successfully Created Inbound ACE $ACEString Provided To Principal '$IdentityDN' Towards '$TargetDN' !"
-    
-    # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
-    # Writing the Check / Restoration texts for convenience
-    if ($AccessRightGUID -eq [Guid]::Empty) {
-        Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
-    } else {
-        Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$(_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid")' }"
-        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
+        # ACEs:                   https://learn.microsoft.com/en-us/windows/win32/secauthz/access-control-entries
+            # AceFlags:               https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.aceflags
+            # AceQualifier:           https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.acequalifier
+            # AccessMask:             https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.accessmask
+            # ObjectAceFlags:         https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.objectaceflags
+            # ObjectAceType:          https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/1522b774-6464-41a3-87a5-1e5633c3fbbb
+            # InheritedObjectAceType: https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.objectace.inheritedobjectacetype
+        
+        # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
+        if ($AccessRightGUID -eq [Guid]::Empty) {
+            $ObjectAceTypePresent = [System.Security.AccessControl.ObjectAceFlags]::None;
+        } else {
+            $ObjectAceTypePresent = [System.Security.AccessControl.ObjectAceFlags]::ObjectAceTypePresent;
+        }
+        
+        $SD.DiscretionaryAcl.InsertAce(
+            0,
+            (New-Object System.Security.AccessControl.ObjectAce(
+                [System.Security.AccessControl.AceFlags]::None,                      # AceFlags (Inherited, ContainerInherit, etc.)
+                [System.Security.AccessControl.AceQualifier]$NewAceQualifier,        # AceQualifier (AccessAllowed, AccessDenied, SystemAudit, SystemAlarm)
+                [System.Int32]$AccessMaskValue,                                      # AccessMask (GenericAll, ReadProperty, WriteProperty, etc.)
+                [System.Security.Principal.SecurityIdentifier]$IdentitySID,          # SecurityIdentifier (Trustee's SID)
+                [System.Security.AccessControl.ObjectAceFlags]$ObjectAceTypePresent, # ObjectAceFlags (None, ObjectAceTypePresent, InheritedObjectAceTypePresent)
+                [Guid]$AccessRightGUID,                                              # ObjectAceType (Access Right's GUID)
+                [Guid]::Empty,                                                       # InheritedObjectAceType (Inherited Right's GUID)
+                [bool]$false,                                                        # isCallback
+                [byte[]]$null                                                        # opaque
+            ))
+        )
+        
+        $NewSD = New-Object byte[] $SD.BinaryLength
+        $SD.GetBinaryForm($NewSD, 0)
+
+        $LdapConnection.SendRequest(
+            (New-Object System.DirectoryServices.Protocols.ModifyRequest(
+                $TargetDN,
+                [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace,
+                'nTSecurityDescriptor',
+                $NewSD
+            ))
+        ) |Out-Null
+
+        Write-Host "[+] Successfully Created Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' !"
+        
+        # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
+        # Writing the Check / Restoration texts for convenience
+        if ($AccessRightGUID -eq [Guid]::Empty) {
+            Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
+            Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
+        } else {
+            Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
+            Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
+        }
     }
 }
 
@@ -8848,6 +8882,7 @@ function _DeleteInboundACE {
 
             - You may manually check any `PrincipalTo*.txt` file, to get a glance of possible ACEs.
             - The inbound ACE to delete MUST already exist in the target's inbound ACEs (i.e. in its 'nTSecurityDescriptor').
+            - IdentitySID can be used instead of IdentityDN, for well-known SIDs, especially when such SIDs can't be looked up domain-wise (e.g. 'S-1-1-0' for `Everyone`).
 
         .PARAMETER LdapConnection
 
@@ -8860,6 +8895,16 @@ function _DeleteInboundACE {
             [System.String] 
 
             The source principal's identity of the ACE to delete (i.e. principal already granted / denied with the ACE)
+
+            - REQUIRED if -IdentitySID is NOT specified.
+
+        .PARAMETER IdentitySID
+
+            [System.String] 
+
+            The source principal's identity of the ACE to delete (i.e. principal already granted / denied with the ACE)
+
+            - REQUIRED if -IdentityDN is NOT specified.
 
         .PARAMETER AceQualifier
 
@@ -8926,6 +8971,14 @@ function _DeleteInboundACE {
 
             - As per `PrincipalTo...`, I mean... WHUT?!
 
+        .EXAMPLE
+
+            _DeleteInboundACE -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -AceQualifier 'AccessDenied' -AccessMaskNames 'Delete,DeleteTree' -TargetDN 'OU=Unity,DC=X'
+
+            Deletes the inbound ACE `[AceQualifier='AccessDenied', AccessMasks='Delete,DeleteTree', ObjectAceType=NULL]` provided to the principal `Everyone`. In other words, `Everyone` will no longer have `AccessDenied` restrictions against `OU=Unity,DC=X`
+
+            - Given that the principal is provided via its SID, no lookup is performed, and the ACE is deleted with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via an DN, and must be specified by its SID directly.
+
         .LINK
 
             https://learn.microsoft.com/en-us/dotnet/api/system.directoryservices.protocols.ldapconnection
@@ -8950,24 +9003,27 @@ function _DeleteInboundACE {
         [ValidateNotNullorEmpty()]
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
-        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the source principal's identity of the ACE to delete (i.e. principal granted / denied with the ACE)")]
+        [Parameter(Position=1, Mandatory=$false, HelpMessage="Enter the source principal's identity of the ACE to delete (i.e. principal granted / denied with the ACE). REQUIRED if -IdentitySID is not specified.")]
         [System.String]$IdentityDN,
 
-        [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the Qualifier of the ACE to delete (i.e. 'AccessAllowed', 'AccessDenied', 'SystemAudit', or 'SystemAlarm')")]
+        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the source principal's identity of the ACE to delete (i.e. principal granted / denied with the ACE). REQUIRED if -IdentityDN is not specified.")]
+        [System.String]$IdentitySID,
+
+        [Parameter(Position=3, Mandatory=$true, HelpMessage="Enter the Qualifier of the ACE to delete (i.e. 'AccessAllowed', 'AccessDenied', 'SystemAudit', or 'SystemAlarm')")]
         [ValidateSet('AccessAllowed', 'AccessDenied', 'SystemAudit', 'SystemAlarm')]
         [System.String]$AceQualifier,
 
-        [Parameter(Position=3, Mandatory=$true, HelpMessage="Enter the Access Mask Name(s) (comma-separated, if multiple) of the ACE to delete (among 'CreateChild', 'DeleteChild', 'ListChildren', 'Self', 'ReadProperty', 'WriteProperty', 'DeleteTree', 'ListObject', 'ExtendedRight', 'Delete', 'ReadControl', 'GenericExecute', 'GenericWrite', 'GenericRead', 'WriteDacl', 'WriteOwner', 'GenericAll', 'Synchronize', and 'AccessSystemSecurity')")]
+        [Parameter(Position=4, Mandatory=$true, HelpMessage="Enter the Access Mask Name(s) (comma-separated, if multiple) of the ACE to delete (among 'CreateChild', 'DeleteChild', 'ListChildren', 'Self', 'ReadProperty', 'WriteProperty', 'DeleteTree', 'ListObject', 'ExtendedRight', 'Delete', 'ReadControl', 'GenericExecute', 'GenericWrite', 'GenericRead', 'WriteDacl', 'WriteOwner', 'GenericAll', 'Synchronize', and 'AccessSystemSecurity')")]
         [System.String]$AccessMaskNames,
 
-        [Parameter(Position=4, Mandatory=$false, HelpMessage="Enter the Access Right Name (i.e. ObjectAceType) of the ACE to delete (refer to '[MS-ADTS]: 5.1.3.2.1 Control Access Rights', and 'PrincipalTo*.txt')")]
+        [Parameter(Position=5, Mandatory=$false, HelpMessage="Enter the Access Right Name (i.e. ObjectAceType) of the ACE to delete (refer to '[MS-ADTS]: 5.1.3.2.1 Control Access Rights', and 'PrincipalTo*.txt')")]
         [PSDefaultValue(Help="Empty string to handle ACEs without ObjectAceType (i.e. with access mask(s) only, such as 'GenericAll')")]
         [System.String]$AccessRightName = '',
 
-        [Parameter(Position=5, Mandatory=$true, HelpMessage="Enter the destination object's identity of the ACE to delete (i.e. targeted object against which the ACE applies)")]
+        [Parameter(Position=6, Mandatory=$true, HelpMessage="Enter the destination object's identity of the ACE to delete (i.e. targeted object against which the ACE applies)")]
         [System.String]$TargetDN,
 
-        [Parameter(Position=6, Mandatory=$false, HelpMessage="Enter the Access Right GUID (i.e. ObjectAceType) of the ACE to delete (you may refer to '[MS-ADTS]: 5.1.3.2.1 Control Access Rights', and 'PrincipalTo*.txt'). (... ¿ do you really need to specify it, as you may conveniently use -AccessRightName instead ? ...)")]
+        [Parameter(Position=7, Mandatory=$false, HelpMessage="Enter the Access Right GUID (i.e. ObjectAceType) of the ACE to delete (you may refer to '[MS-ADTS]: 5.1.3.2.1 Control Access Rights', and 'PrincipalTo*.txt'). (... ¿ do you really need to specify it, as you may conveniently use -AccessRightName instead ? ...)")]
         [PSDefaultValue(Help="Empty string by default if not specified. Can specifying INVALID GUIDs (e.g. '12345678-1234-1234-1234-123456789012') have side effects ? ¯\_(*_*)_/¯")]
         [System.String]$AccessRightGUID = ''
     )
@@ -8979,53 +9035,50 @@ function _DeleteInboundACE {
     $AccessMaskValue = _Helper-GetValueOfACEAccessMaskNames -AccessMaskNames $AccessMaskNames;
 
     if ($AccessRightGUID) {
-        # We shouldn't (?) be here. See '_CreateInboundACE' function.
         $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightGUID']"
-    } else {
+    } elseif ($AccessRightName) {
+        $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightName']"
         $AccessRightGUID = _Helper-GetGUIDOfACEAccessRightName -AccessRightName $AccessRightName;
-        # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
-        if ($AccessRightGUID -eq [Guid]::Empty) {
-            $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType=NULL]"
-        } else {
-            $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames', ObjectAceType='$AccessRightName']"
-        }
+    } else {
+        $ACEString = "[AceQualifier='$AceQualifier', AccessMasks='$AccessMaskNames']"
     }
 
-    Write-Verbose "[*] Deleting Inbound ACE $ACEString Provided To Principal '$IdentityDN' Towards '$TargetDN'..."
+    if (-not $IdentitySID) {
+        if (-not $IdentityDN) {
+            Write-Host "[!] Either -IdentityDN Or -IdentitySID Must Be Provided !"
+            return
+        }
+        $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'objectSid'
+    }
 
-    $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid"
-    $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute "nTSecurityDescriptor"
-    $InboundACEs = _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $TargetDN
+    Write-Verbose "[*] Deleting Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN'..."
 
-    Write-Verbose "[*] Inbound ACEs Provided To Principal '$IdentityDN' Towards '$TargetDN' Are:`r`n$($InboundACEs | Where-Object { $_.SecurityIdentifier -eq $IdentitySID } | Out-String)"
+    #$InboundACEs = _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $TargetDN
+    #Write-Verbose "[*] Inbound ACEs Provided To Principal '$IdentitySID' Towards '$TargetDN' Are:`r`n$($InboundACEs | Where-Object { $_.SecurityIdentifier -eq $IdentitySID } | Out-String)"
 
     # Remove the inbound ACE only if it's found among the target's inbound ACEs.
-    $i = 0;
-    foreach ($ACE in $InboundACEs) {
-        if ($ACE.SecurityIdentifier -eq $IdentitySID -and $ACE.AccessMaskNames -eq $AccessMaskNames -and $ACE.ObjectAceType -eq $AccessRightGUID -and $ACE.AceQualifier -eq 'AccessAllowed') {
-            $SD.DiscretionaryAcl.RemoveAce($i) |Out-Null
-            $NewSD = New-Object byte[] $SD.BinaryLength
-            $SD.GetBinaryForm($NewSD, 0)
-            $LdapConnection.SendRequest(
-                (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-                    $TargetDN, 
-                    [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace, 
-                    "nTSecurityDescriptor", 
-                    $NewSD
-                ))
-            ) |Out-Null
-            
-            Write-Host "[+] Successfully Deleted Inbound ACE $ACEString Provided To Principal '$IdentityDN' Towards '$TargetDN' !"
+    $ACEIndex = _GetIndexOfInboundACE -LdapConnection $LdapConnection -IdentitySID $IdentitySID -AceQualifier $AceQualifier -AccessMaskNames $AccessMaskNames -AccessRightGUID $AccessRightGUID -TargetDN $TargetDN
+    if ($ACEIndex -eq -1) {
+        Write-Host "[!] Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' Doesn't Exist !"
+        return
+    } else {
+        $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor'
+        $SD.DiscretionaryAcl.RemoveAce($ACEIndex) |Out-Null
+        $NewSD = New-Object byte[] $SD.BinaryLength
+        $SD.GetBinaryForm($NewSD, 0)
 
-            #Write-Verbose "[*] Remaining Inbound ACEs Provided To Principal '$IdentityDN' Towards '$TargetDN' Are:`r`n$(_GetInboundACEs -LdapConnection $LdapConnection -Object $TargetDN | Where-Object { $ACE.SecurityIdentifier -eq $IdentitySID } |Out-String)"
-            return 
-        }
-        $i++;
+        $LdapConnection.SendRequest(
+            (New-Object System.DirectoryServices.Protocols.ModifyRequest(
+                $TargetDN, 
+                [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace, 
+                'nTSecurityDescriptor', 
+                $NewSD
+            ))
+        ) |Out-Null
+        
+        Write-Host "[+] Successfully Deleted Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' !"
+        #Write-Verbose "[*] Remaining Inbound ACEs Provided To Principal '$IdentitySID' Towards '$TargetDN' Are:`r`n$(_GetInboundACEs -LdapConnection $LdapConnection -Object $TargetDN | Where-Object { $ACE.SecurityIdentifier -eq $IdentitySID } |Out-String)"
     }
-
-    # Otherwise, the specified inbound ACE is not found.
-    Write-Host "[!] Inbound ACE $ACEString Provided To Principal '$IdentityDN' Towards '$TargetDN' Doesn't Exist !"
-    return
 }
 
 
@@ -9128,6 +9181,7 @@ function _CreateInboundSDDL {
             Creates an inbound SDDL (Security Descriptor Definition Language) for a principal into a targeted object's attribute. In other words, it grants/denies an SDDL to the principal (source) over the attribute of a targeted object (destination).
 
             - You may check the `DeepDiveIntoACEsAndSDDLs` to get a glance of the SDDL format.
+            - IdentitySID can be used instead of IdentityDN, for well-known SIDs, especially when such SIDs can't be looked up domain-wise (e.g. 'S-1-1-0' for `Everyone`).
 
         .PARAMETER LdapConnection
 
@@ -9157,6 +9211,16 @@ function _CreateInboundSDDL {
             
             The identity of the principal to be provided the SDDL ACE entry.
 
+            - REQUIRED if -IdentitySID is NOT specified.
+
+        .PARAMETER IdentitySID
+
+            [System.String] 
+            
+            The identity of the principal to be provided the SDDL ACE entry.
+
+            - REQUIRED if -IdentityDN is NOT specified.
+
         .PARAMETER TargetDN
 
             [System.String] 
@@ -9170,14 +9234,6 @@ function _CreateInboundSDDL {
             The attribute of the targeted object against which the SDDL ACE entry applies. (Optional)
 
             - If not specified, the created ACE entry won't have an `ObjectAceType` GUID.
-
-        .PARAMETER IdentitySID
-
-            [System.String] 
-            
-            The identity of the principal to be provided the SDDL ACE entry (Optional)
-
-            - This parameter is NOT required if -IdentityDN is specified.
 
         .EXAMPLE
 
@@ -9199,9 +9255,11 @@ function _CreateInboundSDDL {
 
         .EXAMPLE
 
-            _CreateInboundSDDL -LdapConnection $LdapConnection -IdentityDN 'CN=Wanha BE. Y4,CN=Users,DC=X' -TargetDN 'CN=Smart SC. CARDY,CN=Users,DC=X' -Attribute 'msDS-KeyCredentialLink' -SDDLACEType 'OA' -SDDLACERights 'RPWP'
+            _CreateInboundSDDL -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -TargetDN 'OU=Unity,DC=X' -SDDLACEType 'D' -SDDLACERights 'DTSD'
 
-            Creates an SDDL ACE entry allowing the principal `Wanha BE. Y4` the following ACE Right against the `Smart SC. CARDY`:`msDS-KeyCredentialLink` attribute: `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`
+            Creates an SDDL ACE entry denying the principal `EVERYONE` the following ACE Right against the `OU=Unity,DC=X` object: `SDDL_DELETE_TREE`, `SDDL_STANDARD_DELETE`.
+
+            - Given that the principal is provided via its SID, no lookup is performed, and the SDDL's ACE is deleted with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via an DN, and must be specified by its SID directly.
 
         .LINK
 
@@ -9257,17 +9315,17 @@ function _CreateInboundSDDL {
         [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the Right(s) of the SDDL entry to create")]
         [System.String]$SDDLACERights,
 
-        [Parameter(Position=3, Mandatory=$false, HelpMessage="Enter the source principal's identity of the SDDL entry to create (i.e. principal granted / denied with the SDDL)")]
+        [Parameter(Position=3, Mandatory=$false, HelpMessage="Enter the source principal's identity of the SDDL entry to create (i.e. principal granted / denied with the SDDL). REQUIRED if -IdentitySID is not specified.")]
         [System.String]$IdentityDN,
 
-        [Parameter(Position=4, Mandatory=$true, HelpMessage="Enter the destination object's identity of the SDDL entry to create (i.e. targeted object against which the SDDL applies)")]
+        [Parameter(Position=4, Mandatory=$false, HelpMessage="Enter the source principal's identity (SID format) of the SDDL entry to create (i.e. principal granted / denied with the SDDL). REQUIRED if -IdentityDN is not specified.")]
+        [System.String]$IdentitySID,
+
+        [Parameter(Position=5, Mandatory=$true, HelpMessage="Enter the destination object's identity of the SDDL entry to create (i.e. targeted object against which the SDDL applies)")]
         [System.String]$TargetDN,
 
-        [Parameter(Position=5, Mandatory=$false, HelpMessage="Enter the attribute's lDAPDsiplayName (as per 'ADAttributeGUIDs.csv') of the destination object's identity of the SDDL entry to create (i.e. attribute of the targeted object against which the SDDL applies)")]
-        [System.String]$Attribute,
-
-        [Parameter(Position=6, Mandatory=$false, HelpMessage="Enter the source principal's identity (SID format) of the SDDL entry to create (i.e. principal granted / denied with the SDDL). If this parameter is not specified, the SID is retrieved from the 'objectSid' LDAP attribute of the principal in `$IdentityDN.")]
-        [System.String]$IdentitySID
+        [Parameter(Position=6, Mandatory=$false, HelpMessage="Enter the attribute's lDAPDsiplayName (as per 'ADAttributeGUIDs.csv') of the destination object's identity of the SDDL entry to create (i.e. attribute of the targeted object against which the SDDL applies)")]
+        [System.String]$Attribute
     )
     
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
@@ -9295,16 +9353,17 @@ function _CreateInboundSDDL {
     if (-not $SDDLACERights) { $SDDLACERights = 'RPWP' } # SDDL_READ_PROPERTY, SDDL_WRITE_PROPERTY
     
     if (-not $IdentitySID) {
-    $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'objectSid'
+        if (-not $IdentityDN) {
+            Write-Host "[!] Either -IdentityDN Or -IdentitySID Must Be Provided !"
+            return
+        }
+        $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'objectSid'
     }
 
     # Some SIDs are automatically converted into their respective SID Token (i.e. abreviated names) into the SDDL's ACE entry (e.g. 'S-1-1-0' is actually shown as "WD"). Here, we deal with such cases, if any.
     $SIDToken = _Helper-GetSIDTokenOfSID -SID $IdentitySID
-    if ($SIDToken) {
-        $SIDString = $SIDToken
-    } else {
-        $SIDString = $IdentitySID
-    }
+    if ($SIDToken) { $SIDString = $SIDToken } 
+    else { $SIDString = $IdentitySID }
 
     # Without the LDAP attribute specified, the ACE entry has no ObjectAceType
     if ($Attribute) {
@@ -9359,9 +9418,9 @@ function _CreateInboundSDDL {
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundSDDLs' -LdapConnection `$LdapConnection -Object '$TargetDN' |%{(`$_ -replace '\(',`"``n  `" -replace '\)','').Split(`"``n`") } |Select-String -Pattern '$SIDString`$'"
 
     if ($Attribute) {
-        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentitySID' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$SDDLObjectAceType'"
+        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$SDDLObjectAceType'"
     } else {
-        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -Identity '$IdentitySID' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
+        Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
     }
     return
 }
@@ -11903,19 +11962,22 @@ function Invoke-PassTheCert {
         [Parameter(Position=35, Mandatory=$false, HelpMessage="Enter the identity of the principal")]
         [System.String]$Identity,
 
-        [Parameter(Position=36, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Identity' Parameter (REQUIRED if the '-Identity' parameter is NOT a distinguished name)")]
+        [Parameter(Position=36, Mandatory=$false, HelpMessage="Enter the identity of the principal (SID specific, especially useful for well-known SIDs, such as 'S-1-1-0' for 'EVERYONE')")]
+        [System.String]$IdentitySID,
+
+        [Parameter(Position=37, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Identity' Parameter (REQUIRED if the '-Identity' parameter is NOT a distinguished name)")]
         [System.String]$IdentityDomain,
 
-        [Parameter(Position=37, Mandatory=$false, HelpMessage="Enter the identity of the targeted object")]
+        [Parameter(Position=38, Mandatory=$false, HelpMessage="Enter the identity of the targeted object")]
         [System.String]$Target,
 
-        [Parameter(Position=38, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Target' Parameter (REQUIRED if the '-Target' parameter is NOT a distinguished name)")]
+        [Parameter(Position=39, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Target' Parameter (REQUIRED if the '-Target' parameter is NOT a distinguished name)")]
         [System.String]$TargetDomain,
 
-        [Parameter(Position=39, Mandatory=$false, HelpMessage="Enter the identity of the object")]
+        [Parameter(Position=40, Mandatory=$false, HelpMessage="Enter the identity of the object")]
         [System.String]$Object,
 
-        [Parameter(Position=40, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Object' Parameter (REQUIRED if the '-Object' parameter is NOT a distinguished name)")]
+        [Parameter(Position=41, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Object' Parameter (REQUIRED if the '-Object' parameter is NOT a distinguished name)")]
         [System.String]$ObjectDomain,
         
         [Parameter(Position=1337, Mandatory=$false, HelpMessage="Set to true to hide the banner :(")]
@@ -11982,12 +12044,15 @@ function Invoke-PassTheCert {
 
         # Else, Proceed with the action
         else {
-            # Converting the provided Identity/Target/Object parameters into their respective Distinguished Name, if applicable.
+            # Converting the provided identity parameters into their respective Distinguished Name, if applicable.
             if ($Identity) {
-                if ((_Helper-GetTypeOfIdentityString -IdentityString $Identity) -ne 'distinguishedName') {
-                    if (-not $IdentityDomain) { Write-Host "[!] If '-Identity' Is NOT A Distinguished Name, Then '-IdentityDomain' Becomes Mandatory !"; return }
-                    $IdentityDN = _Helper-GetDNOfIdentityString -LdapConnection $LdapConnection -IdentityString $Identity -IdentityDomain $IdentityDomain
-                } else { $IdentityDN = $Identity }
+                # Exception: Some actions MAY accept raw specified SIDs. Thus, whenever specified, no need to get their DNs. Instead, the raw SID will be used. This is especially useful for ACE actions (e.g. 'CreateInboundACE', 'DeleteInboundACE', 'CreateInboundSDDL'), when the ACE's SecurityIdentifier is raw'ly specified, and CANNOT be looked-up domain-wise (e.g. 'S-1-1-0' for 'EVERYONE', with NO DN).
+                if (-not $IdentitySID) {
+                    if ((_Helper-GetTypeOfIdentityString -IdentityString $Identity) -ne 'distinguishedName') {
+                        if (-not $IdentityDomain) { Write-Host "[!] If '-Identity' Is NOT A Distinguished Name, Then '-IdentityDomain' Becomes Mandatory !"; return }
+                        $IdentityDN = _Helper-GetDNOfIdentityString -LdapConnection $LdapConnection -IdentityString $Identity -IdentityDomain $IdentityDomain
+                    } else { $IdentityDN = $Identity }
+                }
             }
             if ($Target) {
                 if ((_Helper-GetTypeOfIdentityString -IdentityString $Target) -ne 'distinguishedName') {
@@ -12039,16 +12104,16 @@ function Invoke-PassTheCert {
                 $Result = _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $ObjectDN;
             }
             "CreateInboundACE" {
-                $Result = _CreateInboundACE -LdapConnection $LdapConnection -IdentityDN $IdentityDN -AceQualifier $AceQualifier -AccessMaskNames $AccessMaskNames -AccessRightName $AccessRightName -TargetDN $TargetDN -AccessRightGUID $AccessRightGUID;
+                $Result = _CreateInboundACE -LdapConnection $LdapConnection -IdentityDN $IdentityDN -IdentitySID $IdentitySID -AceQualifier $AceQualifier -AccessMaskNames $AccessMaskNames -AccessRightName $AccessRightName -TargetDN $TargetDN -AccessRightGUID $AccessRightGUID;
             }
             "DeleteInboundACE" {
-                $Result = _DeleteInboundACE -LdapConnection $LdapConnection -IdentityDN $IdentityDN -AceQualifier $AceQualifier -AccessMaskNames $AccessMaskNames -AccessRightName $AccessRightName -TargetDN $TargetDN -AccessRightGUID $AccessRightGUID;
+                $Result = _DeleteInboundACE -LdapConnection $LdapConnection -IdentityDN $IdentityDN -IdentitySID $IdentitySID -AceQualifier $AceQualifier -AccessMaskNames $AccessMaskNames -AccessRightName $AccessRightName -TargetDN $TargetDN -AccessRightGUID $AccessRightGUID;
             }
             "GetInboundSDDLs" {
                 $Result = _GetInboundSDDLs -LdapConnection $LdapConnection -ObjectDN $ObjectDN
             }
             "CreateInboundSDDL" { 
-                $Result = _CreateInboundSDDL -LdapConnection $LdapConnection -IdentityDN $IdentityDN -TargetDN $TargetDN -Attribute $Attribute -SDDLACEType $SDDLACEType -SDDLACERights $SDDLACERights -IdentitySID $IdentitySID;
+                $Result = _CreateInboundSDDL -LdapConnection $LdapConnection -IdentityDN $IdentityDN -IdentitySID $IdentitySID -TargetDN $TargetDN -Attribute $Attribute -SDDLACEType $SDDLACEType -SDDLACERights $SDDLACERights;
             }
             "UpdatePasswordOfIdentity" { 
                 $Result = _UpdatePasswordOfIdentity -LdapConnection $LdapConnection -IdentityDN $IdentityDN -NewPassword $NewPassword;
