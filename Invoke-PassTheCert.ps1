@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.3.2 "
+    Write-Host -ForegroundColor Red     "   v1.3.3 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -10878,7 +10878,7 @@ function _LDAPEnum {
             _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope 'Subtree' -Properties * -LDAPFilter '(objectCategory=domain)' |%{
                 $TargetDomain = $_; 
                 $ResultObjects += _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $TargetDomain.distinguishedName |?{
-                    $_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*Write*' -or $_.AccessMaskNames -ilike '*ExtendedRight*' -or $_.ObjectAceTypeName -ieq 'DS-Replication-Get-Changes(-All)?$') -and $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}\d{4,}'
+                    $_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*Write*' -or $_.ObjectAceTypeName -imatch 'DS-Replication-Get-Changes(-All)?$') -and ($_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}\d{4,}' -or $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}513' -or $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}515' -or $_.SecurityIdentifier -in @('S-1-1-0', 'S-1-5-11', 'S-1-5-15', 'S-1-5-7', 'S-1-5-32-545', 'S-1-5-32-546'))
                 } | Add-Member -PassThru -Force -NotePropertyName 'TargetDN' -NotePropertyValue $TargetDomain.distinguishedname
             }
             return $ResultObjects |%{ $_ |Add-Member -Force -NotePropertyName 'SecurityIdentifierDN' -NotePropertyValue (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope 'Subtree' -SIDFilter $_.SecurityIdentifier |Select -ExpandProperty distinguishedName); $_}
