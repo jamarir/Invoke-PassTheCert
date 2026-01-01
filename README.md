@@ -258,10 +258,8 @@ Invoke-PassTheCert :
 ## TODOs
 
 - Support for Start TLS.
-- `GetInboundACEs`: Investigate why translating the SID to a `sAMAccountName` makes the execution extremely slower.
 - `CreateObject`: Implement more supported types.
 - `_Helper-GetSIDTokensArray`: Make the function dynamic (i.e. replacing `<machine>`, `<domain>`, `<root-domain>` with valid values).
-- `Invoke-PassTheCert`: Add handling of identity parameters that are NOT tied to a domain (e.g. to delete an inbound SDDL set to `EVERYONE`, with SID `S-1-1-0`, WITHOUT specifying the `-IdentityDomain` parameter).
 - `LDAPEnum`: Implement more LDAP enumerations.
 - `LDAPExploit`: Implement more LDAP attacks.
 - `LDAPExtendedOperationPasswordModify`: Implement the `Password Modify` LDAP Extended Operation. *Alternatively, `UpdatePasswordOfIdentity` can be used, where the identity is the LDAP Connection Instance's account.*

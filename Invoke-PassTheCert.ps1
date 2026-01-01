@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.3.1 "
+    Write-Host -ForegroundColor Red     "   v1.3.2 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -143,9 +143,9 @@ function _Helper-ShowHelpOfFunction {
         )) | Invoke-Expression
 
         # Showing the Help of the function
-        if ($HelpType.Trim().ToUpper() -eq 'FULL') { $FunctionHelp = Get-Help -Name $FunctionName -Full }
-        if ($HelpType.Trim().ToUpper() -eq 'DETAILED') { $FunctionHelp = Get-Help -Name $FunctionName -Detailed }
-        if ($HelpType.Trim().ToUpper() -eq 'EXAMPLES') { $FunctionHelp = Get-Help -Name $FunctionName -Examples }
+        if ($HelpType.Trim() -eq 'Full') { $FunctionHelp = Get-Help -Name $FunctionName -Full }
+        if ($HelpType.Trim() -eq 'Detailed') { $FunctionHelp = Get-Help -Name $FunctionName -Detailed }
+        if ($HelpType.Trim() -eq 'Examples') { $FunctionHelp = Get-Help -Name $FunctionName -Examples }
 
         $FunctionHelpString = $FunctionHelp |Out-String
 
@@ -5770,7 +5770,7 @@ function _Helper-GetGUIDOfACEAccessRightName {
     $ACEAccessRights = _Helper-GetACEAccessRightsArray
 
     foreach ($ACEAccessRight in $ACEAccessRights.GetEnumerator()) {
-        if ($ACEAccessRight.Key.ToUpper() -eq $AccessRightName.Trim().ToUpper()) {
+        if ($ACEAccessRight.Key -eq $AccessRightName.Trim()) {
             #Write-Verbose "[+] Successfully Retrieved '$($ACEAccessRight.Value)' Name Associated With Access Right Name (i.e. ObjectAceType) '$AccessRightName' !"
             return $ACEAccessRight.Value;
         }
@@ -5854,7 +5854,7 @@ function _Helper-GetNameOfACEAccessRightGUID {
     $ACEAccessRights = _Helper-GetACEAccessRightsArray
     
     foreach ($ACEAccessRight in $ACEAccessRights.GetEnumerator()) {
-        if ($ACEAccessRight.Value.ToUpper() -eq $AccessRightGUID.Trim().ToUpper()) {
+        if ($ACEAccessRight.Value -eq $AccessRightGUID.Trim()) {
             #Write-Verbose "[+] Successfully Retrieved '$($ACEAccessRight.Key)' Name Associated With Access Right GUID (i.e. ObjectAceType) '$AccessRightGUID' !"
             return $ACEAccessRight.Key;
         }
@@ -5929,7 +5929,7 @@ function _Helper-GetGUIDOfLDAPAttributeName {
     $LDAPAttributes = _Helper-GetLDAPAttributesArray
 
     foreach ($LDAPAttribute in $LDAPAttributes.GetEnumerator()) {
-        if ($LDAPAttribute.Key.ToUpper() -eq $LDAPAttributeName.Trim().ToUpper()) {
+        if ($LDAPAttribute.Key -eq $LDAPAttributeName.Trim()) {
             #Write-Verbose "[+] Successfully Retrieved '$($LDAPAttribute.Value)' Name Associated With lDAPDisplayName '$LDAPAttributeName' !"
             return $LDAPAttribute.Value;
         }
@@ -6006,7 +6006,7 @@ function _Helper-GetNameOfLDAPAttributeGUID {
     $LDAPAttributes = _Helper-GetLDAPAttributesArray
     
     foreach ($LDAPAttribute in $LDAPAttributes.GetEnumerator()) {
-        if ($LDAPAttribute.Value.ToUpper() -eq $LDAPAttributeGUID.Trim().ToUpper()) {
+        if ($LDAPAttribute.Value -eq $LDAPAttributeGUID.Trim()) {
             #Write-Verbose "[+] Successfully Retrieved '$($LDAPAttribute.Key)' Name Associated With LDAP Attribute GUID '$LDAPAttributeGUID' !"
             return $LDAPAttribute.Key;
         }
@@ -6073,7 +6073,7 @@ function _Helper-GetSIDTokenOfSID {
     $SIDTokens = _Helper-GetSIDTokensArray
     
     foreach ($SIDToken in $SIDTokens.GetEnumerator()) {
-        if ($SIDToken.Value.ToUpper() -eq $SID.Trim().ToUpper()) {
+        if ($SIDToken.Value -eq $SID.Trim()) {
             #Write-Verbose "[+] Successfully Retrieved '$($SIDToken.Key)' SID Token Associated With SID '$SID' !"
             return $SIDToken.Key;
         }
@@ -7722,7 +7722,7 @@ function _Filter {
             return
         }
     } elseif ($GUIDFilter) {
-        if ($GUIDFilter.Trim().ToUpper() -imatch '^[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}$') {
+        if ($GUIDFilter.Trim() -imatch '^[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}$') {
             $GUIDBytes = ([Guid]$GUIDFilter).ToByteArray();
             # https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1#L8176-L8179
             # https://unlockpowershell.wordpress.com/2010/07/01/powershell-search-ad-for-a-guid/
@@ -7943,9 +7943,9 @@ function _CreateObject {
 
         .SYNOPSIS
 
-            Creates an LDAP object.
+            Creates a specified object.
 
-            - The object MUST NOT already exist.
+            - The object MUST NOT exist.
             - (Computers) The LDAP Connection Instance's account MUST NOT have already created an MAQ (ms-DS-MachineAccountQuota) number of computers (defaults to 10 maximum per account).
             - (Users/Computers/Groups) The `sAMAccountName` MUST be UNIQUE.
 
@@ -8214,8 +8214,8 @@ function _CreateObject {
     Write-Verbose "[*] Trying To Add Attribute objectClass '$ObjectClass' Into The Object...";
     $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'objectClass', "$ObjectClass")) |Out-Null;
     Write-Verbose "[+] Successfully Added Attribute objectClass '$ObjectClass' Into The Object !";
-    
-    # User/Computer Specific Attributes
+
+    # Attributes specific to users or computers
     if ($ObjectType -in @('User', 'Computer')) {
         # Password Stuff
         # If the '-NewPassword' parameter is specifically set to '' by the user, then it means we want an empty password.
@@ -8253,25 +8253,29 @@ function _CreateObject {
         $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'userAccountControl', "$UACValue")) |Out-Null;
         Write-Verbose "[+] Successfully Added Attribute userAccountControl '$UACValue' Into The Object !";
     
-        # Attributes specific to computers
-        if ($ObjectType -eq 'Computer') {
-            $Domain = _Helper-GetDomainNameFromDN -DN $ObjectDN;
-            $ComputerHostname = _Helper-GetCNFromDN -DN $ObjectDN;
-            $SPNs = @("HOST/$ComputerHostname", "HOST/$ComputerHostname.$Domain", "RestrictedKrbHost/$ComputerHostname", "RestrictedKrbHost/$ComputerHostname.$Domain");
+    }
+    
+    # Attributes specific to computers
+    if ($ObjectType -eq 'Computer') {
+        $Domain = _Helper-GetDomainNameFromDN -DN $ObjectDN;
+        $ComputerHostname = _Helper-GetCNFromDN -DN $ObjectDN;
+        $SPNs = @("HOST/$ComputerHostname", "HOST/$ComputerHostname.$Domain", "RestrictedKrbHost/$ComputerHostname", "RestrictedKrbHost/$ComputerHostname.$Domain");
 
-            Write-Verbose "[*] Trying To Add Attribute dNSHostName '$ComputerHostname.$Domain' Into The Object...";
-            $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'dNSHostName', "$ComputerHostname.$Domain")) |Out-Null;
-            Write-Verbose "[+] Successfully Added Attribute dNSHostName '$ComputerHostname.$Domain' Into The Object !";
+        Write-Verbose "[*] Trying To Add Attribute dNSHostName '$ComputerHostname.$Domain' Into The Object...";
+        $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'dNSHostName', "$ComputerHostname.$Domain")) |Out-Null;
+        Write-Verbose "[+] Successfully Added Attribute dNSHostName '$ComputerHostname.$Domain' Into The Object !";
 
-            Write-Verbose "[*] Trying To Add Attribute ServicePrincipalName '$SPNs' Into The Object...";
-            $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'ServicePrincipalName', $SPNs)) |Out-Null;
-            Write-Verbose "[+] Successfully Added Attribute ServicePrincipalName '$SPNs' Into The Object !";
-        }
-    } elseif ($ObjectType -eq 'OU') {
+        Write-Verbose "[*] Trying To Add Attribute ServicePrincipalName '$SPNs' Into The Object...";
+        $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'ServicePrincipalName', $SPNs)) |Out-Null;
+        Write-Verbose "[+] Successfully Added Attribute ServicePrincipalName '$SPNs' Into The Object !";
+    }
+
+    # Attributes specific to OUs
+    if ($ObjectType -eq 'OU') {
         $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'ou', "$(_Helper-GetCNFromDN -DN $ObjectDN)")) |Out-Null;
     }
 
-    # sAMAccountName 
+    # sAMAccountName specific to users, computers, groups
     if ($ObjectType -in @('User', 'Computer', 'Group')) {
         # sAMAccountName is mandatory for users...
         if ($ObjectType -eq 'User' -and -not $sAMAccountName) {
@@ -8281,12 +8285,11 @@ function _CreateObject {
         elseif ($ObjectType -eq 'Computer' -and -not $sAMAccountName) {
             $sAMAccountName = "$(_Helper-GetCNFromDN -DN $ObjectDN)$"
         }
-        # ...And CN for Groups
+        # ...And CN for Groups by default
         elseif ($ObjectType -eq 'Group' -and -not $sAMAccountName) {
             $sAMAccountName = "$(_Helper-GetCNFromDN -DN $ObjectDN)"
         }
 
-        # Attributes specific to accounts
         Write-Verbose "[*] Trying To Add Attribute sAMAccountName '$sAMAccountName' Into The Object...";
         $AddRequest.Attributes.Add((New-Object "System.DirectoryServices.Protocols.DirectoryAttribute" -ArgumentList 'sAMAccountName', "$sAMAccountName")) |Out-Null;
         Write-Verbose "[+] Successfully Added Attribute sAMAccountName '$sAMAccountName' Into The Object !";
@@ -8299,8 +8302,8 @@ function _CreateObject {
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base"
     Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteObject' -LdapConnection `$LdapConnection -Object '$ObjectDN'"
 
+    # Set the "Protect object from accidental deletion" attribute (default on OUs).
     if ($ObjectType -eq 'OU') {
-        # Set the "Protect object from accidental deletion" attribute (default on OUs).
         # Empirically, "D;;DTSD;;;WD" SDDL ACE is populated when the protection is defined, where "WD" is "Everyone" SID.
         _CreateInboundSDDL -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -TargetDN $ObjectDN -SDDLACEType 'D' -SDDLACERights 'DTSD'
     }
@@ -8315,7 +8318,7 @@ function _DeleteObject {
 
             Deletes a specified object.
 
-            - The object to be deleted MUST exist.
+            - The object MUST exist.
 
         .PARAMETER LdapConnection
 
@@ -8327,7 +8330,7 @@ function _DeleteObject {
 
             [System.String] 
             
-            The identity of the targeted object to delete.
+            The Distinguished Name of the object to delete.
 
         .EXAMPLE
 
@@ -8463,7 +8466,7 @@ function _GetInboundACEs {
 
         .OUTPUTS
 
-            [PSCustomObject]{}
+            [PSCustomObject[]]
             
             All inbound ACEs over a specified targeted object.
 
@@ -8565,7 +8568,7 @@ function _CreateInboundACE {
 
             - You may manually check any `PrincipalTo*.txt` file, to get a glance of possible ACEs.
             - The inbound ACE to create MUST NOT already exist in the target's inbound ACEs (i.e. in its `nTSecurityDescriptor`).
-            - IdentitySID can be used instead of IdentityDN, for well-known SIDs, especially when such SIDs can't be looked up domain-wise (e.g. 'S-1-1-0' for `Everyone`).
+            - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
 
         .PARAMETER LdapConnection
 
@@ -8608,6 +8611,8 @@ function _CreateInboundACE {
             The Access Right Name (i.e. `ObjectAceType`) of the ACE to create (Optional).
 
             - Some ACE doesn't have an `ObjectAceType` (check `PrincipalTo*.txt` to get legitimately formed ACEs). For instance, `GenericAll` ACEs are provided without `ObjectAceType`, hence this attribute MUST NOT be provided whenever we want to create a `GenericAll`-type'ed ACE.
+            - If not specified, defaults to $null.
+            - NOT REQUIRED if -AccessRightGUID is specified.
 
         .PARAMETER TargetDN
 
@@ -8621,10 +8626,9 @@ function _CreateInboundACE {
             
             The Access Right GUID (i.e. `ObjectAceType`'s GUID) of the ACE to create (Optional).
 
-            - Not required if -AccessRightName is specified.
-
             - Some ACE doesn't have an `ObjectAceType` (check `PrincipalTo*.txt` to get legitimately formed ACEs). For instance, `GenericAll` ACEs are provided without `ObjectAceType`, hence this attribute MUST NOT be provided whenever we want to create a `GenericAll`-type'ed ACE.
-            - This parameter should (?) be useless, as the `AccessRightName` parameter is given for convenience. For instance, you may set -AccessRightName `DS-Replication-Get-Changes-All`, instead of `1131f6ad-9c07-11d1-f79f-00c04fc2dcd2`. 
+            - If not specified, defaults to $null.
+            - NOT REQUIRED if -AccessRightName is specified.
             - What can happen if an invalid `ObjectAceType` GUID is provided, such as '12345678-1234-1234-1234-123456789012' ? ¯\_(*_*)_/¯
 
         .EXAMPLE
@@ -8882,7 +8886,7 @@ function _DeleteInboundACE {
 
             - You may manually check any `PrincipalTo*.txt` file, to get a glance of possible ACEs.
             - The inbound ACE to delete MUST already exist in the target's inbound ACEs (i.e. in its 'nTSecurityDescriptor').
-            - IdentitySID can be used instead of IdentityDN, for well-known SIDs, especially when such SIDs can't be looked up domain-wise (e.g. 'S-1-1-0' for `Everyone`).
+            - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
 
         .PARAMETER LdapConnection
 
@@ -8924,8 +8928,9 @@ function _DeleteInboundACE {
             
             The Access Right Name (i.e. ObjectAceType) of the ACE to delete (Optional).
 
-            - If not specified, this attribute is set to $null.
             - Some ACE doesn't have an ObjectAceType (as per `PrincipalTo*.txt`). For instance, `GenericAll` ACEs are provided without `ObjectAceType`, hence this attribute MUST NOT be provided whenever we want to delete a `GenericAll`-type'ed ACE.
+            - If not specified, defaults to $null.
+            - NOT REQUIRED if -AccessRightGUID is specified.
 
         .PARAMETER TargetDN
 
@@ -8939,7 +8944,9 @@ function _DeleteInboundACE {
             
             The Access Right GUID (i.e. ObjectAceType's GUID) of the ACE to delete (Optional).
 
-            - Not required if -AccessRightName is specified.
+            - Some ACE doesn't have an ObjectAceType (as per `PrincipalTo*.txt`). For instance, `GenericAll` ACEs are provided without `ObjectAceType`, hence this attribute MUST NOT be provided whenever we want to delete a `GenericAll`-type'ed ACE.
+            - If not specified, defaults to $null.
+            - NOT REQUIRED if -AccessRightName is specified.
 
         .EXAMPLE
 
@@ -9122,7 +9129,7 @@ function _GetInboundSDDLs {
 
         .OUTPUTS
 
-            [PSCustomObject]{}
+            [PSCustomObject[]]
             
             The SDDL String of all the inbound ACEs applied against a specified targeted object.
 
@@ -9181,7 +9188,7 @@ function _CreateInboundSDDL {
             Creates an inbound SDDL (Security Descriptor Definition Language) for a principal into a targeted object's attribute. In other words, it grants/denies an SDDL to the principal (source) over the attribute of a targeted object (destination).
 
             - You may check the `DeepDiveIntoACEsAndSDDLs` to get a glance of the SDDL format.
-            - IdentitySID can be used instead of IdentityDN, for well-known SIDs, especially when such SIDs can't be looked up domain-wise (e.g. 'S-1-1-0' for `Everyone`).
+            - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
 
         .PARAMETER LdapConnection
 
@@ -9203,7 +9210,7 @@ function _CreateInboundSDDL {
             
             The Right(s) of the SDDL entry to be created, among `RC`, `SD`, `WD`, `WO`, `RP`, `WP`, `CC`, `DC`, `LC`, `SW`, `LO`, `DT` (comma-separated, if multiple) (Optional). For instance, to create an SDDL entry like `O:BAD:(OA;CI;RCSDWDWORPWPCCDCLCSWLODT;;;S-1-1-0)`, this parameter MUST be set to `RCSDWDWORPWPCCDCLCSWLODT` (i.e. `SDDL_READ_CONTROL`, `SDDL_STANDARD_DELETE`, `SDDL_WRITE_DAC`, `SDDL_WRITE_OWNER`, `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`, `SDDL_CREATE_CHILD`, `SDDL_DELETE_CHILD`, `SDDL_LIST_CHILDREN `SDDL_SELF_WRITE`, `SDDL_LIST_OBJECT`, `SDDL_DELETE_TREE`).
 
-            - If not specified, this parameter is set to `RPWP` (i.e. `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`)
+            - If not specified, this parameter is set to 'RPWP' (i.e. `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`)
 
         .PARAMETER IdentityDN
 
@@ -9525,17 +9532,17 @@ function _OverwriteValueInAttribute {
 
             [System.String] 
             
-            The identity of the targeted object whose attribute's value must be overwritten (e.g. `CN=John JD. DOE,CN=Users,DC=X`).
+            The identity of the targeted object whose attribute's value must be overwritten (e.g. 'CN=John JD. DOE,CN=Users,DC=X').
 
         .PARAMETER Attribute
 
             [System.String] 
             
-            The attribute of the targeted object (e.g. `description`).
+            The attribute of the targeted object (e.g. 'description').
 
         .PARAMETER Value
             
-            The new value to set on the specified attribute (e.g. `!D3$cR1Pt4t0R!`).
+            The new value to set on the specified attribute (e.g. '!D3$cR1Pt4t0R!').
 
         .EXAMPLE
 
@@ -9635,8 +9642,6 @@ function _AddValueInAttribute {
             The attribute of the targeted object
 
         .PARAMETER Value
-
-            [System.String] 
             
             The value to add into the specified attribute
 
@@ -9687,7 +9692,7 @@ function _AddValueInAttribute {
         [System.String]$Attribute,
 
         [Parameter(Position=3, Mandatory=$true, HelpMessage="Enter the value to be added")]
-        [System.String]$Value
+        $Value
     )
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
@@ -9740,8 +9745,6 @@ function _RemoveValueInAttribute {
             The attribute of the targeted object
 
         .PARAMETER Value
-
-            [System.String] 
             
             The value to remove from the specified attribute
 
@@ -9792,7 +9795,7 @@ function _RemoveValueInAttribute {
         [System.String]$Attribute,
 
         [Parameter(Position=3, Mandatory=$true, HelpMessage="Enter the value to be removed")]
-        [System.String]$Value
+        $Value
     )
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
@@ -10573,7 +10576,7 @@ function _LDAPEnum {
 
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'WritePrincipal'
 
-            Returns any Write'ty ACE provided to any non-default user over any object in the LDAP/S Server's Domain (default SearchBase)
+            Returns any Write'ty ACE provided to any non-default user over (or to permissive groups, such as `Everyone`, `Authenticated Users`, or `Domain Users`) any object in the LDAP/S Server's Domain (default SearchBase)
 
             - Might take some time to run.
 
@@ -10595,7 +10598,7 @@ function _LDAPEnum {
 
             Return'Em All !!!
 
-            - Enumerations requiring specific value ARE NOT run. In other words, enumerations like `GroupMembers`, or `OUMembers`, requiring specific parameters, ARE NOT run.
+            - Enumerations requiring specific parameter(s) ARE NOT run. In other words, enumerations like `GroupMembers`, or `OUMembers`, requiring specific parameters, ARE NOT run.
 
         .EXAMPLE
 
@@ -10858,28 +10861,27 @@ function _LDAPEnum {
         }
 
         'WritePrincipal' {
+            Write-Host "[*] May Take A While..."
             $ResultObjects = @()
             _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=person)' |%{ 
                 $TargetObject = $_; 
                 $ResultObjects += _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $TargetObject.distinguishedName |?{
                     $SourceSID = $_.SecurityIdentifier
-                    $_.AceQualifier -eq 'AccessAllowed' -and ($_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*GenericWrite*' -or $_.AccessMaskNames -ilike '*WriteProperty*' -or $_.AccessMaskNames -ilike '*WriteDACL*') -and $SourceSID -match 'S-1-5-21-(\d+-){3}\d{4,}') |
-                    Add-Member -PassThru -Force -NotePropertyName 'Target' -NotePropertyValue $TargetObject.distinguishedname
-                }
+                    $_.AceQualifier -eq 'AccessAllowed' -and ($_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*GenericWrite*' -or $_.AccessMaskNames -ilike '*WriteProperty*' -or $_.AccessMaskNames -ilike '*WriteDACL*') -and ($SourceSID -match 'S-1-5-21-(\d+-){3}\d{4,}' -or $SourceSID -match 'S-1-5-21-(\d+-){3}513' -or $SourceSID -match 'S-1-5-21-(\d+-){3}515' -or $SourceSID -in @('S-1-1-0', 'S-1-5-11', 'S-1-5-15', 'S-1-5-7', 'S-1-5-32-545', 'S-1-5-32-546')))
+                } | Add-Member -PassThru -Force -NotePropertyName 'TargetDN' -NotePropertyValue $TargetObject.distinguishedname
             }
-            return $ResultObjects |%{ $_ |Add-Member -Force -NotePropertyName 'SecurityIdentifierDN' -NotePropertyValue (_Filter -LdapConnection $LdapConnection -SearchBase (_Helper-GetDomainDNFromDN -DN (_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)) -SearchScope 'Subtree' -SIDFilter $_.SecurityIdentifier |Select -ExpandProperty distinguishedName); $_}
+            return $ResultObjects |%{ $_ |Add-Member -Force -NotePropertyName 'SecurityIdentifierDN' -NotePropertyValue (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope 'Subtree' -SIDFilter $_.SecurityIdentifier |Select -ExpandProperty distinguishedName); $_}
         }
 
         'DCSync' {
             $ResultObjects = @()
-            _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -Properties * -LDAPFilter '(objectCategory=domain)' |%{
+            _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope 'Subtree' -Properties * -LDAPFilter '(objectCategory=domain)' |%{
                 $TargetDomain = $_; 
                 $ResultObjects += _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $TargetDomain.distinguishedName |?{
-                    $_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*Write*' -or $_.AccessMaskNames -ilike '*ExtendedRight*' -or $_.ObjectAceTypeName -ieq 'DS-Replication-Get-Changes(-All)?$') -and $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}\d{4,}' |
-                    Add-Member -PassThru -Force -NotePropertyName 'Target' -NotePropertyValue $TargetDomain.distinguishedname
-                }
+                    $_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*Write*' -or $_.AccessMaskNames -ilike '*ExtendedRight*' -or $_.ObjectAceTypeName -ieq 'DS-Replication-Get-Changes(-All)?$') -and $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}\d{4,}'
+                } | Add-Member -PassThru -Force -NotePropertyName 'TargetDN' -NotePropertyValue $TargetDomain.distinguishedname
             }
-            return $ResultObjects |%{ $_ |Add-Member -Force -NotePropertyName 'SecurityIdentifierDN' -NotePropertyValue (_Filter -LdapConnection $LdapConnection -SearchBase (_Helper-GetDomainDNFromDN -DN (_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)) -SearchScope 'Subtree' -SIDFilter $_.SecurityIdentifier |Select -ExpandProperty distinguishedName); $_}
+            return $ResultObjects |%{ $_ |Add-Member -Force -NotePropertyName 'SecurityIdentifierDN' -NotePropertyValue (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope 'Subtree' -SIDFilter $_.SecurityIdentifier |Select -ExpandProperty distinguishedName); $_}
         }
 
         'PassPol' {
