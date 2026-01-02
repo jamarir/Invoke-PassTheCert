@@ -9,7 +9,7 @@
 
 Invoke-PassTheCert is a pure PowerShell port of PassTheCert. The purpose of this repository is to expand the landscape of PowerShell tooling available to Penetration testers and red teamers. 
 
-The original work by AlmondOffsec can be found here: https://github.com/AlmondOffSec/PassTheCert along with the accompanying blog post: https://offsec.almond.consulting/authenticating-with-certificates-when-pkinit-is-not-supported.html
+The original work by AlmondOffsec can be found [here](https://github.com/AlmondOffSec/PassTheCert). along with the accompanying [blog post](https://offsec.almond.consulting/authenticating-with-certificates-when-pkinit-is-not-supported.html).
 
 Sometimes, Domain Controllers do not support PKINIT. This can be because their certificates do not have the Smart Card Logon EKU. However, several protocols, including LDAP, support Schannel, thus authentication through TLS.
 
@@ -23,7 +23,7 @@ This fork alters [the initial code](https://github.com/The-Viper-One/Invoke-Pass
 
 - Get-Manual sections for each function added, providing detailed synopsis, syntax, parameters, examples, expected outputs, and reference links.
 
-- Support of different types of Identity/Target, namely: `DistinguishedName`, `SID`, `GUID`, `sAMAccountName` (*not specifying a distinguishedName within `-Identity` (resp. `-Target`, `-Object`) implies `-IdentityDomain` (resp. `-TargetDomain`, `-ObjectDomain`) becomes required*).
+- Support of different types of identities, namely: `DistinguishedName`, `SID`, `GUID`, `sAMAccountName` (*not specifying a distinguishedName within `-Identity` (resp. `-Target`, `-Object`) implies `-IdentityDomain` (resp. `-TargetDomain`, `-ObjectDomain`) becomes required*).
 
 - Added multiple LDAP Building Blocks functions (i.e. core LDAP functions upon which extra features could be implemented). These functions may *easily* be exported (especially the Helpers ones) as standalones in other projects.
 
