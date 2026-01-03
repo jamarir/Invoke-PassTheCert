@@ -29,7 +29,7 @@ This fork alters [the initial code](https://github.com/The-Viper-One/Invoke-Pass
 
 - Usage of LDAP Paging Control to avoid [`The size limit was exceeded` errors](https://www.openldap.org/doc/admin26/limits.html).
 
-- Added LDAP Enumerations and Exploitations (Groups, Shadow Credentials, Ownership, etc.).
+- Added LDAP Enumerations and Exploitations (Groups, Shadow Credentials, Ownership, RBCD, DCSync, gMSA, Owner, etc.).
 
 - Added a `_TODO` function to build a custom action.
 

