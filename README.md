@@ -167,14 +167,14 @@ Filter :
     - Returns $null if no entry is found.
 --
 CreateObject :
-    Creates an LDAP object.
-    - The object MUST NOT already exist.
+    Creates a specified object.
+    - The object MUST NOT exist.
     - (Computers) The LDAP Connection Instance's account MUST NOT have already created an MAQ (ms-DS-MachineAccountQuota) number of computers (defaults to 10 maximum per account).
     - (Users/Computers/Groups) The `sAMAccountName` MUST be UNIQUE.
 --
 DeleteObject :
     Deletes a specified object.
-    - The object to be deleted MUST exist.
+    - The object MUST exist.
 --
 GetInboundACEs :
     Returns all inbound ACEs over a targeted specified object.
@@ -184,11 +184,13 @@ CreateInboundACE :
     Creates an inbound ACE for a principal into a targeted object. In other words, it grants/denies an ACE to the principal (source) over the targeted object (destination)
     - You may manually check any `PrincipalTo*.txt` file, to get a glance of possible ACEs.
     - The inbound ACE to create MUST NOT already exist in the target's inbound ACEs (i.e. in its `nTSecurityDescriptor`).
+    - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
 --
 DeleteInboundACE :
     Deletes an inbound ACE for a principal into a targeted object. In other words, it deletes an ACE granted/denied to the principal (source) over the targeted object (destination)
     - You may manually check any `PrincipalTo*.txt` file, to get a glance of possible ACEs.
     - The inbound ACE to delete MUST already exist in the target's inbound ACEs (i.e. in its 'nTSecurityDescriptor').
+    - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
 --
 GetInboundSDDLs :
     Returns the SDDL String of all the inbound ACEs applied against a specified targeted object.
@@ -196,6 +198,7 @@ GetInboundSDDLs :
 CreateInboundSDDL :
     Creates an inbound SDDL (Security Descriptor Definition Language) for a principal into a targeted object's attribute. In other words, it grants/denies an SDDL to the principal (source) over the attribute of a targeted object (destination).
     - You may check the `DeepDiveIntoACEsAndSDDLs` to get a glance of the SDDL format.
+    - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
 --
 UpdatePasswordOfIdentity :
     Updates the password of the specified identity.
@@ -216,6 +219,12 @@ RemoveValueInAttribute :
 ClearAttribute :
     Clears the value(s) of a specified attribute on a targeted object.
     - The attribute MUST exist (i.e. filled with at least one non-empty value).
+--
+AddUACFlags :
+    Adds the specified UAC Flag(s) (comma-separated, if multiple) into the provided object's UAC attribute.
+--
+RemoveUACFlags :
+    Removes the specified UAC Flag(s) (comma-separated, if multiple) from the provided object's UAC attribute.
 --
 ShowStatusOfAccount :
     Returns the text of the specified account's status (i.e. 'Enabled', or 'Disabled').
