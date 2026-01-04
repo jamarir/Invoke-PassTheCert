@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.5.6 "
+    Write-Host -ForegroundColor Red     "   v1.5.7 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -733,7 +733,7 @@ function _Helper-GetIndexOfUnicodeWideCharNull {
     
         .SYNOPSIS
 
-            Returns the index of the NULL byte from the provided blob, starting at the given Start index.
+            Returns the index of the WCHAR NULL character found within the provided blob, starting at the given Start index.
 
         .PARAMETER Blob
 
@@ -757,7 +757,7 @@ function _Helper-GetIndexOfUnicodeWideCharNull {
 
             [System.Int32]
             
-            The index of the NULL byte from the provided blob, starting at the given index.
+            The index of the WCHAR NULL character found within the provided blob, starting at the given Start index.
 
         .LINK
 
@@ -781,7 +781,7 @@ function _Helper-GetIndexOfUnicodeWideCharNull {
     for ($i = $StartIndex; $i -lt $Blob.Length; $i += 2) {
         if ([BitConverter]::ToChar($Blob, $i) -eq [char]::MinValue) {
             # Null-terminated WCHAR string found
-            Write-Verbose "[*] Successfully Retrieved Index $i Of The WCHAR NULL Character In The Provided From Start Index $StartIndex, In Blob '$Blob'..."
+            Write-Verbose "[*] Successfully Retrieved Index $i Of The WCHAR NULL Character In The Provided From Start Index $StartIndex, In Blob '$Blob' !"
             return $i
         }
     }
@@ -9332,7 +9332,15 @@ function _DeleteInboundACE {
         $SD.GetBinaryForm($NewSD, 0)
         _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor' -Value ($NewSD)
         Write-Host "[+] Successfully Deleted Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' !"
-        #Write-Verbose "[*] Remaining Inbound ACEs Provided To Principal '$IdentitySID' Towards '$TargetDN' Are:`r`n$(_GetInboundACEs -LdapConnection $LdapConnection -Object $TargetDN | Where-Object { $ACE.SecurityIdentifier -eq $IdentitySID } |Out-String)"
+        # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
+        # Writing the Check / Restoration texts for convenience
+        if ($AccessRightGUID -eq [Guid]::Empty) {
+            Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
+            Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
+        } else {
+            Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
+            Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'CreateInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
+        }
     }
 }
 
