@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.5.3 "
+    Write-Host -ForegroundColor Red     "   v1.5.4 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -6876,7 +6876,7 @@ function _GetSubjectDNFromLdapConnection {
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection
     )
     
-    return ($LdapConnection.ClientCertificates.Subject
+    return $LdapConnection.ClientCertificates.Subject
 }
 
 
@@ -11894,7 +11894,7 @@ function Invoke-PassTheCert-GetLDAPConnectionInstance {
         # Skip certificate verification
         $LdapConnection.SessionOptions.VerifyServerCertificate = { return $true }
         
-        Write-Host "[+] Successfully Connected To LDAP/S Server $($LdapConnection.SessionOptions.HostName) !"
+        Write-Host "[+] Successfully Connected To LDAP/S Server $($LdapConnection.Directory.Servers):$($LdapConnection.Directory.PortNumber) !"
         Write-Host "[*] The CA Issuer Of The Instance Of The Established LDAP Connection Is '$(_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)'"
         Write-Host "[*] The Subject Of The Instance Of The Established LDAP Connection Is '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)'"
 

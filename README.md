@@ -238,7 +238,7 @@ LDAPEnum :
     Invoke-PassTheCert wrapper for LDAP enumerations.
 --
 LDAPExploit :
-    Invoke-PassTheCert wrapper for LDAP exploitation
+    Invoke-PassTheCert wrapper for LDAP exploitations.
 --
 TODO :
     Makin' My Own Custom Function.
