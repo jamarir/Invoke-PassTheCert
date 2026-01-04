@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.5.4 "
+    Write-Host -ForegroundColor Red     "   v1.5.5 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -11056,70 +11056,75 @@ function _LDAPEnum {
 
             foreach ($gMSAAccount in $gMSAAccounts) {
                 
-                $ManagedPasswordBlob = _Filter -LdapConnection $LdapConnection -SearchBase $gMSAAccount.distinguishedname -SearchScope 'Base' -Properties 'msDS-ManagedPassword'
+                # Try to read a gMSA's msDS-ManagedPassword attribute, without stoping execution if not allowed (catch-continue)
+                try {
+                    $ManagedPasswordBlob = _Filter -LdapConnection $LdapConnection -SearchBase $gMSAAccount.distinguishedname -SearchScope 'Base' -Properties 'msDS-ManagedPassword'
+                    $ManagedPasswordBlob = [byte[]]($ManagedPasswordBlob.'msds-managedpassword')
 
-                $ManagedPasswordBlob = [byte[]]($ManagedPasswordBlob.'msds-managedpassword')
+                    # https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/9cd2fc5e-7305-4fb8-b233-2a60bc3eec68
+                    # https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/a9019740-3d73-46ef-a9ae-3ea8eb86ac2e
+                    # https://github.com/rvazarkar/GMSAPasswordReader/blob/f8406f8f1294e07faedc416e9ffb472c15ff88f8/MsDsManagedPassword.cs
+                    $ManagedPassword = [PSCustomObject]@{
+                        Version               = $null
+                        CurrentPassword       = $null
+                        CurrentPasswordNTHash = $null
+                        OldPassword           = $null
+                        OldPasswordNTHash     = $null
+                        NextQueryTime         = $null
+                        PasswordGoodUntil     = $null
+                    }
 
-                # https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/9cd2fc5e-7305-4fb8-b233-2a60bc3eec68
-                # https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/a9019740-3d73-46ef-a9ae-3ea8eb86ac2e
-                # https://github.com/rvazarkar/GMSAPasswordReader/blob/f8406f8f1294e07faedc416e9ffb472c15ff88f8/MsDsManagedPassword.cs
-                $ManagedPassword = [PSCustomObject]@{
-                    Version               = $null
-                    CurrentPassword       = $null
-                    CurrentPasswordNTHash = $null
-                    OldPassword           = $null
-                    OldPasswordNTHash     = $null
-                    NextQueryTime         = $null
-                    PasswordGoodUntil     = $null
-                }
-
-                $reader = [System.IO.BinaryReader]::new(
-                    [System.IO.MemoryStream]::new(
-                        $ManagedPasswordBlob,
-                        $false
+                    $reader = [System.IO.BinaryReader]::new(
+                        [System.IO.MemoryStream]::new(
+                            $ManagedPasswordBlob,
+                            $false
+                        )
                     )
-                )
 
-                $ManagedPassword.Version = $reader.ReadUInt16()
-                $reader.ReadUInt16() |Out-Null
-                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob Version"
+                    $ManagedPassword.Version = $reader.ReadUInt16()
+                    $reader.ReadUInt16() |Out-Null
+                    #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob Version"
 
-                $length = [int]$reader.ReadUInt32()
-                if ($Length -ne $ManagedPasswordBlob.Length) {
-                    throw "Missized blob"
+                    $length = [int]$reader.ReadUInt32()
+                    if ($Length -ne $ManagedPasswordBlob.Length) {
+                        throw "Missized blob"
+                    }
+                    #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob Length"
+
+                    $curPwdOffset = $reader.ReadUInt16()
+                    $UnicodeWCharNullIndex = _Helper-GetIndexOfUnicodeWideCharNull -Blob $ManagedPasswordBlob -StartIndex $curPwdOffset
+                    $ManagedPassword.CurrentPassword = $ManagedPasswordBlob[$curPwdOffset..$($UnicodeWCharNullIndex - 1)]
+                    $ManagedPassword.CurrentPasswordNTHash = _Helper-ConvertToNTHashMD4 -Bytes $ManagedPassword.CurrentPassword
+                    #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob curPwdOffset"
+
+                    $oldPwdOffset = $reader.ReadUInt16()
+                    if ($oldPwdOffset -gt 0) {
+                        $UnicodeWCharNullIndex = _Helper-GetIndexOfUnicodeWideCharNull -Blob $ManagedPasswordBlob -StartIndex $oldPwdOffset
+                        $ManagedPassword.OldPassword = $ManagedPasswordBlob[$oldPwdOffset..$($UnicodeWCharNullIndex - 1)]
+                        $ManagedPassword.OldPasswordNTHash = _Helper-ConvertToNTHashMD4 -Bytes $ManagedPassword.OldPassword
+                    }
+                    #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob oldPwdOffset"
+
+                    $queryPasswordIntervalOffset = $reader.ReadUInt16()
+                    $queryPasswordIntervalTicks = [BitConverter]::ToInt64($ManagedPasswordBlob, $queryPasswordIntervalOffset)
+                    $ManagedPassword.NextQueryTime = [DateTime]::Now.AddTicks($QueryIntervalTicks)
+                    #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob queryPasswordIntervalOffset"
+
+                    $UnchangedIntervalOffset = $reader.ReadInt16()
+                    $UnchangedIntervalTicks = [BitConverter]::ToInt64($ManagedPasswordBlob, $UnchangedIntervalOffset)
+                    #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob UnchangedIntervalOffset"
+
+                    $ManagedPassword.PasswordGoodUntil = [DateTime]::Now.AddTicks($UnchangedIntervalTicks)
+
+                    $reader.Close()
+
+                    $Results += $ManagedPassword |
+                        Add-Member -PassThru -Force -NotePropertyName 'sAMAccountName' -NotePropertyValue $gMSAAccount.samaccountname |
+                        Add-Member -PassThru -Force -NotePropertyName 'distinguishedName' -NotePropertyValue $gMSAAccount.distinguishedname
+                } catch {
+                    Write-Host "[!] Reading msDS-ManagedPassword Attribute Of gMSA Account '$($gMSAAccount.samaccountname)' Failed With Error: $_"
+                    continue
                 }
-                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob Length"
-
-                $curPwdOffset = $reader.ReadUInt16()
-                $UnicodeWCharNullIndex = _Helper-GetIndexOfUnicodeWideCharNull -Blob $ManagedPasswordBlob -StartIndex $curPwdOffset
-                $ManagedPassword.CurrentPassword = $ManagedPasswordBlob[$curPwdOffset..$($UnicodeWCharNullIndex - 1)]
-                $ManagedPassword.CurrentPasswordNTHash = _Helper-ConvertToNTHashMD4 -Bytes $ManagedPassword.CurrentPassword
-                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob curPwdOffset"
-
-                $oldPwdOffset = $reader.ReadUInt16()
-                if ($oldPwdOffset -gt 0) {
-                    $UnicodeWCharNullIndex = _Helper-GetIndexOfUnicodeWideCharNull -Blob $ManagedPasswordBlob -StartIndex $oldPwdOffset
-                    $ManagedPassword.OldPassword = $ManagedPasswordBlob[$oldPwdOffset..$($UnicodeWCharNullIndex - 1)]
-                    $ManagedPassword.OldPasswordNTHash = _Helper-ConvertToNTHashMD4 -Bytes $ManagedPassword.OldPassword
-                }
-                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob oldPwdOffset"
-
-                $queryPasswordIntervalOffset = $reader.ReadUInt16()
-                $queryPasswordIntervalTicks = [BitConverter]::ToInt64($ManagedPasswordBlob, $queryPasswordIntervalOffset)
-                $ManagedPassword.NextQueryTime = [DateTime]::Now.AddTicks($QueryIntervalTicks)
-                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob queryPasswordIntervalOffset"
-
-                $UnchangedIntervalOffset = $reader.ReadInt16()
-                $UnchangedIntervalTicks = [BitConverter]::ToInt64($ManagedPasswordBlob, $UnchangedIntervalOffset)
-                #Write-Verbose "[*$Enum*] [*] Successfully Read ManagedPassword Blob UnchangedIntervalOffset"
-
-                $ManagedPassword.PasswordGoodUntil = [DateTime]::Now.AddTicks($UnchangedIntervalTicks)
-
-                $reader.Close()
-
-                $Results += $ManagedPassword |
-                    Add-Member -PassThru -Force -NotePropertyName 'sAMAccountName' -NotePropertyValue $gMSAAccount.samaccountname |
-                    Add-Member -PassThru -Force -NotePropertyName 'distinguishedName' -NotePropertyValue $gMSAAccount.distinguishedname
             }
             return $Results
         }
