@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.6.0 "
+    Write-Host -ForegroundColor Red     "   v1.6.1 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -65,7 +65,9 @@ function _Helper-ShowHelpOfFunction {
 
             [System.String] 
             
-            The type of Get-Help to show for specified action (i.e. `Full`, `Detailed`, or `Examples`). Default is `Detailed`.
+            The type of Get-Help to show for specified action (i.e. 'Full', 'Detailed', or 'Examples') (Optional).
+            
+            - Default to 'Detailed'.
 
         .PARAMETER TranslateToInvokePassTheCertSyntax
 
@@ -73,7 +75,7 @@ function _Helper-ShowHelpOfFunction {
             
             Translate a private function's (e.g. `_Filter ...`, `IdentityDN`, `TargetDN`, `ObjectDN`) documentation to the `Invoke-PassTheCert` syntax (e.g. `Invoke-PassTheCert -Action 'Filter' ...`, `Identity`, `Target`, `Object`) (Optional)
             
-            - If not specified, defaults to $true.
+            - Defaults to `$true`.
 
         .EXAMPLE
 
@@ -244,17 +246,17 @@ function _Helper-GetRandomString {
 
             [System.Int32]
             
-            The length (default: 120, i.e. 240 UTF-16 bytes).
+            The length of the random string (Optional). 
             
-            - The length has been empirically chosen after running a *kindak4tz.exe* command in the DC, where the `DC01$`:`Password` field contained 240 UTF-16 bytes, i.e. 120 characters.
+            - Defaults to 120.
 
         .PARAMETER Charset
 
             [System.String] 
             
-            The Character Set (default: abcdefghjkmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ23456789~@#%^&*()_+={}][,./?;:<>).
-        
-            - If this parameter isn't specified, by default, only ASCII-printable characters are set, and the following characters excluded for convenience: !\`'"-$1il0O|I
+            The Character Set (Optional).
+            
+            - Defaults to ASCII-printable characters, without the following characters (for convenience): !\`'"-$1il0O|I
 
         .EXAMPLE
 
@@ -6129,7 +6131,7 @@ function _Helper-GetGUIDOfLDAPAttributeName {
 
             [System.String]
             
-            The Attribute's lDAPDisplayName (e.g. serviceprincipalname).
+            The Attribute's lDAPDisplayName (e.g. 'serviceprincipalname').
 
         .EXAMPLE
 
@@ -6454,9 +6456,9 @@ function _Helper-GenerateSelfSignedCertificate() {
 
             [System.Int32]
 
-            The number of years the certificate is valid for (e.g. 2)
+            The number of years the certificate is valid for (Optional)
 
-            - If not specified, defaults to 1
+            - Defaults to 1
 
         .EXAMPLE
 
@@ -6562,7 +6564,7 @@ function _Helper-ExportCertificateToFile {
             
             The ContentType of the certificate to be exported (among 'Cert', 'SerializedCert', 'Pfx', 'Pkcs12', 'SerializedStore', 'Pkcs7', 'Authenticode') (Optional)
             
-            - If not specified, defaults to 'pfx'
+            - Defaults to 'pfx'
 
         .PARAMETER ExportPassword
 
@@ -6570,7 +6572,7 @@ function _Helper-ExportCertificateToFile {
             
             The password of the certificate to be exported (Optional)
 
-            - If not specified, defaults to '', i.e. passwordless
+            - Defaults to '' (i.e. passwordless)
 
         .EXAMPLE
 
@@ -6691,7 +6693,7 @@ function _Helper-GetCertificateFromFileOrBase64 {
             
             The password of the certificate to be exported (Optional)
 
-            - If not specified, defaults to '', i.e. passwordless
+            - Defaults to '' (i.e. passwordless)
 
         .EXAMPLE
 
@@ -7548,6 +7550,8 @@ function _LDAPExtendedOperationPasswordModify {
             
             The old password of of the client associated with the LDAP Connection Instance (if applicable, i.e. if the LDAP/S Server's policy requires it) (Optional).
 
+            - Defaults to ''
+
         .PARAMETER NewPassword
 
             [System.String] 
@@ -7642,7 +7646,7 @@ function _Filter {
             
             The Distinguished Name of the Seach Base of the LDAP lookup (e.g. 'DC=X') (Optional)
 
-            - If not specified, defaults to the LDAP/S Server's domain.
+            - Defaults to the LDAP/S Server's domain.
 
         .PARAMETER SearchScope
 
@@ -7650,7 +7654,7 @@ function _Filter {
             
             The Seach Base of the LDAP lookup ('Base', 'OneLevel', or 'Subtree') (Optional)
             
-            - If not specified, defaults to 'Subtree', i.e. search recursively from the given Search Base)
+            - Defaults to 'Subtree' (i.e. search recursively from the given Search Base)
 
         .PARAMETER Properties
 
@@ -7658,7 +7662,7 @@ function _Filter {
             
             The Properties to be returned (e.g. 'sAMAccountName,DistinguishedName') (Optional)
 
-            - If not specified, defaults to '*', i.e. return all properties of the returned object(s).
+            - Defaults to '*' (i.e. return all properties of the returned object(s).
 
         .PARAMETER LDAPFilter
 
@@ -8526,7 +8530,7 @@ function _DeleteObject {
 
             [Switch]
             
-            If specified, no confirmation prompt is displayed before deleting the object (Optional)
+            Whenever specified, no confirmation prompt is displayed before deleting the object.
 
         .EXAMPLE
 
@@ -8789,13 +8793,13 @@ function _CreateInboundACE {
 
             [System.String] 
             
-            The Qualifier of the ACE to create (i.e. `AccessAllowed`, `AccessDenied`, `SystemAudit`, or `SystemAlarm`)
+            The Qualifier of the ACE to create (among 'AccessAllowed', 'AccessDenied', 'SystemAudit', or 'SystemAlarm')
 
         .PARAMETER AccessMaskNames
 
             [System.String] 
             
-            The Access Mask Name(s) (comma-separated, if multiple) of the ACE to create (among `CreateChild`, `DeleteChild`, `ListChildren`, `Self`, `ReadProperty`, `WriteProperty`, `DeleteTree`, `ListObject`, `ExtendedRight`, `Delete`, `ReadControl`, `GenericExecute`, `GenericWrite`, `GenericRead`, `WriteDacl`, `WriteOwner`, `GenericAll`, `Synchronize`, and `AccessSystemSecurity`)
+            The Access Mask Name(s) (comma-separated, if multiple) of the ACE to create (among 'CreateChild', 'DeleteChild', 'ListChildren', 'Self', 'ReadProperty', 'WriteProperty', 'DeleteTree', 'ListObject', 'ExtendedRight', 'Delete', 'ReadControl', 'GenericExecute', 'GenericWrite', 'GenericRead', 'WriteDacl', 'WriteOwner', 'GenericAll', 'Synchronize', and 'AccessSystemSecurity')
 
         .PARAMETER AccessRightName
 
@@ -8803,8 +8807,8 @@ function _CreateInboundACE {
             
             The Access Right Name (i.e. `ObjectAceType`) of the ACE to create (Optional).
 
+            - Defaults to `$null`.
             - Some ACE doesn't have an `ObjectAceType` (check `PrincipalTo*.txt` to get legitimately formed ACEs). For instance, `GenericAll` ACEs are provided without `ObjectAceType`, hence this attribute MUST NOT be provided whenever we want to create a `GenericAll`-type'ed ACE.
-            - If not specified, defaults to $null.
             - NOT REQUIRED if -AccessRightGUID is specified.
 
         .PARAMETER TargetDN
@@ -8819,8 +8823,8 @@ function _CreateInboundACE {
             
             The Access Right GUID (i.e. `ObjectAceType`'s GUID) of the ACE to create (Optional).
 
+            - Defaults to `$null`.
             - Some ACE doesn't have an `ObjectAceType` (check `PrincipalTo*.txt` to get legitimately formed ACEs). For instance, `GenericAll` ACEs are provided without `ObjectAceType`, hence this attribute MUST NOT be provided whenever we want to create a `GenericAll`-type'ed ACE.
-            - If not specified, defaults to $null.
             - NOT REQUIRED if -AccessRightName is specified.
             - What can happen if an invalid `ObjectAceType` GUID is provided, such as '12345678-1234-1234-1234-123456789012' ? ¯\_(*_*)_/¯
 
@@ -9088,14 +9092,14 @@ function _DeleteInboundACE {
         .PARAMETER AceQualifier
 
             [System.String] 
-            
-            The Qualifier of the ACE to delete (i.e. `AccessAllowed`, `AccessDenied`, `SystemAudit`, or `SystemAlarm`)
+
+            The Qualifier of the ACE to delete (among 'AccessAllowed', 'AccessDenied', 'SystemAudit', or 'SystemAlarm')
 
         .PARAMETER AccessMaskNames
 
             [System.String] 
-            
-            The Access Mask Name(s) (comma-separated, if multiple) of the ACE to delete (among `CreateChild`, `DeleteChild`, `ListChildren`, `Self`, `ReadProperty`, `WriteProperty`, `DeleteTree`, `ListObject`, `ExtendedRight`, `Delete`, `ReadControl`, `GenericExecute`, `GenericWrite`, `GenericRead`, `WriteDacl`, `WriteOwner`, `GenericAll`, `Synchronize`, and `AccessSystemSecurity`)
+
+            The Access Mask Name(s) (comma-separated, if multiple) of the ACE to delete (among 'CreateChild', 'DeleteChild', 'ListChildren', 'Self', 'ReadProperty', 'WriteProperty', 'DeleteTree', 'ListObject', 'ExtendedRight', 'Delete', 'ReadControl', 'GenericExecute', 'GenericWrite', 'GenericRead', 'WriteDacl', 'WriteOwner', 'GenericAll', 'Synchronize', and 'AccessSystemSecurity')
 
         .PARAMETER AccessRightName
 
@@ -9103,8 +9107,8 @@ function _DeleteInboundACE {
             
             The Access Right Name (i.e. ObjectAceType) of the ACE to delete (Optional).
 
+            - Defaults to $null.
             - Some ACE doesn't have an ObjectAceType (as per `PrincipalTo*.txt`). For instance, `GenericAll` ACEs are provided without `ObjectAceType`, hence this attribute MUST NOT be provided whenever we want to delete a `GenericAll`-type'ed ACE.
-            - If not specified, defaults to $null.
             - NOT REQUIRED if -AccessRightGUID is specified.
 
         .PARAMETER TargetDN
@@ -9119,8 +9123,8 @@ function _DeleteInboundACE {
             
             The Access Right GUID (i.e. ObjectAceType's GUID) of the ACE to delete (Optional).
 
+            - Defaults to $null.
             - Some ACE doesn't have an ObjectAceType (as per `PrincipalTo*.txt`). For instance, `GenericAll` ACEs are provided without `ObjectAceType`, hence this attribute MUST NOT be provided whenever we want to delete a `GenericAll`-type'ed ACE.
-            - If not specified, defaults to $null.
             - NOT REQUIRED if -AccessRightName is specified.
 
         .EXAMPLE
@@ -9359,17 +9363,19 @@ function _CreateInboundSDDL {
 
             [System.String] 
             
-            The ACE type of the SDDL entry to be created (e.g. `OA` or `OD`) (Optional). For instance, to create an SDDL entry like `O:BAD:(OA;CI;RPWP;bf967915-0de6-11d0-a285-00aa003049e2;;S-1-1-0)`, this parameter MUST be set to 'OA' (i.e. `SDDL_OBJECT_ACCESS_ALLOWED`).
+            The ACE type of the SDDL entry to be created (e.g. `OA` or `OD`) (Optional). 
+            For instance, to create an SDDL entry like `O:BAD:(OA;CI;RPWP;bf967915-0de6-11d0-a285-00aa003049e2;;S-1-1-0)`, this parameter MUST be set to 'OA' (i.e. `SDDL_OBJECT_ACCESS_ALLOWED`).
 
-            - If not specified, this parameter is set to 'OA' (i.e. `SDDL_OBJECT_ACCESS_ALLOWED`)
+            - Defaults to 'OA' (i.e. `SDDL_OBJECT_ACCESS_ALLOWED`)
 
         .PARAMETER SDDLACERights
 
             [System.String] 
             
-            The Right(s) of the SDDL entry to be created, among `RC`, `SD`, `WD`, `WO`, `RP`, `WP`, `CC`, `DC`, `LC`, `SW`, `LO`, `DT` (comma-separated, if multiple) (Optional). For instance, to create an SDDL entry like `O:BAD:(OA;CI;RCSDWDWORPWPCCDCLCSWLODT;;;S-1-1-0)`, this parameter MUST be set to `RCSDWDWORPWPCCDCLCSWLODT` (i.e. `SDDL_READ_CONTROL`, `SDDL_STANDARD_DELETE`, `SDDL_WRITE_DAC`, `SDDL_WRITE_OWNER`, `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`, `SDDL_CREATE_CHILD`, `SDDL_DELETE_CHILD`, `SDDL_LIST_CHILDREN `SDDL_SELF_WRITE`, `SDDL_LIST_OBJECT`, `SDDL_DELETE_TREE`).
+            The Right(s) of the SDDL entry to be created (among 'RC', 'SD', 'WD', 'WO', 'RP', 'WP', 'CC', 'DC', 'LC', 'SW', 'LO', 'DT' (comma-separated, if multiple)) (Optional). 
+            For instance, to create an SDDL entry like `O:BAD:(OA;CI;RCSDWDWORPWPCCDCLCSWLODT;;;S-1-1-0)`, this parameter MUST be set to `RCSDWDWORPWPCCDCLCSWLODT` (i.e. `SDDL_READ_CONTROL`, `SDDL_STANDARD_DELETE`, `SDDL_WRITE_DAC`, `SDDL_WRITE_OWNER`, `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`, `SDDL_CREATE_CHILD`, `SDDL_DELETE_CHILD`, `SDDL_LIST_CHILDREN `SDDL_SELF_WRITE`, `SDDL_LIST_OBJECT`, `SDDL_DELETE_TREE`).
 
-            - If not specified, this parameter is set to 'RPWP' (i.e. `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`)
+            - Defaults to 'RPWP' (i.e. `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`)
 
         .PARAMETER IdentityDN
 
@@ -9397,9 +9403,9 @@ function _CreateInboundSDDL {
 
             [System.String] 
             
-            The attribute of the targeted object against which the SDDL ACE entry applies. (Optional)
+            The attribute of the targeted object against which the SDDL ACE entry applies (Optional).
 
-            - If not specified, the created ACE entry won't have an `ObjectAceType` GUID.
+            - Defaults to `[Guid]::Empty` (i.e. the created ACE entry won't have an `ObjectAceType` GUID).
 
         .EXAMPLE
 
@@ -9592,7 +9598,7 @@ function _UpdatePasswordOfIdentity {
 
             [System.String] 
             
-            The identity of the targeted account (whose password must be updated).
+            The identity of the targeted account whose password must be updated.
 
         .PARAMETER NewPassword
 
@@ -10188,7 +10194,7 @@ function _ShowStatusOfAccount {
 
         .SYNOPSIS
 
-            Returns the text of the specified account's status (i.e. 'Enabled', or 'Disabled').
+            Shows the text of the specified account's status (i.e. 'Enabled', or 'Disabled').
 
         .PARAMETER LdapConnection
 
@@ -10207,12 +10213,6 @@ function _ShowStatusOfAccount {
             _ShowStatusOfAccount -LdapConnection $LdapConnection -IdentityDN 'CN=Ima IN. NBELD,CN=Users,DC=X'
 
             Shows Enabled if the account `Ima IN. NBELD` is enabled, Disabled otherwise.
-
-        .OUTPUTS
-
-            [System.String] 
-            
-            The text of the specified account's status (i.e. 'Enabled', or 'Disabled').
 
         .LINK
 
@@ -10244,9 +10244,9 @@ function _ShowStatusOfAccount {
     [System.Int32]$AccountDisabled = 0x0002;
 
     if (($UAC.ToString() -band $AccountDisabled) -gt 0) {
-        return "[*] Account '$IdentityDN' Is Disabled.";
+        Write-Host "[*] Account '$IdentityDN' Is Disabled.";
     } else {
-        return "[*] Account '$IdentityDN' Is Enabled.";
+        Write-Host "[*] Account '$IdentityDN' Is Enabled.";
     }
 }
 
@@ -10519,19 +10519,19 @@ function _LDAPEnum {
 
         .PARAMETER Enum 
 
-            LDAP Enumeration to be performed (e.g. `Kerberoasting`)
+            LDAP Enumeration to be performed (e.g. 'Kerberoasting')
 
         .PARAMETER SearchBase
         
-            The Distinguished Name of the Seach Base of the LDAP lookup
+            The Distinguished Name of the Seach Base of the LDAP lookup (Optional).
 
-            - If not specified, defaults to the LDAP/S Server's domain, taken from the provided LDAP Connection Instance.
+            - Defaults to the LDAP/S Server's domain.
 
         .PARAMETER SearchScope 
 
-            The Seach Base of the LDAP lookup (accepted values: 'Base', 'OneLevel', 'Subtree')
+            The Seach Base of the LDAP lookup (among 'Base', 'OneLevel', 'Subtree') (Optional).
 
-            - If not specified, defaults to Subtree (or `Base`, for RootDSE enumeration)
+            - Defaults to 'Base' for RootDSE enumeration, and to 'Subtree' otherwise.
 
         .EXAMPLE
 
@@ -10824,7 +10824,7 @@ function _LDAPEnum {
     switch ($Enum) {
 
         'RootDSE' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base
+            return $RootDSE
         }
 
         'DCs' {
@@ -11244,7 +11244,7 @@ function _LDAPExploit {
 
             Sets the owner of `Kinda KO. OWNED` to the entity with SID `S-1-5-21-[...]-1103`. In other words, principal with RID 1103 becomes the owner of `Kinda KO. OWNED`.
 
-            - This requires WRITE privileges against the target's `nTSecurityDescriptor` attribute
+            - This requires WRITE privileges against the target's `nTSecurityDescriptor` attribute.
 
         .EXAMPLE
 
@@ -11600,7 +11600,7 @@ function _TODO {
 
             [System.Custom] 
             
-            The Customizator parameter of the Customized Custom Stuff (i.e. `Customorus1` or `Customorus2`) (Mandatory)
+            The Customizator parameter of the Customized Custom Stuff (i.e. 'Customorus1' or 'Customorus2')
 
         .PARAMETER Customizatoration
 
@@ -11608,7 +11608,7 @@ function _TODO {
             
             The Customizatoration parameter on which the Customized Custom Stuff must be applied on Customizing'ly (Optional).
 
-            - If not specified, defaults to 'root'
+            - Defaults to 'root'
 
         .EXAMPLE
 
@@ -11678,19 +11678,21 @@ function Invoke-PassTheCert-GetLDAPConnectionInstance {
 
         .SYNOPSIS
 
-            Returns an object containing the LDAP Connection Instance upon after certificate-authenticating to an LDAP/S Server.
+            Returns an LDAP Connection Instance of a certificate-based authentication against an LDAP/S Server.
 
         .PARAMETER Server
 
             [System.String] 
             
-            The IP of the LDAP/S Server against which to certificate-authenticate
+            The IP of the LDAP/S Server against which to certificate-authenticate.
 
         .PARAMETER Port
 
             [System.Int32] 
             
-            The port of the LDAP/S Server against which to certificate-authenticate
+            The port of the LDAP/S Server against which to certificate-authenticate (Optional).
+
+            - Defaults to 636.
 
         .PARAMETER Certificate
 
@@ -11702,40 +11704,40 @@ function Invoke-PassTheCert-GetLDAPConnectionInstance {
 
             [System.String] 
             
-            The password of the certificate used to certificate-authenticate (if applicable, i.e. if the certificate is password-protected)
+            The password of the certificate used to certificate-authenticate.
             
-            - Optional if "$Certificate" is NOT password-protected (i.e. passwordless certificate)
-            - Mandatory if "$Certificate" is password-protected
+            - Optional if `$Certificate` is passwordless.
+            - Mandatory if `$Certificate` is password-protected
 
         .EXAMPLE
 
             Invoke-PassTheCert-GetLDAPConnectionInstance -Server '192.168.56.202' -Certificate 'Administrator.pfx'
 
-            Returns an object with the LDAP Connection Instance to the LDAP/S Server '192.168.56.202:636', using the certificate 'Administrator.pfx' (not password protected, hence no password provided)
+            Returns an LDAP Connection Instance to the LDAP/S Server '192.168.56.202:636', using the passwordless certificate 'Administrator.pfx'
 
         .EXAMPLE
 
             Invoke-PassTheCert-GetLDAPConnectionInstance -Server '192.168.56.202' -Port 1636 -Certificate 'Administrator.pfx' -CertificatePassword 'P@ssw0rd123!'
 
-            Returns an object with the LDAP Connection Instance to the LDAP/S Server '192.168.56.202:1636', using the Certificate 'Administrator.pfx' protected with password 'P@ssw0rd123!'
+            Returns an LDAP Connection Instance to the LDAP/S Server '192.168.56.202:1636', using the Certificate 'Administrator.pfx' protected with password 'P@ssw0rd123!'
 
         .EXAMPLE
 
             Invoke-PassTheCert-GetLDAPConnectionInstance -Server '192.168.56.202' -Certificate 'MIINA...'
 
-            Returns an object with the LDAP Connection Instance to the LDAP/S Server '192.168.56.202:636', using the 'MIINA...' Base64 form of a certificate (not password protected, hence no password provided)
+            Returns an LDAP Connection Instance to the LDAP/S Server '192.168.56.202:636', using the passwordless 'MIINA...' Base64 form of the certificate
 
         .EXAMPLE
 
             Invoke-PassTheCert-GetLDAPConnectionInstance -Server '192.168.56.202' -Port 2636 -Certificate 'MIINA...' -CertificatePassword 'P@ssw0rd123!'
 
-            Returns an object with the LDAP Connection Instance to the LDAP/S Server '192.168.56.202:2636', using the 'MIINA...' Base64 form of the certificate protected with password 'P@ssw0rd123!'.
+            Returns an LDAP Connection Instance to the LDAP/S Server '192.168.56.202:2636', using the 'MIINA...' Base64 form of the certificate protected with password 'P@ssw0rd123!'
 
         .OUTPUTS
 
             [System.DirectoryServices.Protocols.LdapConnection] 
             
-            An object containing the LDAP Connection Instance upon after certificate-authenticating to an LDAP/S Server.
+            An LDAP Connection Instance of a certificate-based authentication against an LDAP/S Server.
 
         .LINK
 
@@ -11827,7 +11829,7 @@ function Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile {
             
             The ContentType of the certificate to be exported (among 'Cert', 'SerializedCert', 'Pfx', 'Pkcs12', 'SerializedStore', 'Pkcs7', 'Authenticode') (Optional)
             
-            - If not specified, defaults to 'pfx'
+            - Defaults to 'pfx'
 
         .PARAMETER ExportPassword
 
@@ -11835,7 +11837,7 @@ function Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile {
             
             The password of the certificate to be exported (Optional)
 
-            - If not specified, defaults to '', i.e. passwordless
+            - Defaults to '' (i.e. passwordless)
 
         .EXAMPLE
 
@@ -11958,6 +11960,7 @@ function Invoke-PassTheCert {
                 PS > Invoke-PassTheCert -Action 'LDAPExploit' -LdapConnection $LdapConnection -Exploit 'DCSync' -Identity 'CN=John JD. DOE,CN=Users,DC=X' -Target 'DC=X'
                 PS > Invoke-PassTheCert -Action 'LDAPExploit' -LdapConnection $LdapConnection -Exploit 'ShadowCreds' -Target 'jdoe' -TargetDomain 'X' -Verbose
 
+
         .PARAMETER Action
 
             [System.String] 
@@ -11977,34 +11980,6 @@ function Invoke-PassTheCert {
             The established LDAP Connection Instance. 
             
             - Can be retrieved via the 'Invoke-PassTheCert-GetLDAPConnectionInstance' function
-            - Optional if the Server, Port, Certificate, and CertificatePassword (if applicable, i.e. if the certificate is password-protected) parameters are provided.
-
-        .PARAMETER Server
-
-            [System.String] 
-            
-            The IP of the LDAP/S Server against which to certificate-authenticate
-
-        .PARAMETER Port
-
-            [System.Int32] 
-            
-            The port of the LDAP/S Server against which to certificate-authenticate
-
-        .PARAMETER Certificate
-
-            [System.String] 
-            
-            The FilePath of Base64String of the certificate to use to authenticate against the LDAP/S Server
-
-        .PARAMETER CertificatePassword
-
-            [System.String] 
-            
-            The password of the certificate used to certificate-authenticate (if applicable, i.e. if the certificate is password-protected)
-
-            - Optional if "$Certificate" is NOT password-protected (i.e. passwordless certificate)
-            - Mandatory if "$Certificate" is password-protected
 
         .EXAMPLE
 

@@ -227,7 +227,7 @@ RemoveUACFlags :
     Removes the specified UAC Flag(s) (comma-separated, if multiple) from the provided object's UAC attribute.
 --
 ShowStatusOfAccount :
-    Returns the text of the specified account's status (i.e. 'Enabled', or 'Disabled').
+    Shows the text of the specified account's status (i.e. 'Enabled', or 'Disabled').
 --
 EnableAccount :
     Enables a specified account.
@@ -254,7 +254,7 @@ TODO :
     - The Custom Function MUST be implemented by YOU !
 --
 Invoke-PassTheCert-GetLDAPConnectionInstance :
-    Returns an object containing the LDAP Connection Instance upon after certificate-authenticating to an LDAP/S Server.
+    Returns an LDAP Connection Instance of a certificate-based authentication against an LDAP/S Server.
 --
 Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile :
     Exports an LDAP Connection Instance to a certificate file
