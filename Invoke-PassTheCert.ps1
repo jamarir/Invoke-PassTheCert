@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.6.1 "
+    Write-Host -ForegroundColor Red     "   v1.6.2 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -155,10 +155,11 @@ function _Helper-ShowHelpOfFunction {
 
         # When translating to 'Invoke-PassTheCert' syntax, the Get-Help's REMARKS section (if present) is no longer relevant
         # For some reasons, ($FunctionHelpString -contains 'REMARKS') doesn't work, hence using a 'Select-String -Pattern' workaround.
-        if (($FunctionHelpString |Select-String -Pattern '(?i).*\s+REMARKS\s+.*') -ne $null) {
-            $FunctionHelpString = ([regex]::Match(($FunctionHelpString), '(?ims)(.*)REMARKS\s+.*')).Groups[1].Value;
-            Write-Verbose "[+] Successfully Stripped irrelevant 'REMARKS' Section Of Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script As:`r`n==========================================`r`n$($FunctionHelpString)`r`n====================================================";
-        }
+        # (Commented REMARK-stripping to avoid blanking non-english documentations)
+		#if (($FunctionHelpString |Select-String -Pattern '(?i).*\s+REMARKS\s+.*') -ne $null) {
+        #    $FunctionHelpString = ([regex]::Match(($FunctionHelpString), '(?ims)(.*)REMARKS\s+.*')).Groups[1].Value;
+        #    Write-Verbose "[+] Successfully Stripped irrelevant 'REMARKS' Section Of Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script As:`r`n==========================================`r`n$($FunctionHelpString)`r`n====================================================";
+        #}
 
         # Each function's description contains its own way of executing itself. However, these are mostly *private* helper functions (prefixed '_').
         # For these functions to be reliable documentation, they should either be executed manually (e.g. copy-pasted into the powershell process), or executed using the context of 'Invoke-PassTheCert'.
@@ -6651,20 +6652,20 @@ function _Helper-ExportCertificateToFile {
             Default { Write-Host "[!] X509ContentType '$ExportContentType' Not Recognized !"; return; }
         }
 
-        Set-Content -Path $ExportPath -AsByteStream -Force -Value (
-            $Certificate.Export(
-                $X509ContentType,
-                $SecureString
-            )
-        )
-
-        #[System.IO.File]::WriteAllBytes(
-        #    $ExportPath, 
+        #Set-Content -Path $ExportPath -AsByteStream -Force -Value (
         #    $Certificate.Export(
-        #        $X509ContentType, 
-        #        $ExportPassword
+        #        $X509ContentType,
+        #        $SecureString
         #    )
         #)
+
+        [System.IO.File]::WriteAllBytes(
+            $ExportPath, 
+            $Certificate.Export(
+                $X509ContentType, 
+                $ExportPassword
+            )
+        )
 
         Write-Host "[+] Successfully Generated And Exported Self-Signed Certificate To File '$ExportPath' Of Type '$ExportContentType', $PasswordString"
 
@@ -7998,7 +7999,7 @@ function _Filter {
                     #   serviceprincipalname    : CIFS/DC01
                     #                             LDAP/DC01
                     # However, some very long array binaries (e.g. 'usercertificate') are not interesting to split. Hence, we'll whitelist the interesting multi-valued attributes to CRLF-split.
-                    if ($Attribute -in @('objectClass', 'serviceprincipalname', 'memberof', 'msds-keycredentiallink', 'namingcontexts', 'supportedcontrol', 'supportedsaslmechanisms', 'supportedcapabilities', 'supportedldappolicies', 'certificatetemplates', 'mspki-certificate-application-policy', 'pkicriticalextensions', 'pkiextendedkeyusage', 'pkidefaultcsps', 'msds-allowedtodelegateto', 'otherwellknownobjects', 'wellknownobjects', 'subrefs')) {
+                    if ($Attribute -in @('objectClass', 'serviceprincipalname', 'member', 'memberof', 'msds-keycredentiallink', 'namingcontexts', 'supportedcontrol', 'supportedsaslmechanisms', 'supportedcapabilities', 'supportedldappolicies', 'certificatetemplates', 'mspki-certificate-application-policy', 'pkicriticalextensions', 'pkiextendedkeyusage', 'pkidefaultcsps', 'msds-allowedtodelegateto', 'otherwellknownobjects', 'wellknownobjects', 'subrefs')) {
                         $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $($AttributeObject -join "`r`n")
                     } else {
                         $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $AttributeObject
@@ -12460,7 +12461,8 @@ if (-not $SkipStartup) {
         Write-Host "    PS > .\Invoke-PassTheCert.ps1 -?"
     } elseif ($Args.Count -gt 0 -and ($Args -contains '-?' -or $Args -contains '-h' -or $Args -contains '-Help')) {
         # Stripping irrelevant 'REMARKS' section
-        Invoke-PassTheCert -? |Out-String |Select-String -Pattern "(?ms)(.*)`r`n\s*REMARKS\s+.*" |ForEach-Object {$_.Matches.Groups[1].Value}
+        # (Commented REMARK-stripping to avoid blanking non-english documentations)
+        Invoke-PassTheCert -? |Out-String #|Select-String -Pattern "(?ms)(.*)`r`n\s*REMARKS\s+.*" |ForEach-Object {$_.Matches.Groups[1].Value}
     }
     Write-Host ""
 }
