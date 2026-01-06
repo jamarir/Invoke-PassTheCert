@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.6.2 "
+    Write-Host -ForegroundColor Red     "   v1.6.3 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -7088,7 +7088,7 @@ function _Helper-GetReadableValueOfBytes {
 
             [System.String]
 
-            The type of the array bytes (among 'objectSid', 'nTSecurityDescriptor', 'objectGuid')
+            The type of the array bytes (among 'objectSid', 'nTSecurityDescriptor', 'objectGuid', 'period')
 
         .PARAMETER ArrayOfBytes
 
@@ -7100,19 +7100,25 @@ function _Helper-GetReadableValueOfBytes {
 
             _Helper-GetReadableValueOfBytes -Type 'objectSid' -ArrayOfBytes $Bytes
 
-            Returns the string representation of the given `objectSid` bytes.
+            Returns the human-readable representation of the given `objectSid` bytes.
 
         .EXAMPLE
 
             _Helper-GetReadableValueOfBytes -Type 'nTSecurityDescriptor' -ArrayOfBytes $Bytes
 
-            Returns the object representation of the given `nTSecurityDescriptor` bytes.
+            Returns the human-readable representation of the given `nTSecurityDescriptor` bytes.
 
         .EXAMPLE
 
             _Helper-GetReadableValueOfBytes -Type 'objectGuid' -ArrayOfBytes $Bytes
 
-            Returns the string representation of the given `objectGuid` bytes.
+            Returns the human-readable representation of the given `objectGuid` bytes.
+
+        .EXAMPLE
+
+            _Helper-GetReadableValueOfBytes -Type 'period' -ArrayOfBytes $Bytes
+
+            Returns the human-readable representation of the given `period` bytes (e.g. `pkiexpirationperiod`).
 
         .OUTPUTS
             
@@ -7130,12 +7136,20 @@ function _Helper-GetReadableValueOfBytes {
         
             https://learn.microsoft.com/en-us/windows/win32/api/guiddef/ns-guiddef-guid
 
+        .LINK 
+
+            https://unlockpowershell.wordpress.com/2010/07/01/powershell-search-ad-for-a-guid/
+        
+        .LINK
+
+            https://www.sysadmins.lv/blog-en/how-to-convert-pkiexirationperiod-and-pkioverlapperiod-active-directory-attributes.aspx
+
     #>
     
     [CmdletBinding()]
     param(
-        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the type of the array bytes (among 'objectSid', 'nTSecurityDescriptor', 'objectGuid')")]
-        [ValidateSet('objectSid', 'nTSecurityDescriptor', 'objectGuid')]
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the type of the array bytes (among 'objectSid', 'nTSecurityDescriptor', 'objectGuid', 'period')")]
+        [ValidateSet('objectSid', 'nTSecurityDescriptor', 'objectGuid', 'period')]
         [System.String]$Type,
 
         [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the array of bytes containing the value of the specified type")]
@@ -7149,12 +7163,12 @@ function _Helper-GetReadableValueOfBytes {
     # Some attributes CANNOT be converted, as they don't hold byte data (e.g. SID of some builtin groups). Therefore, these cases (triggering conversion errors) are NOT translated, and left as is.
     try {
         $ArrayOfBytes = [byte[]]$ArrayOfBytes
-        if ($Type -eq "objectSid") {
+        if ($Type -eq 'objectSid') {
             $Result = New-Object System.Security.Principal.SecurityIdentifier($ArrayOfBytes, 0)
             $Result = $Result.Value
-        } elseif ($Type -eq "nTSecurityDescriptor") {
+        } elseif ($Type -eq 'nTSecurityDescriptor') {
             $Result = New-Object System.Security.AccessControl.RawSecurityDescriptor($ArrayOfBytes, 0)
-        } elseif ($Type -eq "objectGuid") {
+        } elseif ($Type -eq 'objectGuid') {
             # https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1#L8176-L8179
             # https://unlockpowershell.wordpress.com/2010/07/01/powershell-search-ad-for-a-guid/
             # Byte order is 4th, 3rd, 2nd, 1st, 6th, 5th, 8th, 7th, 9th, 10th, ...
@@ -7165,6 +7179,17 @@ function _Helper-GetReadableValueOfBytes {
                 $AOB[7], $AOB[6]
             ) + $AOB[8..15]
             $Result = [Guid]::New([byte[]]$ArrayOfBytes)
+        } elseif ($Type -eq 'period') {
+            # https://www.sysadmins.lv/blog-en/how-to-convert-pkiexirationperiod-and-pkioverlapperiod-active-directory-attributes.aspx
+            [array]::Reverse($ArrayOfBytes)
+            $LittleEndianByte = -join ($ArrayOfBytes | %{"{0:x2}" -f $_})
+            $Value = [Convert]::ToInt64($LittleEndianByte,16) * -.0000001
+            if (!($Value % 31536000) -and ($Value / 31536000) -ge 1) { $Result = [string]($Value / 31536000) + " year(s)" }
+            elseif (!($Value % 2592000) -and ($Value / 2592000) -ge 1) { $Result = [string]($Value / 2592000) + " month(s)" }
+            elseif (!($Value % 604800) -and ($Value / 604800) -ge 1) { $Result = [string]($Value / 604800) + " week(s)" }
+            elseif (!($Value % 86400) -and ($Value / 86400) -ge 1) { $Result = [string]($Value / 86400) + " day(s)" }
+            elseif (!($Value % 3600) -and ($Value / 3600) -ge 1) { $Result = [string]($Value / 3600) + " hour(s)" }
+            else { $Result = "0 hour(s)" }
         }
 
         Write-Verbose "[+] Successfully Converted Array Of Bytes Of Type '$Type' Into A Human-Readable Form !"
@@ -7177,9 +7202,97 @@ function _Helper-GetReadableValueOfBytes {
         return $ArrayOfBytes
 
     }
-    
-
 }
+
+
+function _Helper-GetReadableValueOfString {
+    
+    <#
+    
+        .SYNOPSIS
+
+            Returns the human-readable form of the given string
+
+        .PARAMETER Type
+
+            [System.String]
+
+            The type of the string (among 'fileTime', 'generalizedTime')
+
+        .PARAMETER String
+
+            [System.String]
+
+            The string containing the value of the specified type
+
+        .EXAMPLE
+
+            _Helper-GetReadableValueOfString -Type 'fileTime' -String '132539327990000000'
+
+            Returns the human-readable representation `31/12/2020 23:59:59` of the `132539327990000000` Generalized-Time.
+
+        .EXAMPLE
+
+            _Helper-GetReadableValueOfString -Type 'generalizedTime' -String '20201231235959.0Z'
+
+            Returns the human-readable representation `31/12/2020 23:59:59` of the `20201231235959.0Z` Generalized-Time.
+
+        .OUTPUTS
+            
+            The human-readable form of the given string
+        
+        .LINK 
+
+            https://learn.microsoft.com/en-us/dotnet/api/system.datetime.fromfiletimeutc
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/windows/win32/adschema/s-string-generalized-time
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the type of the string (among 'fileTime', 'generalizedTime')")]
+        [ValidateSet('fileTime', 'generalizedTime')]
+        [System.String]$Type,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the string containing the value of the specified type")]
+        [System.String]$String
+    )
+
+    #_Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    Write-Verbose "[*] Converting String Of Type '$Type' Into A Human-Readable Form..."
+
+    try {
+        switch ($Type) {
+            'fileTime' {
+                $Result = [DateTime]::FromFileTimeUtc($String)
+            }
+
+            'generalizedTime' {
+                $Result = [DateTime]::ParseExact(
+                    $String,
+                    'yyyyMMddHHmmss.0Z',
+                    [System.Globalization.CultureInfo]::InvariantCulture,
+                    [System.Globalization.DateTimeStyles]::AssumeUniversal
+                ) 
+            }
+        }
+        
+        Write-Verbose "[+] Successfully Converted String Of Type '$Type' Into A Human-Readable Form !"
+
+        return $Result
+
+    } catch {
+
+        Write-Verbose "[!] Couldn't Convert String Of Type '$Type' Into A Human-Readable Form ! Returning The Input As Is..."
+        return $String
+
+    }
+}
+
 
 
 function _GetAttributeOfObject {
@@ -8037,91 +8150,112 @@ function _Filter {
                 
                 switch ($Property.Name) {
                     
-                    'samaccounttype' { $AddMember = $true; $NewMember = _Helper-GetNamesOfSAMAccountTypeValue -Value $Property.Value }
-                    
-                    'useraccountcontrol' { $AddMember = $true; $NewMember = _Helper-GetUACFlagsOfValue -Value $Property.Value }
-                    
-                    'ntsecuritydescriptor' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'ntsecuritydescriptor' -ArrayOfBytes $Property.Value }
-
-                    'objectsid' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value }
-
-                    'objectguid' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectguid' -ArrayOfBytes $Property.Value }
-                    
-                    'grouptype' { $AddMember = $true; $NewMember = _Helper-GetNameOfGroupTypeValue -Value $Property.Value }
-                    
-                    'accountexpires' { 
+                    'samaccounttype' { 
                         $AddMember = $true; 
-                        # https://learn.microsoft.com/en-us/windows/win32/adschema/a-accountexpires
-                        if ($Property.Value -in @('0', '9223372036854775807')) { $NewMember = 'Never Expires'}
-                        else { $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
+                        $NewMember = _Helper-GetNamesOfSAMAccountTypeValue -Value $Property.Value 
                     }
                     
-                    'whencreated' { 
+                    'useraccountcontrol' { 
                         $AddMember = $true; 
-                        $NewMember = [DateTime]::ParseExact(
-                            $Property.Value,
-                            'yyyyMMddHHmmss.0Z',
-                            [System.Globalization.CultureInfo]::InvariantCulture,
-                            [System.Globalization.DateTimeStyles]::AssumeUniversal
-                        ) 
+                        $NewMember = _Helper-GetUACFlagsOfValue -Value $Property.Value 
                     }
                     
-                    'whenchanged' { 
+                    'ntsecuritydescriptor' { 
                         $AddMember = $true; 
-                        $NewMember = [DateTime]::ParseExact(
-                            $Property.Value,
-                            'yyyyMMddHHmmss.0Z',
-                            [System.Globalization.CultureInfo]::InvariantCulture,
-                            [System.Globalization.DateTimeStyles]::AssumeUniversal
-                        ) 
+                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'ntsecuritydescriptor' -ArrayOfBytes $Property.Value 
                     }
-                    
-                    'creationtime' { $AddMember = $true; $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
-                    
-                    'pwdlastset' { $AddMember = $true; $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
-                    
-                    'lastlogontimestamp' { $AddMember = $true; $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
-                    
-                    'lastlogon' { $AddMember = $true; $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
-
-                    'badpasswordtime' { $AddMember = $true; $NewMember = [DateTime]::FromFileTimeUtc($Property.Value) }
 
                     'msds-allowedtoactonbehalfofotheridentity' { 
                         $AddMember = $true;
-                        $NewMember = (_Helper-GetReadableValueOfBytes -Type 'nTSecurityDescriptor' -ArrayOfBytes $Property.Value).DiscretionaryAcl.SecurityIdentifier
+                        $NewMember = (_Helper-GetReadableValueOfBytes -Type 'ntsecuritydescriptor' -ArrayOfBytes $Property.Value).DiscretionaryAcl.SecurityIdentifier
+                    }
+                    
+                    'msds-groupmsamembership' { 
+                        $AddMember = $true; 
+                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'ntsecuritydescriptor' -ArrayOfBytes $Property.Value 
                     }
 
-                    # https://www.sysadmins.lv/blog-en/how-to-convert-pkiexirationperiod-and-pkioverlapperiod-active-directory-attributes.aspx
+                    'objectsid' { 
+                        $AddMember = $true; 
+                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value 
+                    }
+                    
+                    'msds-managedpasswordid' { 
+                        $AddMember = $true; 
+                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value 
+                    }
+
+                    'objectguid' { 
+                        $AddMember = $true; 
+                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectguid' -ArrayOfBytes $Property.Value 
+                    }
+                    
+                    'grouptype' { 
+                        $AddMember = $true; 
+                        $NewMember = _Helper-GetNameOfGroupTypeValue -Value $Property.Value 
+                    }
+                    
+                    
+                    'whencreated' { 
+                        $AddMember = $true;
+                        $NewMember = _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $Property.Value
+                    }
+                    
+                    'whenchanged' { 
+                        $AddMember = $true;
+                        $NewMember = _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $Property.Value
+                    }
+                    
+                    'currenttime' { 
+                        $AddMember = $true;
+                        $NewMember = _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $Property.Value
+                    }
+                    
+                    'creationtime' { 
+                        $AddMember = $true; 
+                        $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
+                    }
+
+                    'accountexpires' { 
+                        $AddMember = $true; 
+                        # https://learn.microsoft.com/en-us/windows/win32/adschema/a-accountexpires
+                        if ($Property.Value -in @('0', '9223372036854775807')) { 
+                            $NewMember = 'Never Expires'
+                        }
+                        else { 
+                            $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value 
+                        }
+                    }
+                    
+                    'pwdlastset' { 
+                        $AddMember = $true; 
+                        $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
+                    }
+                    
+                    'lastlogontimestamp' { 
+                        $AddMember = $true; 
+                        $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
+                    }
+                    
+                    'lastlogon' { 
+                        $AddMember = $true; 
+                        $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
+                    }
+
+                    'badpasswordtime' { 
+                        $AddMember = $true; 
+                        $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
+                    }
+
                     'pkiexpirationperiod' { 
                         $AddMember = $true;
-                        [array]::Reverse($Property.Value)
-                        $LittleEndianByte = -join ($Property.Value | %{"{0:x2}" -f $_})
-                        $Value = [Convert]::ToInt64($LittleEndianByte,16) * -.0000001
-                        if (!($Value % 31536000) -and ($Value / 31536000) -ge 1) { $NewMember = [string]($Value / 31536000) + " year(s)" }
-                        elseif (!($Value % 2592000) -and ($Value / 2592000) -ge 1) { $NewMember = [string]($Value / 2592000) + " month(s)" }
-                        elseif (!($Value % 604800) -and ($Value / 604800) -ge 1) { $NewMember = [string]($Value / 604800) + " week(s)" }
-                        elseif (!($Value % 86400) -and ($Value / 86400) -ge 1) { $NewMember = [string]($Value / 86400) + " day(s)" }
-                        elseif (!($Value % 3600) -and ($Value / 3600) -ge 1) { $NewMember = [string]($Value / 3600) + " hour(s)" }
-                        else { $NewMember = "0 hour(s)" }
+                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'period' -ArrayOfBytes $Property.Value
                     }
 
-                    # https://www.sysadmins.lv/blog-en/how-to-convert-pkiexirationperiod-and-pkioverlapperiod-active-directory-attributes.aspx
                     'pkioverlapperiod' { 
                         $AddMember = $true;
-                        ([array]::Reverse($Property.Value))
-                        $LittleEndianByte = -join ($Property.Value | %{"{0:x2}" -f $_})
-                        $Value = [Convert]::ToInt64($LittleEndianByte,16) * -.0000001
-                        if (!($Value % 31536000) -and ($Value / 31536000) -ge 1) { $NewMember = [string]($Value / 31536000) + " year(s)" }
-                        elseif (!($Value % 2592000) -and ($Value / 2592000) -ge 1) { $NewMember = [string]($Value / 2592000) + " month(s)" }
-                        elseif (!($Value % 604800) -and ($Value / 604800) -ge 1) { $NewMember = [string]($Value / 604800) + " week(s)" }
-                        elseif (!($Value % 86400) -and ($Value / 86400) -ge 1) { $NewMember = [string]($Value / 86400) + " day(s)" }
-                        elseif (!($Value % 3600) -and ($Value / 3600) -ge 1) { $NewMember = [string]($Value / 3600) + " hour(s)" }
-                        else { $NewMember = "0 hour(s)" }
+                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'period' -ArrayOfBytes $Property.Value
                     }
-                    
-                    'msds-managedpasswordid' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value }
-                    
-                    'msds-groupmsamembership' { $AddMember = $true; $NewMember = _Helper-GetReadableValueOfBytes -Type 'nTSecurityDescriptor' -ArrayOfBytes $Property.Value }
 
                 }
 
