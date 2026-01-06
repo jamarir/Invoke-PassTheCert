@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.6.3 "
+    Write-Host -ForegroundColor Red     "   v1.6.4 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -7404,7 +7404,7 @@ function _GetAttributeOfObject {
         # Dealing with edge-cases (i.e. attribute containing bytes)
         if (-not $Raw -and $Attribute -in @('objectGuid')) {
             $Result = _Helper-GetReadableValueOfBytes -Type 'objectGuid' -ArrayOfBytes $Value
-        } elseif (-not $Raw -and $Attribute -in @('objectSid', 'mS-DS-CreatorSID')) {
+        } elseif (-not $Raw -and $Attribute -in @('objectSid', 'mS-DS-CreatorSID', 'msDS-ManagedPasswordId')) {
             $Result = _Helper-GetReadableValueOfBytes -Type 'objectSid' -ArrayOfBytes $Value
         } elseif (-not $Raw -and $Attribute -in @('nTSecurityDescriptor', 'msDS-AllowedToActOnBehalfOfOtherIdentity', 'msDS-GroupMSAMembership')) {
             $Result = _Helper-GetReadableValueOfBytes -Type 'nTSecurityDescriptor' -ArrayOfBytes $Value
@@ -7492,10 +7492,6 @@ function _GetIndexOfInboundACE {
             [System.Int32]
             
             The Index (starting at 0) of an ACE provided to a source principal towards a targeted object (-1 if not found)
-
-        .LINK
-
-            https://learn.microsoft.com/en-us/dotnet/api/system.directoryservices.protocols.ldapconnection
 
     #>
     
@@ -11059,12 +11055,12 @@ function _LDAPEnum {
         }
 
         'gMSA' {
-            # With no $ObjectDN specified, enumerate all gMSAs' passwords
+            # With no $ObjectDN specified, enumerate all gMSA passwords
             if (-not $ObjectDN) {
                 $gMSAAccounts = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-GroupManagedServiceAccount)'
             }
 
-            # Otherwise, enumerate the specified gMSA's password
+            # Otherwise, enumerate the specified object's gMSA password
             else {
                 $gMSAAccounts = _Filter -LdapConnection $LdapConnection -SearchBase $ObjectDN -SearchScope 'Base' -LDAPFilter '(ObjectClass=msDS-GroupManagedServiceAccount)'
             }
@@ -11148,10 +11144,11 @@ function _LDAPEnum {
 
         'ShadowCreds' {
 
+            # With no $ObjectDN specified, enumerate all Shadow Credentials
             if (-not $ObjectDN) {
                 $KeyCredentialStrings = (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-KeyCredentialLink=*)' |Select -ExpandProperty msDS-KeyCredentialLink) -split "`r`n"
             }
-            # Otherwise, enumerate all gMSA accounts
+            # Otherwise, enumerate the specified object's Shadow Credentials
             else {
                 $KeyCredentialStrings = (_Filter -LdapConnection $LdapConnection -SearchBase $ObjectDN -SearchScope 'Base' -LDAPFilter '(msDS-KeyCredentialLink=*)' |Select -ExpandProperty msDS-KeyCredentialLink) -split "`r`n"
             }
