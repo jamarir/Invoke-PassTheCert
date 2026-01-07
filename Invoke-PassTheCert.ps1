@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.6.4 "
+    Write-Host -ForegroundColor Red     "   v1.6.5 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -11492,8 +11492,11 @@ function _LDAPExploit {
 
                 # 2.a. Initalize Variables
                 # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredential.cs#L285
-                $RawKeyMaterial         = _Helper-ExportRSAPublicKeyBCrypt -Certificate $NewSelfSignedCertificate
-                #$RawKeyMaterial        = _Helper-ExportRSAPublicKeyDER -Certificate $NewSelfSignedCertificate
+                try {
+                    $RawKeyMaterial = _Helper-ExportRSAPublicKeyBCrypt -Certificate $NewSelfSignedCertificate
+                } catch {
+                    $RawKeyMaterial = _Helper-ExportRSAPublicKeyDER -Certificate $NewSelfSignedCertificate
+                }
 
                 # https://github.com/MichaelGrafnetter/DSInternals/blob/6fe15cab429f51d91e8b281817fa23b13804456c/Src/DSInternals.Common/Data/Hello/KeyCredential.cs#L295-L318
                 $Version                = [uint32]0x00000200
