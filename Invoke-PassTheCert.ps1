@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.6.6 "
+    Write-Host -ForegroundColor Red     "   v1.7.3 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -7294,6 +7294,191 @@ function _Helper-GetReadableValueOfString {
 }
 
 
+function _Helper-Convert-DNSRecord {
+
+    <#
+        .SYNOPSIS
+        
+            Helpers that decodes a binary DNS record blob.
+            
+            Author: Michael B. Smith, Will Schroeder (@harmj0y)  
+            License: BSD 3-Clause  
+            Required Dependencies: None  
+        
+        .DESCRIPTION
+        
+            Decodes a binary blob representing an Active Directory DNS entry.
+            Used by Get-DomainDNSRecord.
+            
+            Adapted/ported from Michael B. Smith's code at https://raw.githubusercontent.com/mmessano/PowerShell/master/dns-dump.ps1
+        
+        .PARAMETER DNSRecord
+        
+            A byte array representing the DNS record.
+        
+        .OUTPUTS
+        
+            System.Management.Automation.PSCustomObject
+            
+            Outputs custom PSObjects with detailed information about the DNS record entry.
+        
+        .LINK
+        
+            https://raw.githubusercontent.com/mmessano/PowerShell/master/dns-dump.ps1
+
+        .LINK 
+
+            https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1#L3545-L3711
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dnsp/6912b338-5472-4f59-b912-0edb536b6ed8
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dnsp/3fd41adc-c69e-407b-979e-721251403132
+
+        .LINK 
+
+            https://github.com/jameswhite/net-ad-dnsrecord/blob/master/doc/dNSRecord
+
+    #>
+    
+    [OutputType('System.Management.Automation.PSCustomObject')]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Position = 0, Mandatory = $True, ValueFromPipelineByPropertyName = $True)]
+        [Byte[]]
+        $DNSRecord
+    )
+
+    BEGIN {
+        function Get-Name {
+            [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseOutputTypeCorrectly', '')]
+            [CmdletBinding()]
+            Param(
+                [Byte[]]
+                $Raw
+            )
+
+            [Int]$Length = $Raw[0]
+            [Int]$Segments = $Raw[1]
+            [Int]$Index =  2
+            [String]$Name  = ''
+
+            while ($Segments-- -gt 0)
+            {
+                [Int]$SegmentLength = $Raw[$Index++]
+                while ($SegmentLength-- -gt 0) {
+                    $Name += [Char]$Raw[$Index++]
+                }
+                $Name += "."
+            }
+            $Name
+        }
+    }
+
+    PROCESS {
+        # $RDataLen = [BitConverter]::ToUInt16($DNSRecord, 0)
+        $RDataType = [BitConverter]::ToUInt16($DNSRecord, 2)
+        $UpdatedAtSerial = [BitConverter]::ToUInt32($DNSRecord, 8)
+
+        $TTLRaw = $DNSRecord[12..15]
+
+        # reverse for big endian
+        $Null = [array]::Reverse($TTLRaw)
+        $TTL = [BitConverter]::ToUInt32($TTLRaw, 0)
+
+        $Age = [BitConverter]::ToUInt32($DNSRecord, 20)
+        if ($Age -ne 0) {
+            $TimeStamp = ((Get-Date -Year 1601 -Month 1 -Day 1 -Hour 0 -Minute 0 -Second 0).AddHours($Age)).ToString()
+        } else {
+            $TimeStamp = '[static]'
+        }
+
+        $DNSRecordObject = New-Object PSObject
+
+        if ($RDataType -eq 1) {
+            $IP = "{0}.{1}.{2}.{3}" -f $DNSRecord[24], $DNSRecord[25], $DNSRecord[26], $DNSRecord[27]
+            $Data = $IP
+            $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'A'
+        }
+
+        elseif ($RDataType -eq 2) {
+            $NSName = Get-Name $DNSRecord[24..$DNSRecord.length]
+            $Data = $NSName
+            $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'NS'
+        }
+
+        elseif ($RDataType -eq 5) {
+            $Alias = Get-Name $DNSRecord[24..$DNSRecord.length]
+            $Data = $Alias
+            $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'CNAME'
+        }
+
+        elseif ($RDataType -eq 6) {
+            # TODO: how to implement properly? nested object?
+            $Data = $([System.Convert]::ToBase64String($DNSRecord[24..$DNSRecord.length]))
+            $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'SOA'
+        }
+
+        elseif ($RDataType -eq 12) {
+            $Ptr = Get-Name $DNSRecord[24..$DNSRecord.length]
+            $Data = $Ptr
+            $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'PTR'
+        }
+
+        elseif ($RDataType -eq 13) {
+            # TODO: how to implement properly? nested object?
+            $Data = $([System.Convert]::ToBase64String($DNSRecord[24..$DNSRecord.length]))
+            $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'HINFO'
+        }
+
+        elseif ($RDataType -eq 15) {
+            # TODO: how to implement properly? nested object?
+            $Data = $([System.Convert]::ToBase64String($DNSRecord[24..$DNSRecord.length]))
+            $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'MX'
+        }
+
+        elseif ($RDataType -eq 16) {
+            [string]$TXT  = ''
+            [int]$SegmentLength = $DNSRecord[24]
+            $Index = 25
+
+            while ($SegmentLength-- -gt 0) {
+                $TXT += [char]$DNSRecord[$index++]
+            }
+
+            $Data = $TXT
+            $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'TXT'
+        }
+
+        elseif ($RDataType -eq 28) {
+            # TODO: how to implement properly? nested object?
+            $Data = $([System.Convert]::ToBase64String($DNSRecord[24..$DNSRecord.length]))
+            $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'AAAA'
+        }
+
+        elseif ($RDataType -eq 33) {
+            # TODO: how to implement properly? nested object?
+            $Data = $([System.Convert]::ToBase64String($DNSRecord[24..$DNSRecord.length]))
+            $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'SRV'
+        }
+
+        else {
+            $Data = $([System.Convert]::ToBase64String($DNSRecord[24..$DNSRecord.length]))
+            $DNSRecordObject | Add-Member Noteproperty 'RecordType' 'UNKNOWN'
+        }
+
+        $DNSRecordObject | Add-Member Noteproperty 'UpdatedAtSerial' $UpdatedAtSerial
+        $DNSRecordObject | Add-Member Noteproperty 'TTL' $TTL
+        $DNSRecordObject | Add-Member Noteproperty 'Age' $Age
+        $DNSRecordObject | Add-Member Noteproperty 'TimeStamp' $TimeStamp
+        $DNSRecordObject | Add-Member Noteproperty 'Data' $Data
+        $DNSRecordObject
+    }
+}
+
 
 function _GetAttributeOfObject {
     
@@ -10665,6 +10850,7 @@ function _LDAPEnum {
         
             The Distinguished Name of the Seach Base of the LDAP lookup (Optional).
 
+            - MUST start with 'DC=' (e.g. 'DC=ADLAB,DC=LOCAL').
             - Defaults to the LDAP/S Server's domain.
 
         .PARAMETER SearchScope 
@@ -10786,6 +10972,12 @@ function _LDAPEnum {
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'Trusts'
 
             Returns all Trust Relationships in the LDAP/S Server's Domain (default SearchBase)
+
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'DnsRecords'
+
+            Returns all ADIDNS DnsRecords existing from any possible zone (i.e. `Domain`, `Forest`, and `Legacy`) in the LDAP/S Server's Domain (default SearchBase)
 
         .EXAMPLE
 
@@ -10958,13 +11150,15 @@ function _LDAPEnum {
 
     # If $SearchBase isn't specified, defaults to the LDAP/S Server's Domain
     if (-not $SearchBase) { $SearchBase = $(_Helper-GetDomainDNFromDN -DN $(_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)) }
-
-    $RootDSE = _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base
+    elseif ($SearchBase -notmatch '^DC=') {
+        Write-Host "[*$Enum*] [!] SearchBase '$SearchBase' MUST start with 'DC=' (e.g. 'DC=ADLAB,DC=LOCAL') !"
+        return
+    }
 
     switch ($Enum) {
 
         'RootDSE' {
-            return $RootDSE
+            return _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base
         }
 
         'DCs' {
@@ -11024,11 +11218,11 @@ function _LDAPEnum {
         }
 
         'CAs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKIEnrollmentService)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Public Key Services,CN=Services,CN=Configuration,$SearchBase" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKIEnrollmentService)'
         }
 
         'CertificateTemplates' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,$($RootDSE.configurationnamingcontext)" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKICertificateTemplate)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,$SearchBase" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKICertificateTemplate)'
         }
 
         'sMSA' {
@@ -11037,6 +11231,42 @@ function _LDAPEnum {
 
         'Trusts' {
             return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=trustedDomain)'
+        }
+
+        'DnsRecords' {
+            $Results = @()
+
+            # https://github.com/franc-pentest/ldeep/blob/a32b7c8d37cd5b4180cfceb4d0d0b19fb7e725ac/ldeep/__main__.py#L818-L820
+            foreach ($Zone in @("CN=MicrosoftDNS,DC=DomainDnsZones", "CN=MicrosoftDNS,DC=ForestDnsZones", "CN=MicrosoftDNS,CN=System")) {
+                # https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1#L3998-L4017
+                _Filter -LdapConnection $LdapConnection -SearchBase "$Zone,$SearchBase" -SearchScope 'Subtree' -Properties '*' -LDAPFilter '(objectClass=dnsNode)' |%{ 
+                    try {
+                        $DnsNode = $_
+                        $DnsRecords = @()
+                        # Unique dnsRecord (e.g. one IP for one name)
+                        if ($DnsNode.dnsrecord -is [byte[]]) { 
+                            $DnsRecords += _Helper-Convert-DNSRecord -DNSRecord $DnsNode.dnsrecord 
+                        } 
+                        # Nested dnsRecords (e.g. one IP for multiple nanmes)
+                        elseif ($DnsNode.dnsrecord -is [System.DirectoryServices.ResultPropertyValueCollection]) { 
+                            $DnsNode.dnsrecord |%{
+                                $DnsRecords += _Helper-Convert-DNSRecord -DNSRecord $_
+                            }
+                        }
+                        if ($DnsRecords) {
+                            $DnsRecords |% {
+                                $_ |
+                                    Add-Member -Force -PassThru -NotePropertyName 'name' -NotePropertyValue $DnsNode.name |
+                                    Add-Member -Force -PassThru -NotePropertyName 'distinguishedname' -NotePropertyValue $DnsNode.distinguishedname
+                                $Results += $_
+                            }
+                        }
+                    } catch {
+                        continue
+                    }
+                }
+            }
+            return $Results
         }
 
         'admins' {
@@ -11275,7 +11505,7 @@ function _LDAPEnum {
 
         'All' {
             # Executing only the enumeration modules with the strict minimum number of mandatory parameters. For instance, we won't run OUMembers, or GroupMembers, as they require a specific parameter.
-            foreach ($Enum in @('RootDSE', 'DCs', 'admins', 'DAs', 'Groups', 'Descriptions', 'Users', 'Computers', 'OSs', 'MAQ', 'LAPS', 'OUs', 'Sites', 'GPOs', 'GPLinks', 'Printers', 'LogonScripts', 'CAs', 'CertificateTemplates', 'sMSA', 'Trusts', 'DONT_EXPIRE_PASSWORD', 'PASSWD_NOTREQD', 'Kerberoasting', 'ASREPRoasting', 'gMSA', 'ShadowCreds', 'Unconstrained', 'Constrained', 'RBCD', 'DCSync', 'PassPol')) {
+            foreach ($Enum in @('RootDSE', 'DCs', 'admins', 'DAs', 'Groups', 'Descriptions', 'Users', 'Computers', 'OSs', 'MAQ', 'LAPS', 'OUs', 'Sites', 'GPOs', 'GPLinks', 'Printers', 'LogonScripts', 'CAs', 'CertificateTemplates', 'sMSA', 'Trusts', 'DnsRecords', 'DONT_EXPIRE_PASSWORD', 'PASSWD_NOTREQD', 'Kerberoasting', 'ASREPRoasting', 'gMSA', 'ShadowCreds', 'Unconstrained', 'Constrained', 'RBCD', 'DCSync', 'PassPol')) {
                 _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope
             }
         }
@@ -11288,13 +11518,14 @@ function _LDAPEnum {
             
             # First degree membership
             $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter "(&(cn=$Name)(|(member=*)(objectClass=group)))"
-            $Result = $Result |Select -ExpandProperty Member | %{ _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter "(distinguishedName=$_)" }
+            # Filter CRLF-split the 'member' multi-valued attribute. Hence, we split back that string to get an array
+            $Result = ($Result |Select -ExpandProperty Member) -split "`r`n" | %{ _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter "(distinguishedName=$_)" }
             $Results += $Result
 
             # Grabbing each value within the 'member' array attribute of the group. 
             # Each of these is a principal's distinguishedname, being either a `User`, `Computer`, `Group`, `OU`, or `Contact`.
             # The recursive logic relies on group objects ONLY !
-            $Result |?{ $_.objectcategory -eq "CN=Group,$($RootDSE.schemanamingcontext)"} |%{
+            $Result |?{ $_.objectcategory -eq "CN=Group,CN=Schema,CN=Configuration,$SearchBase"} |%{
                 # True whenever a group is within a group, false otherwise (hence STOP of the recursive nested group lookup)
                 $Results += _LDAPEnum -LdapConnection $LdapConnection -Enum 'GroupMembers' -Name $_.cn
             }
