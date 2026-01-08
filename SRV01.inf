@@ -1,11 +1,11 @@
 ; https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/certreq_1
-; INF config file to request a certificate as `Administrator` user in the `ADLAB.LOCAL` domain
+; INF config file to request a certificate as `SRV01$` computer in the `ADLAB.LOCAL` domain
 
 [Version]
 Signature="$Windows NT$"
 
 [NewRequest]
-Subject="CN=Administrator,CN=Users,DC=ADLAB,DC=LOCAL"
+Subject="CN=SRV01.ADLAB.LOCAL"
 Exportable = TRUE
 ExportableEncrypted = TRUE
 HashAlgorithm = SHA256
@@ -20,12 +20,11 @@ AlternateSignatureAlgorithm = FALSE
 
 [Extensions]
 2.5.29.17 = "{text}"
-_continue_ = "UPN=Administrator@ADLAB.LOCAL"
+_continue_ = "DNS=SRV01.ADLAB.LOCAL"
 
 [RequestAttributes]
-CertificateTemplate = User
+CertificateTemplate = Machine
 
 [EnhancedKeyUsageExtension]
-OID = 1.3.6.1.5.5.7.3.2         ; Client Authentication
-OID = 1.3.6.1.4.1.311.10.3.4    ; Encrypting File System
-OID = 1.3.6.1.5.5.7.3.4         ; Secure Email
+OID = 1.3.6.1.5.5.7.3.2   ; Client Authentication
+OID = 1.3.6.1.5.5.7.3.1   ; Server Authentication
