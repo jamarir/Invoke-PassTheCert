@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.7.4 "
+    Write-Host -ForegroundColor Red     "   v1.7.5 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -7169,7 +7169,7 @@ function _Helper-GetReadableValueOfBytes {
 
     #_Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    Write-Verbose "[*] Converting Array Of Bytes Of Type '$Type' Into A Human-Readable Form..."
+    #Write-Verbose "[*] Converting Array Of Bytes Of Type '$Type' Into A Human-Readable Form..."
 
     # Some attributes CANNOT be converted, as they don't hold byte data (e.g. SID of some builtin groups). Therefore, these cases (triggering conversion errors) are NOT translated, and left as is.
     try {
@@ -7203,13 +7203,13 @@ function _Helper-GetReadableValueOfBytes {
             else { $Result = "0 hour(s)" }
         }
 
-        Write-Verbose "[+] Successfully Converted Array Of Bytes Of Type '$Type' Into A Human-Readable Form !"
+        #Write-Verbose "[+] Successfully Converted Array Of Bytes Of Type '$Type' Into A Human-Readable Form !"
 
         return $Result
 
     } catch {
 
-        Write-Verbose "[!] Couldn't Convert Array Of Bytes Of Type '$Type' Into A Human-Readable Form ! Returning The Input As Is..."
+        #Write-Verbose "[!] Couldn't Convert Array Of Bytes Of Type '$Type' Into A Human-Readable Form ! Returning The Input As Is..."
         return $ArrayOfBytes
 
     }
@@ -7274,7 +7274,7 @@ function _Helper-GetReadableValueOfString {
 
     #_Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    Write-Verbose "[*] Converting String Of Type '$Type' Into A Human-Readable Form..."
+    #Write-Verbose "[*] Converting String Of Type '$Type' Into A Human-Readable Form..."
 
     try {
         switch ($Type) {
@@ -7292,13 +7292,13 @@ function _Helper-GetReadableValueOfString {
             }
         }
         
-        Write-Verbose "[+] Successfully Converted String Of Type '$Type' Into A Human-Readable Form !"
+        #Write-Verbose "[+] Successfully Converted String Of Type '$Type' Into A Human-Readable Form !"
 
         return $Result
 
     } catch {
 
-        Write-Verbose "[!] Couldn't Convert String Of Type '$Type' Into A Human-Readable Form ! Returning The Input As Is..."
+        #Write-Verbose "[!] Couldn't Convert String Of Type '$Type' Into A Human-Readable Form ! Returning The Input As Is..."
         return $String
 
     }
@@ -8210,14 +8210,14 @@ function _Filter {
     elseif ($DNFilter) { $MyFilter = "(distinguishedName=$DNFilter)" } 
     elseif ($SIDFilter) { $MyFilter = "(objectSid=$SIDFilter)" } 
     elseif ($UACFilter) {
-        # Raw Integer GUID input (e.g. 0x400000, or 514)
-        if ($UACFilter.Trim() -imatch '^(0x[0-9A-Fa-f]+|^\d+)$') {
+        # Integer UAC input (e.g. 514)
+        if ($UACFilter.Trim() -match '^\d+$') {
             $MyFilter = "(&(objectClass=person)(userAccountControl:1.2.840.113556.1.4.803:=$UACFilter))"
-        # String GUID input (e.g. 'DONT_REQ_PREAUTH', or multiple 'NORMAL_ACCOUNT,SMARTCARD_REQUIRED')
+        # String UAC input (e.g. 'DONT_REQ_PREAUTH', or multiple 'NORMAL_ACCOUNT,SMARTCARD_REQUIRED')
         } elseif ($UACFilter.Trim() -imatch '^\s*([A-Za-z_]+(\s*,\s*[A-Za-z_]+)*)\s*$') {
             $MyFilter = "(&(objectClass=person)(userAccountControl:1.2.840.113556.1.4.803:=$(_Helper-GetValueOfUACFlags -UACFlags $UACFilter)))"
         } else {
-            Write-Host "[!] UAC Filter '$UACFilter' Isn't Valid ! Expected Format: Raw Integer (e.g. 0x400000) Or String (e.g. 'DONT_REQ_PREAUTH', or 'NORMAL_ACCOUNT,SMARTCARD_REQUIRED')"
+            Write-Host "[!] UAC Filter '$UACFilter' Isn't Valid ! Expected Format: Raw Integer (e.g. 512) Or String (e.g. 'DONT_REQ_PREAUTH', or 'NORMAL_ACCOUNT,SMARTCARD_REQUIRED')"
             return
         }
     } elseif ($GUIDFilter) {
@@ -11198,7 +11198,7 @@ function _LDAPEnum {
         }
 
         'OSs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |?{ $_.operatingSystem -ne $null -or $_.operatingSytemVersion -ne $null } |Select distinguishedName,sAMAccountName,operatingSystem,operatingSytemVersion
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |?{ $_.operatingSystem -ne $null -or $_.operatingSystemVersion -ne $null } |Select distinguishedName,sAMAccountName,operatingSystem,operatingSystemVersion
         }
 
         'MAQ' {

