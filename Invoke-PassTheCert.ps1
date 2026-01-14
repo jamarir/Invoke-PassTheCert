@@ -497,7 +497,7 @@ function _Helper-GetDomainDNFromDomainName {
 
         .EXAMPLE
 
-            _Helper-GetDomainNameFromDN -DomainName 'ADLAB.LOCAL'
+            _Helper-GetDomainDNFromDomainName -DomainName 'ADLAB.LOCAL'
 
             Returns `DC=ADLAB,DC=LOCAL`
 
@@ -6461,7 +6461,7 @@ function _Helper-GenerateSelfSignedCertificate() {
 
             The CN of the certificate's subject (e.g. 'jdoe')
 
-        .PARAMETER AddYears
+        .PARAMETER AddYear
 
             [System.Int32]
 
@@ -7949,7 +7949,7 @@ function _Filter {
 
             [System.String] 
             
-            The Distinguished Name of the Seach Base of the LDAP lookup (e.g. 'DC=X') (Optional)
+            The Distinguished Name of the Search Base of the LDAP lookup (e.g. 'DC=X') (Optional)
 
             - Defaults to the LDAP/S Server's domain.
 
@@ -7957,7 +7957,7 @@ function _Filter {
 
             [System.String] 
             
-            The Seach Base of the LDAP lookup ('Base', 'OneLevel', or 'Subtree') (Optional)
+            The Search Base of the LDAP lookup ('Base', 'OneLevel', or 'Subtree') (Optional)
             
             - Defaults to 'Subtree' (i.e. search recursively from the given Search Base)
 
@@ -8159,14 +8159,14 @@ function _Filter {
         [ValidateNotNullorEmpty()]
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
-        [Parameter(Position=1, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the Seach Base of the LDAP lookup")]
+        [Parameter(Position=1, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the Search Base of the LDAP lookup")]
         [PSDefaultValue(Help="Defaulting to an empty string allows to differentiate from an undefined value (hence empty string here), and `$null (specifically used to look for the RootDSE)")]
         # Not setting its type [System.String] allows to differentiate '' and $null
         # If we use [System.String]$SearchBase, then we won't be allowed to differentiate when the variable is set to '', or $null => It will always be considered as '', even if unspecified from the command line.
         # Being able to tell when this parameter is $null (and NOT '') can be handy to differentiate, for instance, if the user specifically request the RootDSE (setting the SearchBase to $null).
         $SearchBase = '',
         
-        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the Seach Base of the LDAP lookup (accepted values: 'Base', 'OneLevel', 'Subtree')")]
+        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the Search Base of the LDAP lookup (accepted values: 'Base', 'OneLevel', 'Subtree')")]
         [ValidateSet('Base', 'OneLevel', 'Subtree')]
         [PSDefaultValue(Help="'Subtree' (i.e. search recursively from the given Search Base)")]
         [System.String]$SearchScope = 'Subtree',
@@ -8282,8 +8282,6 @@ function _Filter {
         foreach ($Entry in $SearchResponse.Entries) {
             $ResultObject = [PSCustomObject]@{}
             foreach ($Attribute in $Entry.Attributes.AttributeNames) {
-                # Dirty but handy way of getting the attribute's size (especially if it's an array, such as 'memberof', for a principal within multiple groups).
-                #$AttributeLength = 0; $Entry.Attributes[$Attribute] |%{ $AttributeLength++ }
                 $AttributeLength = $Entry.Attributes[$Attribute].Count
                 # If we're dealing with single-valued attributes (i.e. attribute containing a single value only, such as 'distinguishedname', or 'cn', we'd avoid their array'ification. For instance, 'sAMAccountName' is NEVER an array. Hence, no need to make it an array, e.g. {Administrator}. Just make it a string, e.g. 'Administrator'.
                 if ($AttributeLength -eq 1) {
@@ -8332,7 +8330,7 @@ function _Filter {
         Write-Host "[!] No Entry Found ! Returning `$null..."
         return $null
     } else {
-        # For each result object, translate attributes, if applicable.
+        # For each result object
         return $ResultObjects |%{ 
 
             # Translate the attribute accordingly, if any
@@ -8393,7 +8391,6 @@ function _Filter {
                         $Property.Value |%{ 
                             $NewMember += _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $_
                         }
-                        
                     }
                     
                     'whencreated' { 
@@ -9207,9 +9204,9 @@ function _CreateInboundACE {
 
             _CreateInboundACE -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -AceQualifier 'AccessDenied' -AccessMaskNames 'Delete,DeleteTree' -TargetDN 'OU=Unity,DC=X'
 
-            Creates the inbound ACE `[AceQualifier='AccessDenied', AccessMasks='Delete,DeleteTree', ObjectAceType=NULL]` provided to the principal `Everyone`. In other words, `Everyone` will have `AccessDenied` restrictions against `OU=Unity,DC=X`
+            Creates the inbound ACE `[AceQualifier='AccessDenied', AccessMasks='Delete,DeleteTree', ObjectAceType=NULL]` provided to the principal `Everyone` against the `Unity` Organizational Unity. In other words, `Everyone` will have `AccessDenied` restrictions against `OU=Unity,DC=X`
 
-            - Given that the principal is provided via its SID, no lookup is performed, and the ACE is created with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via an DN, and must be specified by its SID directly.
+            - Given that the principal is provided via its SID, no lookup is performed, and the ACE is created with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via its DN, and must be specified by its SID directly.
 
         .LINK
 
@@ -9326,13 +9323,13 @@ function _CreateInboundACE {
 
         Write-Host "[!] Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' Already Exists !"
 
-        # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
         # Writing the Check / Restoration texts for convenience
+        Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
+
+        # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
         if ($AccessRightGUID -eq [Guid]::Empty) {
-            Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
             Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
         } else {
-            Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
             Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
         }
 
@@ -9377,13 +9374,13 @@ function _CreateInboundACE {
         _OverwriteValueInAttribute -LdapConnection $LdapConnection -ObjectDN $TargetDN -Attribute 'nTSecurityDescriptor' -Value ($NewSD)
         Write-Host "[+] Successfully Created Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' !"
         
-        # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
         # Writing the Check / Restoration texts for convenience
+        Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
+        
+        # Some ACEs doesn't have 'ObjectAceType' attribute (e.g. 'GenericAll'), hence being set to None.
         if ($AccessRightGUID -eq [Guid]::Empty) {
-            Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
             Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)'"
         } else {
-            Write-Host "[*] [Check] Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection `$LdapConnection -Object '$TargetDN' |?{ `$_.SecurityIdentifier -eq '$IdentitySID' }"
             Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'DeleteInboundACE' -LdapConnection `$LdapConnection -IdentitySID '$IdentitySID' -Target '$TargetDN' -AceQualifier '$AceQualifier' -AccessMaskNames '$(_Helper-GetNamesOfACEAccessMaskValue -Value $AccessMaskValue)' -AccessRightGUID '$AccessRightGUID'"
         }
     }
@@ -9490,7 +9487,7 @@ function _DeleteInboundACE {
 
             _DeleteInboundACE -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -AceQualifier 'AccessDenied' -AccessMaskNames 'Delete,DeleteTree' -TargetDN 'OU=Unity,DC=X'
 
-            Deletes the inbound ACE `[AceQualifier='AccessDenied', AccessMasks='Delete,DeleteTree', ObjectAceType=NULL]` provided to the principal `Everyone`. In other words, `Everyone` will no longer have `AccessDenied` restrictions against `OU=Unity,DC=X`
+            Deletes the inbound ACE `[AceQualifier='AccessDenied', AccessMasks='Delete,DeleteTree', ObjectAceType=NULL]` provided to the principal `Everyone` against the `Unity` Organizational Unity. In other words, `Everyone` will no longer have `AccessDenied` restrictions against `OU=Unity,DC=X`
 
             - Given that the principal is provided via its SID, no lookup is performed, and the ACE is deleted with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via an DN, and must be specified by its SID directly.
 
@@ -9699,7 +9696,7 @@ function _CreateInboundSDDL {
             [System.String] 
             
             The ACE type of the SDDL entry to be created (e.g. `OA` or `OD`) (Optional). 
-            For instance, to create an SDDL entry like `O:BAD:(OA;CI;RPWP;bf967915-0de6-11d0-a285-00aa003049e2;;S-1-1-0)`, this parameter MUST be set to 'OA' (i.e. `SDDL_OBJECT_ACCESS_ALLOWED`).
+            For instance, to create an SDDL ACE entry like `O:BAD:(OA;CI;RPWP;bf967915-0de6-11d0-a285-00aa003049e2;;S-1-1-0)`, this parameter MUST be set to 'OA' (i.e. `SDDL_OBJECT_ACCESS_ALLOWED`).
 
             - Defaults to 'OA' (i.e. `SDDL_OBJECT_ACCESS_ALLOWED`)
 
@@ -9707,8 +9704,8 @@ function _CreateInboundSDDL {
 
             [System.String] 
             
-            The Right(s) of the SDDL entry to be created (among 'RC', 'SD', 'WD', 'WO', 'RP', 'WP', 'CC', 'DC', 'LC', 'SW', 'LO', 'DT' (comma-separated, if multiple)) (Optional). 
-            For instance, to create an SDDL entry like `O:BAD:(OA;CI;RCSDWDWORPWPCCDCLCSWLODT;;;S-1-1-0)`, this parameter MUST be set to `RCSDWDWORPWPCCDCLCSWLODT` (i.e. `SDDL_READ_CONTROL`, `SDDL_STANDARD_DELETE`, `SDDL_WRITE_DAC`, `SDDL_WRITE_OWNER`, `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`, `SDDL_CREATE_CHILD`, `SDDL_DELETE_CHILD`, `SDDL_LIST_CHILDREN `SDDL_SELF_WRITE`, `SDDL_LIST_OBJECT`, `SDDL_DELETE_TREE`).
+            The Right(s) (comma-separated, if multiple) of the SDDL entry to be created (among 'RC', 'SD', 'WD', 'WO', 'RP', 'WP', 'CC', 'DC', 'LC', 'SW', 'LO', 'DT') (Optional). 
+            For instance, to create an SDDL ACE entry like `O:BAD:(OA;CI;RCSDWDWORPWPCCDCLCSWLODT;;;S-1-1-0)`, this parameter MUST be set to `RCSDWDWORPWPCCDCLCSWLODT` (i.e. `SDDL_READ_CONTROL`, `SDDL_STANDARD_DELETE`, `SDDL_WRITE_DAC`, `SDDL_WRITE_OWNER`, `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`, `SDDL_CREATE_CHILD`, `SDDL_DELETE_CHILD`, `SDDL_LIST_CHILDREN `SDDL_SELF_WRITE`, `SDDL_LIST_OBJECT`, `SDDL_DELETE_TREE`).
 
             - Defaults to 'RPWP' (i.e. `SDDL_READ_PROPERTY`, `SDDL_WRITE_PROPERTY`)
 
@@ -9758,7 +9755,7 @@ function _CreateInboundSDDL {
 
             _CreateInboundSDDL -LdapConnection $LdapConnection -IdentitySID 'S-1-1-0' -TargetDN 'OU=Unity,DC=X' -SDDLACEType 'D' -SDDLACERights 'DTSD'
 
-            Creates an SDDL ACE entry denying the principal `EVERYONE` the following ACE Right against the `OU=Unity,DC=X` object: `SDDL_DELETE_TREE`, `SDDL_STANDARD_DELETE`.
+            Creates an SDDL ACE entry denying the principal `EVERYONE` the following ACE Rights against the `OU=Unity,DC=X` object: `SDDL_DELETE_TREE`, `SDDL_STANDARD_DELETE`.
 
             - Given that the principal is provided via its SID, no lookup is performed, and the SDDL's ACE is deleted with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via an DN, and must be specified by its SID directly.
 
@@ -10864,14 +10861,14 @@ function _LDAPEnum {
 
         .PARAMETER SearchBase
         
-            The Distinguished Name of the Seach Base of the LDAP lookup (Optional).
+            The Distinguished Name of the Search Base of the LDAP lookup (Optional).
 
             - MUST start with 'DC=' (e.g. 'DC=ADLAB,DC=LOCAL').
             - Defaults to the LDAP/S Server's domain.
 
         .PARAMETER SearchScope 
 
-            The Seach Base of the LDAP lookup (among 'Base', 'OneLevel', 'Subtree') (Optional).
+            The Search Base of the LDAP lookup (among 'Base', 'OneLevel', 'Subtree') (Optional).
 
             - Defaults to 'Base' for RootDSE enumeration, and to 'Subtree' otherwise.
 
@@ -10879,7 +10876,7 @@ function _LDAPEnum {
 
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'RootDSE'
 
-            Returns the `RootDSE` in the LDAP/S Server's Domain (default SearchBase) (in particular: DC Functionality, Forest Functionality, Domain Functionality, Server Name, Schema Naming Context, Configuration Naming Context, dNSHostName, Default Naming Context)
+            Returns the `RootDSE` in the LDAP/S Server's Domain (in particular: DC Functionality, Forest Functionality, Domain Functionality, Server Name, Schema Naming Context, Configuration Naming Context, dNSHostName, Default Naming Context)
 
         .EXAMPLE
 
@@ -10915,7 +10912,7 @@ function _LDAPEnum {
 
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'OSs'
 
-            Returns all Operating Systems of all computers (for which the `operatingSystem`, or `operatingSytemVersion`, attribute is set) in the LDAP/S Server's Domain (default SearchBase)
+            Returns all Operating Systems of all computers (for which the `operatingSystem`, or `operatingSystemVersion`, attribute is set) in the LDAP/S Server's Domain (default SearchBase)
 
         .EXAMPLE
 
@@ -10979,12 +10976,6 @@ function _LDAPEnum {
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'sMSA'
-
-            Returns all the Standalone Managed Service Accounts in the LDAP/S Server's Domain (default SearchBase)
-
-        .EXAMPLE
-
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'Trusts'
 
             Returns all Trust Relationships in the LDAP/S Server's Domain (default SearchBase)
@@ -11037,10 +11028,16 @@ function _LDAPEnum {
 
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'gMSA' -ObjectDN 'CN=gmsad,CN=Managed Service Accounts,DC=X'
 
-            Returns the ManagedPassword-related attributes (password's NTHash included) of the `gmsad` Group Managed Service Account in the LDAP/S Server's Domain (default SearchBase)
+            Returns the ManagedPassword-related attributes (password's NTHash included) of the `gmsad$` Group Managed Service Account in the LDAP/S Server's Domain (default SearchBase)
 
             - The `-ObjectDN` parameter is OPTIONAL.
             - Error `Value cannot be null. (Parameter 'buffer')` is returned if we do not have read permissions over the target's `msDS-ManagedPassword` constructed LDAP attribute.
+
+        .EXAMPLE
+
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'sMSA'
+
+            Returns all the Standalone Managed Service Accounts in the LDAP/S Server's Domain (default SearchBase)
 
         .EXAMPLE
 
@@ -11066,13 +11063,13 @@ function _LDAPEnum {
 
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'RBCD'
 
-            Returns all Resource-Based Constrained Delegation computers (i.e. granting other principals to act on behalf of any domain user against it) in the LDAP/S Server's Domain (default SearchBase)
+            Returns all Resource-Based Constrained Delegation computers (i.e. granting other principals rights to act on behalf of any domain user against it) in the LDAP/S Server's Domain (default SearchBase)
 
         .EXAMPLE
 
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'WritePrincipal'
 
-            Returns any Write'ty ACE provided to any non-default user over (or to permissive groups, such as `Everyone`, `Authenticated Users`, or `Domain Users`) any object in the LDAP/S Server's Domain (default SearchBase)
+            Returns any Write'ty ACE provided to any non-default principals (or to permissive groups, such as `Everyone`, `Authenticated Users`, or `Domain Users`) over any object in the LDAP/S Server's Domain (default SearchBase)
 
             - Might take some time to run.
 
@@ -11080,7 +11077,7 @@ function _LDAPEnum {
 
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'DCSync'
 
-            Returns any DCSync ACE provided to any non-default user over any domain object in the LDAP/S Server's Domain (default SearchBase)
+            Returns any DCSync ACE provided to any non-default principal over any object of category `domain` in the LDAP/S Server's Domain (default SearchBase)
 
         .EXAMPLE
 
@@ -11100,13 +11097,13 @@ function _LDAPEnum {
 
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'GroupMembers' -Name 'KindaGroupy'
 
-            Returns all members (recursively) of the group named `KindaGroupy` in the LDAP/S Server's Domain (default SearchBase).
+            Returns all members (recursively) of the group whose CN is `KindaGroupy` in the LDAP/S Server's Domain (default SearchBase).
 
         .EXAMPLE
 
             _LDAPEnum -LdapConnection $LdapConnection -Enum 'OUMembers' -Name 'Unity'
 
-            Returns all members (recursively) of the Organizational Unit named `Unity` in the LDAP/S Server's Domain (default SearchBase).
+            Returns all members (recursively) of the Organizational Unit whose OU name is `Unity` in the LDAP/S Server's Domain (default SearchBase).
 
         .EXAMPLE
 
@@ -11138,10 +11135,10 @@ function _LDAPEnum {
         #[ValidateSet('Kerberoasting')]
         [System.String]$Enum,
 
-        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the Seach Base of the LDAP lookup")]
+        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the Search Base of the LDAP lookup")]
         [System.String]$SearchBase,
         
-        [Parameter(Position=3, Mandatory=$false, HelpMessage="Enter the Seach Base of the LDAP lookup (accepted values: 'Base', 'OneLevel', 'Subtree')")]
+        [Parameter(Position=3, Mandatory=$false, HelpMessage="Enter the Search Base of the LDAP lookup (accepted values: 'Base', 'OneLevel', 'Subtree')")]
         [ValidateSet('Base', 'OneLevel', 'Subtree')]
         [PSDefaultValue(Help="'Subtree' (i.e. search recursively from the given Search Base)")]
         [System.String]$SearchScope = 'Subtree',
@@ -11239,10 +11236,6 @@ function _LDAPEnum {
 
         'CertificateTemplates' {
             return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,$SearchBase" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKICertificateTemplate)'
-        }
-
-        'sMSA' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-ManagedServiceAccount)'
         }
 
         'Trusts' {
@@ -11395,6 +11388,10 @@ function _LDAPEnum {
                 }
             }
             return $Results
+        }
+
+        'sMSA' {
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-ManagedServiceAccount)'
         }
 
         'ShadowCreds' {
@@ -11606,7 +11603,7 @@ function _LDAPExploit {
 
             _LDAPExploit -LdapConnection $LdapConnection -Exploit 'ASREPRoasting' -TargetDN 'CN=John JD. DOE,CN=Users,DC=X'
 
-            Adds the `DONT_REQ_PREAUTH` UAC Flag into the to the specified account's `useraccountcontrol` attribute.
+            Adds the `DONT_REQ_PREAUTH` UAC Flag into the specified account's `useraccountcontrol` attribute.
 
             - This requires WRITE privileges against the target's `useraccountcontrol` attribute.
 
@@ -11646,7 +11643,7 @@ function _LDAPExploit {
 
             _LDAPExploit -LdapConnection $LdapConnection -Exploit 'gMSA' -gMSAMembershipSID 'S-1-5-21-[...]-1469' -TargetDN 'CN=gmsad,CN=Managed Service Accounts,DC=X'
 
-            Sets the SID of the `gmsad`:`msDS-GroupMSAMembership`'s DACL to `S-1-5-21-[...]-1469`. In other words, principal with RID 1469 becomes the one allowed to read the password of the gMSA account `gmsad$`
+            Sets the SID of the `gmsad$`:`msDS-GroupMSAMembership`'s DACL to `S-1-5-21-[...]-1469`. In other words, principal with RID 1469 becomes the one allowed to read the password of the gMSA account `gmsad$`
 
             - This requires WRITE privileges against the target's `msDS-GroupMSAMembership` attribute.
 
@@ -12252,7 +12249,7 @@ function Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile {
 
             Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $LdapConnection -ExportPath '.\Certified.p12' -ExportContentType 'pkcs12'
 
-            Exports the $LdapConnection LDAP Connection Instance into the PKCS #12 file '.\Certified.p12', passwordless
+            Exports the $LdapConnection LDAP Connection Instance into the passwordless PKCS #12 file '.\Certified.p12'
 
         .LINK
 
@@ -12465,14 +12462,14 @@ function Invoke-PassTheCert {
         [PSDefaultValue(Help="Defaults to 636")]
         [System.Int32]$Port = 636,
 
-        [Parameter(Position=6, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the Seach Base of the LDAP lookup")]
+        [Parameter(Position=6, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the Search Base of the LDAP lookup")]
         [PSDefaultValue(Help="Defaulting to an empty string allows to differentiate from an undefined value (hence empty string here), and `$null (specifically used to look for the RootDSE)")]
         # Not setting its type [System.String] allows to differentiate '' and $null
         # If we use [System.String]$SearchBase, then we won't be allowed to differentiate when the variable is set to '', or $null => It will always be considered as '', even if unspecified from the command line.
         # Being able to tell when this parameter is $null (and NOT '') can be handy to differentiate, for instance, if the user specifically request the RootDSE (setting the SearchBase to $null).
         $SearchBase = '',
         
-        [Parameter(Position=7, Mandatory=$false, HelpMessage="Enter the Seach Base of the LDAP lookup (accepted values: 'Base', 'OneLevel', 'Subtree')")]
+        [Parameter(Position=7, Mandatory=$false, HelpMessage="Enter the Search Base of the LDAP lookup (accepted values: 'Base', 'OneLevel', 'Subtree')")]
         [ValidateSet('Base', 'OneLevel', 'Subtree')]
         [PSDefaultValue(Help="Defaults to 'Subtree' (i.e. search recursively from the given Search Base)")]
         [System.String]$SearchScope = 'Subtree',
