@@ -199,22 +199,20 @@ PS > .\Invoke-PassTheCert.ps1 -?
 
 ## Available Actions
 
-Each function's Get-Help documentation (helpers excluded) is partially shown below.
-
-```bash
-$ grep -A10 -P '^\s*function.*' Invoke-PassTheCert.ps1 |grep -vP '^(\s*|\s*<#\s*|\s+\.[A-Z]+.*|\s+(\[.*?\]|_.*)\s*)$' |sed 's/^\s\+//;s/function _\?\(.*\)[[:space:]]*{/\n### \1\n/;s/^- \(.*\)/\n> \1/' |grep -vP '^-+$' |xsel -b
+```powershell
+$ grep -A10 -P '^\s*function.*' Invoke-PassTheCert.ps1 |grep -vP '^(\s*|\s*<#\s*|\s+\.[A-Z]+.*|\s+(\[.*?\]|_.*)\s*)$' |sed 's/^\s\+//;s/function _\?\(.*\)[[:space:]]\+{/\n- ***\1***\n/;s/^- \(.*\)/\n> \1/' |grep -vP '^-+$'
 ```
 
-### LDAPExtendedOperationWhoami 
+- ***LDAPExtendedOperationWhoami***
 
 Returns the Response of the "Who am I" LDAP Extended Operation (whoamiOID OBJECT IDENTIFIER ::= "1.3.6.1.4.1.4203.1.11.3") using an LDAP Connection Instance.
 
-### LDAPExtendedOperationPasswordModify 
+- ***LDAPExtendedOperationPasswordModify***
 
 Executes the "Password Modify" LDAP Extended Operation (passwdModifyOID OBJECT IDENTIFIER ::= "1.3.6.1.4.1.4203.1.11.1") using an LDAP Connection Instance.
 As a result, updates the client's password associated with the specified LDAP Connection Instance.
 
-### Filter 
+- ***Filter***
 
 Returns a list of [PSCustomObject] object(s) found by the LDAP query.
 
@@ -222,7 +220,7 @@ Returns a list of [PSCustomObject] object(s) found by the LDAP query.
 
 > Returns $null if no entry is found.
 
-### CreateObject 
+- ***CreateObject***
 
 Creates a specified object.
 
@@ -232,19 +230,19 @@ Creates a specified object.
 
 > (Users/Computers/Groups) The `sAMAccountName` MUST be UNIQUE.
 
-### DeleteObject 
+- ***DeleteObject***
 
 Deletes a specified object.
 
 > The object MUST exist.
 
-### GetInboundACEs 
+- ***GetInboundACEs***
 
 Returns all inbound ACEs over a targeted specified object.
 
 > You may manually check any `PrincipalTo*.txt` file, to get a glance of possible ACEs.
 
-### CreateInboundACE 
+- ***CreateInboundACE***
 
 Creates an inbound ACE for a principal into a targeted object. In other words, it grants/denies an ACE to the principal (source) over the targeted object (destination)
 
@@ -254,7 +252,7 @@ Creates an inbound ACE for a principal into a targeted object. In other words, i
 
 > IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
 
-### DeleteInboundACE 
+- ***DeleteInboundACE***
 
 Deletes an inbound ACE for a principal into a targeted object. In other words, it deletes an ACE granted/denied to the principal (source) over the targeted object (destination)
 
@@ -264,11 +262,11 @@ Deletes an inbound ACE for a principal into a targeted object. In other words, i
 
 > IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
 
-### GetInboundSDDLs 
+- ***GetInboundSDDLs***
 
 Returns the SDDL String of all the inbound ACEs applied against a specified targeted object.
 
-### CreateInboundSDDL 
+- ***CreateInboundSDDL***
 
 Creates an inbound SDDL (Security Descriptor Definition Language) for a principal into a targeted object's attribute. In other words, it grants/denies an SDDL to the principal (source) over the attribute of a targeted object (destination).
 
@@ -276,11 +274,11 @@ Creates an inbound SDDL (Security Descriptor Definition Language) for a principa
 
 > IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
 
-### UpdatePasswordOfIdentity 
+- ***UpdatePasswordOfIdentity***
 
 Updates the password of the specified identity.
 
-### OverwriteValueInAttribute 
+- ***OverwriteValueInAttribute***
 
 Replaces the value(s) from an existing attribute on a targeted object.
 
@@ -288,82 +286,69 @@ Replaces the value(s) from an existing attribute on a targeted object.
 
 > For instance, if the `description` attribute was set to `Whoami1?!`, overwritting it with value `Whoami2?!` would set its content to `Whoami2?!`.
 
-### AddValueInAttribute 
+- ***AddValueInAttribute***
 
 Adds a specified value to an existing attribute on a targeted object.
 
 > The attribute's value must be undefined, or empty. Otherwise, the attribute must be multi-valued (e.g. `serviceprincipalname`).
 
-### RemoveValueInAttribute 
+- ***RemoveValueInAttribute***
 
 Removes a specified value from an existing attribute on a targeted object.
 
 > The attribute must have been set to (or contain, if the attribute is multi-valued, e.g. `serviceprincipalname`) the specified value.
 
-### ClearAttribute 
+- ***ClearAttribute***
 
 Clears the value(s) of a specified attribute on a targeted object.
 
 > The attribute MUST exist (i.e. filled with at least one non-empty value).
 
-### AddUACFlags 
+- ***AddUACFlags***
 
 Adds the specified UAC Flag(s) (comma-separated, if multiple) into the provided object's UAC attribute.
 
-### RemoveUACFlags 
+- ***RemoveUACFlags***
 
 Removes the specified UAC Flag(s) (comma-separated, if multiple) from the provided object's UAC attribute.
 
-### ShowStatusOfAccount 
+- ***ShowStatusOfAccount***
 
 Shows the text of the specified account's status (i.e. 'Enabled', or 'Disabled').
 
-### EnableAccount 
+- ***EnableAccount***
 
 Enables a specified account.
 
-### DisableAccount 
+- ***DisableAccount***
 
 Disables a specified account.
 
-### AddGroupMember 
+- ***AddGroupMember***
 
 Adds a member to a group.
 
 > The group MUST NOT already contain the specified member.
 
-### RemoveGroupMember 
+- ***RemoveGroupMember***
 
 Removes a member from a group.
 
 > The group MUST already contain the specified member.
 
-### LDAPEnum 
+- ***LDAPEnum***
 
 Invoke-PassTheCert wrapper for LDAP enumerations.
 
-### LDAPExploit 
+- ***LDAPExploit***
 
 Invoke-PassTheCert wrapper for LDAP exploitations.
 
-### TODO 
+- ***TODO***
 
 Makin' My Own Custom Function.
 
 > The Custom Function MUST be implemented by YOU !
-
-### Invoke-PassTheCert-GetLDAPConnectionInstance 
-
-Returns an LDAP Connection Instance of a certificate-based authentication against an LDAP/S Server.
-
-### Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile 
-
-Exports an LDAP Connection Instance to a certificate file
-
-### Invoke-PassTheCert 
-
-Main function to perform various LDAP Operations after using an established LDAP Connection Instance to an LDAP/S Server through Schannel authentication with a certificate.
-
 
 ## TODOs
 
