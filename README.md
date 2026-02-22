@@ -21,7 +21,7 @@ This fork alters [the initial code](https://github.com/The-Viper-One/Invoke-Pass
 
 - Restructured code architecture and parameters for intuitive usage and easier programming (e.g. `-Action` parameter added).
 
-- Get-Manual sections for each function added, providing detailed synopsis, syntax, parameters, examples, expected outputs, and reference links.
+- Get-Help sections for each function added, providing detailed synopsis, syntax, parameters, examples, expected outputs, and reference links.
 
 - Support of different types of identities, namely: `DistinguishedName`, `SID`, `GUID`, `sAMAccountName` (*not specifying a distinguishedName within `-Identity` (resp. `-Target`, `-Object`) implies `-IdentityDomain` (resp. `-TargetDomain`, `-ObjectDomain`) becomes required*).
 

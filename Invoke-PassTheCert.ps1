@@ -12826,8 +12826,6 @@ function Invoke-PassTheCert {
 
 Write-Host ""
 
-if (-not $NoBanner) {  _ShowBanner; }
-
 # Required .NET Assembly providing LDAP functionalities
 Add-Type -AssemblyName System.DirectoryServices.Protocols
 
@@ -12841,6 +12839,7 @@ if (-not $PSCommandPath) { $CurrentFile = $MyInvocation.MyCommand.Path } else { 
 $SkipStartup = $SkipStartup -or $MyInvocation.Line -match "$(Get-Content $CurrentFile | Select-Object -First 1)`r?`n"
 
 if (-not $SkipStartup) {
+    if (-not $NoBanner) {  _ShowBanner; }
     # If no argument is provided (e.g. using '.\Invoke-PassTheCert.ps1', automatically show Invoke-PassTheCert's Get-Help)
     if ($Args.Count -eq 0) {
         Write-Host "[!] No Argument Provided ! Try The Following To Get Started... (4nd 3nj0y Th4' R1d3 !)"
