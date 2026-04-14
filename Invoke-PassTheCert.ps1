@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.7.5 "
+    Write-Host -ForegroundColor Red     "   v1.8.1 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -7240,13 +7240,13 @@ function _Helper-GetReadableValueOfString {
 
             _Helper-GetReadableValueOfString -Type 'fileTime' -String '132539327990000000'
 
-            Returns the human-readable representation `31/12/2020 23:59:59` of the `132539327990000000` Generalized-Time.
+            Returns the human-readable representation `Thursday, December 31, 2020 11:59:59 PM` of the `132539327990000000` File-Time.
 
         .EXAMPLE
 
             _Helper-GetReadableValueOfString -Type 'generalizedTime' -String '20201231235959.0Z'
 
-            Returns the human-readable representation `31/12/2020 23:59:59` of the `20201231235959.0Z` Generalized-Time.
+            Returns the human-readable representation `Friday, January 1, 2021 12:59:59 AM` of the `20201231235959.0Z` Generalized-Time.
 
         .OUTPUTS
             
@@ -7999,6 +7999,12 @@ function _Filter {
             
             The SID to be filtered from the LDAP lookup (e.g. 'S-1-5-21-2539905369-2457893589-779357875-500')
 
+        .PARAMETER Raw
+
+            [Switch]
+            
+            Whenever specified, returns the raw attributes of the found LDAP object's, i.e. without trying to convert it into human-readable format.
+
         .EXAMPLE
 
             _Filter -LdapConnection $LdapConnection -SearchBase 'DC=X' -SearchScope Subtree -Properties * -LDAPFilter '(&(objectCategory=Computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))'
@@ -8093,9 +8099,9 @@ function _Filter {
 
         .EXAMPLE
 
-            _Filter -LdapConnection $LdapConnection -SearchBase 'DC=X' -SearchScope Subtree -Properties * -GUIDFilter 'ad20f953-2164-2a4a-ace6-7489bb9d7bd3'
+            _Filter -LdapConnection $LdapConnection -SearchBase 'DC=X' -SearchScope Subtree -Properties * -GUIDFilter 'ad20f953-2164-2a4a-ace6-7489bb9d7bd3' -Raw
 
-            Returns the object with GUID `ad20f953-2164-2a4a-ace6-7489bb9d7bd3`
+            Returns the object with GUID `ad20f953-2164-2a4a-ace6-7489bb9d7bd3`, without converting its properties (e.g. binary SID) into human-readable format (using the -Raw switch). 
 
         .OUTPUTS
 
@@ -8188,7 +8194,10 @@ function _Filter {
         [System.String]$GUIDFilter,
         
         [Parameter(Position=8, Mandatory=$false, HelpMessage="Enter SID to be filtered from the LDAP lookup")]
-        [System.String]$SIDFilter
+        [System.String]$SIDFilter,
+
+        [Parameter(Position=9, Mandatory=$false, HelpMessage="Switch to retrieve the raw (i.e. not converted) attribute's value of a found LDAP object. For instance, retrieving 'objectSid' will always be converted into human-readable format (e.g. S-1-1-0), unless this parameter is specified.")]
+        [Switch]$Raw
     )
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
@@ -8301,7 +8310,8 @@ function _Filter {
                     #   serviceprincipalname    : CIFS/DC01
                     #                             LDAP/DC01
                     # However, some very long array binaries (e.g. 'usercertificate') are not interesting to split. Hence, we'll whitelist the interesting multi-valued attributes to CRLF-split.
-                    if ($Attribute -in @('objectClass', 'serviceprincipalname', 'member', 'memberof', 'msds-keycredentiallink', 'namingcontexts', 'supportedcontrol', 'supportedsaslmechanisms', 'supportedcapabilities', 'supportedldappolicies', 'certificatetemplates', 'mspki-certificate-application-policy', 'pkicriticalextensions', 'pkiextendedkeyusage', 'pkidefaultcsps', 'msds-allowedtodelegateto', 'otherwellknownobjects', 'wellknownobjects', 'subrefs')) {
+                    # However, no translation is performed if the -Raw switch is specified.
+                    if (-not $Raw -and $Attribute -in @('objectClass', 'serviceprincipalname', 'member', 'memberof', 'msds-keycredentiallink', 'namingcontexts', 'supportedcontrol', 'supportedsaslmechanisms', 'supportedcapabilities', 'supportedldappolicies', 'certificatetemplates', 'mspki-certificate-application-policy', 'pkicriticalextensions', 'pkiextendedkeyusage', 'pkidefaultcsps', 'msds-allowedtodelegateto', 'otherwellknownobjects', 'wellknownobjects', 'subrefs')) {
                         $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $($AttributeObject -join "`r`n")
                     } else {
                         $ResultObject | Add-Member -Force -NotePropertyName $Attribute -NotePropertyValue $AttributeObject
@@ -8333,133 +8343,137 @@ function _Filter {
         # For each result object
         return $ResultObjects |%{ 
 
-            # Translate the attribute accordingly, if any
-            foreach ($Property in $_.PSObject.Properties) {
-                $AddMember = $false
-                
-                switch ($Property.Name) {
-                    
-                    'samaccounttype' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetNamesOfSAMAccountTypeValue -Value $Property.Value 
-                    }
-                    
-                    'useraccountcontrol' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetUACFlagsOfValue -Value $Property.Value 
-                    }
-                    
-                    'ntsecuritydescriptor' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'ntsecuritydescriptor' -ArrayOfBytes $Property.Value 
-                    }
+            # If the -Raw switch isn't specified
+            if (-not $Raw) {
 
-                    'msds-allowedtoactonbehalfofotheridentity' { 
-                        $AddMember = $true;
-                        $NewMember = (_Helper-GetReadableValueOfBytes -Type 'ntsecuritydescriptor' -ArrayOfBytes $Property.Value).DiscretionaryAcl.SecurityIdentifier
-                    }
-                    
-                    'msds-groupmsamembership' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'ntsecuritydescriptor' -ArrayOfBytes $Property.Value 
-                    }
+                # Translate the attribute accordingly, if any
+                foreach ($Property in $_.PSObject.Properties) {
 
-                    'objectsid' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value 
-                    }
+                    $AddMember = $false
                     
-                    'msds-managedpasswordid' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value 
-                    }
-
-                    'objectguid' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectguid' -ArrayOfBytes $Property.Value 
-                    }
-                    
-                    'grouptype' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetNameOfGroupTypeValue -Value $Property.Value 
-                    }
-                    
-                    
-                    'dscorepropagationdata' { 
-                        $AddMember = $true;
-                        $NewMember = @()
-                        $Property.Value |%{ 
-                            $NewMember += _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $_
+                    switch ($Property.Name) {
+                        
+                        'samaccounttype' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetNamesOfSAMAccountTypeValue -Value $Property.Value 
                         }
-                    }
-                    
-                    'whencreated' { 
-                        $AddMember = $true;
-                        $NewMember = _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $Property.Value
-                    }
-                    
-                    'whenchanged' { 
-                        $AddMember = $true;
-                        $NewMember = _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $Property.Value
-                    }
-                    
-                    'currenttime' { 
-                        $AddMember = $true;
-                        $NewMember = _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $Property.Value
-                    }
-                    
-                    'creationtime' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
-                    }
-
-                    'accountexpires' { 
-                        $AddMember = $true; 
-                        # https://learn.microsoft.com/en-us/windows/win32/adschema/a-accountexpires
-                        if ($Property.Value -in @('0', '9223372036854775807')) { 
-                            $NewMember = 'Never'
+                        
+                        'useraccountcontrol' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetUACFlagsOfValue -Value $Property.Value 
                         }
-                        else { 
-                            $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value 
+                        
+                        'ntsecuritydescriptor' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfBytes -Type 'ntsecuritydescriptor' -ArrayOfBytes $Property.Value 
                         }
+    
+                        'msds-allowedtoactonbehalfofotheridentity' { 
+                            $AddMember = $true;
+                            $NewMember = (_Helper-GetReadableValueOfBytes -Type 'ntsecuritydescriptor' -ArrayOfBytes $Property.Value).DiscretionaryAcl.SecurityIdentifier
+                        }
+                        
+                        'msds-groupmsamembership' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfBytes -Type 'ntsecuritydescriptor' -ArrayOfBytes $Property.Value 
+                        }
+    
+                        'objectsid' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value 
+                        }
+                        
+                        'msds-managedpasswordid' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value 
+                        }
+    
+                        'objectguid' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectguid' -ArrayOfBytes $Property.Value 
+                        }
+                        
+                        'grouptype' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetNameOfGroupTypeValue -Value $Property.Value 
+                        }
+                        
+                        'dscorepropagationdata' { 
+                            $AddMember = $true;
+                            $NewMember = @()
+                            $Property.Value |%{ 
+                                $NewMember += _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $_
+                            }
+                        }
+                        
+                        'whencreated' { 
+                            $AddMember = $true;
+                            $NewMember = _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $Property.Value
+                        }
+                        
+                        'whenchanged' { 
+                            $AddMember = $true;
+                            $NewMember = _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $Property.Value
+                        }
+                        
+                        'currenttime' { 
+                            $AddMember = $true;
+                            $NewMember = _Helper-GetReadableValueOfString -Type 'generalizedTime' -String $Property.Value
+                        }
+                        
+                        'creationtime' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
+                        }
+    
+                        'accountexpires' { 
+                            $AddMember = $true; 
+                            # https://learn.microsoft.com/en-us/windows/win32/adschema/a-accountexpires
+                            if ($Property.Value -in @('0', '9223372036854775807')) { 
+                                $NewMember = 'Never'
+                            }
+                            else { 
+                                $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value 
+                            }
+                        }
+                        
+                        'pwdlastset' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
+                        }
+                        
+                        'lastlogontimestamp' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
+                        }
+                        
+                        'lastlogon' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
+                        }
+    
+                        'badpasswordtime' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
+                        }
+    
+                        'pkiexpirationperiod' { 
+                            $AddMember = $true;
+                            $NewMember = _Helper-GetReadableValueOfBytes -Type 'period' -ArrayOfBytes $Property.Value
+                        }
+    
+                        'pkioverlapperiod' { 
+                            $AddMember = $true;
+                            $NewMember = _Helper-GetReadableValueOfBytes -Type 'period' -ArrayOfBytes $Property.Value
+                        }
+    
                     }
-                    
-                    'pwdlastset' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
+    
+                    if ($AddMember) {
+                        $_ |Add-Member -Force -NotePropertyName $Property.Name -NotePropertyValue $NewMember
                     }
-                    
-                    'lastlogontimestamp' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
-                    }
-                    
-                    'lastlogon' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
-                    }
-
-                    'badpasswordtime' { 
-                        $AddMember = $true; 
-                        $NewMember = _Helper-GetReadableValueOfString -Type 'fileTime' -String $Property.Value
-                    }
-
-                    'pkiexpirationperiod' { 
-                        $AddMember = $true;
-                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'period' -ArrayOfBytes $Property.Value
-                    }
-
-                    'pkioverlapperiod' { 
-                        $AddMember = $true;
-                        $NewMember = _Helper-GetReadableValueOfBytes -Type 'period' -ArrayOfBytes $Property.Value
-                    }
-
+    
                 }
-
-                if ($AddMember) {
-                    $_ |Add-Member -Force -NotePropertyName $Property.Name -NotePropertyValue $NewMember
-                }
-
             }
             
             $_
@@ -12593,6 +12607,9 @@ function Invoke-PassTheCert {
 
         [Parameter(Position=42, Mandatory=$false, HelpMessage="Switch to force an action (without confirmation prompt).")]
         [Switch]$Force,
+
+        [Parameter(Position=43, Mandatory=$false, HelpMessage="Switch to get the raw attribute of filtered LDAP objects (without converting them into human-readable format).")]
+        [Switch]$Raw,
         
         [Parameter(Position=1337, Mandatory=$false, HelpMessage="Set to true to hide the banner :(")]
         [PSDefaultValue(Help="Defaults to showing the banner")]
@@ -12702,12 +12719,12 @@ function Invoke-PassTheCert {
                 $Result = _LDAPExtendedOperationPasswordModify -LdapConnection $LdapConnection -NewPassword $NewPassword; 
             }
             "Filter" { 
-                if ($DNFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -DNFilter $DNFilter -SearchScope $SearchScope -Properties $Properties; }
-                elseif ($UACFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -UACFilter $UACFilter -SearchScope $SearchScope -Properties $Properties; }
-                elseif ($GUIDFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -GUIDFilter $GUIDFilter -SearchScope $SearchScope -Properties $Properties; }
-                elseif ($SIDFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SIDFilter $SIDFilter -SearchScope $SearchScope -Properties $Properties; }
-                elseif ($LDAPFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -LDAPFilter $LDAPFilter -SearchScope $SearchScope -Properties $Properties; }
-                else { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -Properties $Properties; }
+                if ($DNFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -DNFilter $DNFilter -SearchScope $SearchScope -Properties $Properties -Raw:$Raw; }
+                elseif ($UACFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -UACFilter $UACFilter -SearchScope $SearchScope -Properties $Properties -Raw:$Raw; }
+                elseif ($GUIDFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -GUIDFilter $GUIDFilter -SearchScope $SearchScope -Properties $Properties -Raw:$Raw; }
+                elseif ($SIDFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SIDFilter $SIDFilter -SearchScope $SearchScope -Properties $Properties -Raw:$Raw; }
+                elseif ($LDAPFilter) { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -LDAPFilter $LDAPFilter -SearchScope $SearchScope -Properties $Properties -Raw:$Raw; }
+                else { $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -Properties $Properties -Raw:$Raw; }
             }
             "CreateObject" {
                 if ($NewPassword -eq '') { $Result = _CreateObject -LdapConnection $LdapConnection -ObjectType $ObjectType -ObjectDN $ObjectDN -sAMAccountName $sAMAccountName -UACFlags $UACFlags -NewPassword ''; }
@@ -12715,7 +12732,7 @@ function Invoke-PassTheCert {
                 else { $Result = _CreateObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -ObjectType $ObjectType -sAMAccountName $sAMAccountName -UACFlags $UACFlags -NewPassword $NewPassword; }
             }
             "DeleteObject" {
-                $Result = _DeleteObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN $Force;
+                $Result = _DeleteObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Force:$Force;
             }
             "GetInboundACEs" {
                 $Result = _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $ObjectDN;
