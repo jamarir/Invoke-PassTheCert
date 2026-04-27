@@ -226,7 +226,7 @@ Returns a list of [PSCustomObject] object(s) found by the LDAP query.
 
 > Suffixing the command with `|fl` pipe allows to print the multi-valued attributes conveniently, i.e. separated by new lines (e.g. `serviceprincipalename`, `memberof`) (no more "...").
 
-> Returns $null if no entry is found.
+> Returns `$null` if no entry is found.
 
 - ***CreateObject***
 
@@ -258,7 +258,7 @@ Creates an inbound ACE for a principal into a targeted object. In other words, i
 
 > The inbound ACE to create MUST NOT already exist in the target's inbound ACEs (i.e. in its `nTSecurityDescriptor`).
 
-> IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
+> IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as `S-1-1-0`, i.e. `Everyone`).
 
 - ***DeleteInboundACE***
 
@@ -266,9 +266,9 @@ Deletes an inbound ACE for a principal into a targeted object. In other words, i
 
 > You may manually check any `PrincipalTo*.txt` file, to get a glance of possible ACEs.
 
-> The inbound ACE to delete MUST already exist in the target's inbound ACEs (i.e. in its 'nTSecurityDescriptor').
+> The inbound ACE to delete MUST already exist in the target's inbound ACEs (i.e. in its `nTSecurityDescriptor`).
 
-> IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
+> IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as `S-1-1-0`, i.e. `Everyone`).
 
 - ***GetInboundSDDLs***
 
@@ -280,7 +280,7 @@ Creates an inbound SDDL (Security Descriptor Definition Language) for a principa
 
 > You may check the `DeepDiveIntoACEsAndSDDLs` to get a glance of the SDDL format.
 
-> IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as 'S-1-1-0', i.e. `Everyone`).
+> IdentitySID MAY be used instead of IdentityDN, especially when such SIDs can't be looked up domain-wise (e.g. Well-Known SIDs, such as `S-1-1-0`, i.e. `Everyone`).
 
 - ***UpdatePasswordOfIdentity***
 
@@ -344,6 +344,10 @@ Removes a member from a group.
 
 > The group MUST already contain the specified member.
 
+- ***MoveIdentity***
+
+Moves an identity from its current location to a new container / OU (editing the identity's Distinguished Name).
+
 - ***LDAPEnum***
 
 Invoke-PassTheCert wrapper for LDAP enumerations.
@@ -354,7 +358,13 @@ Invoke-PassTheCert wrapper for LDAP exploitations.
 
 - ***PowerHound***
 
-This function is a BloodHound ingestor / collector, i.e. returning the JSON files to be populated into BloodHound.
+This function is a BloodHound data collector / ingestor, i.e. returning the JSON files to be populated into BloodHound
+
+> Version 5 ONLY is currently supported.
+
+> PowerHound is able to gather data through Schannel (hence through LDAP) ONLY. Therefore, some BloodHound data, like computer sessions related to SMB, CANNOT be collected.
+
+> PowerHound has been implemented using an environmental lab empirically comparing the lab's data and a regular SharpHound collection. In particular, the environment lab used is likely not to illustrate every possible AD scenarios. Hence, the generated collection is NOT guaranteed to be exhaustive (especially for ACE BloodHound edges, e.g. Trusts). For exhaustivity, prefer using the other enumeration functions (e.g. GetInboundACEs, GetInboundSDDLs).
 
 - ***TODO***
 
@@ -368,7 +378,7 @@ Makin' My Own Custom Function.
 - `CreateObject`: Implement more supported types.
 - `_Helper-GetSIDTokensArray`: Make the function dynamic (i.e. replacing `<machine>`, `<domain>`, `<root-domain>` with valid values).
 - `LDAPEnum`: Implement more LDAP enumerations.
-- `LDAPExploit`: Implement more LDAP attacks.
+- `LDAPExploit`: Implement more LDAP exploitations.
 - `LDAPExtendedOperationPasswordModify`: Implement the `Password Modify` LDAP Extended Operation. *Alternatively, `UpdatePasswordOfIdentity` can be used, where the identity is the LDAP Connection Instance's account.*
 
 # Disclaimer

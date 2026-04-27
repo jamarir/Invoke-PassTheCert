@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.10.2 "
+    Write-Host -ForegroundColor Red     "   v1.10.3 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -52,7 +52,7 @@ function _Helper-ShowHelpOfFunction {
     
         .SYNOPSIS
 
-            ReGEX'ly shows the Get-Help of the specified function in the specified PowerShell script.
+            Shows the Get-Help of the specified function in the specified PowerShell script.
 
         .PARAMETER FunctionName
 
@@ -8928,12 +8928,6 @@ function _Helper-PowerHound-GetLinks {
 
             Returns the data entry's GPO Links to be populated into the BloodHound collection.
 
-        .PARAMETER LdapConnection
-
-            [System.DirectoryServices.Protocols.LdapConnection] 
-            
-            The established LDAP Connection Instance.
-
         .PARAMETER LDAPObject
 
             [PSCustomObject]
@@ -12942,7 +12936,7 @@ function _LDAPEnum {
                         if ($DnsNode.dnsrecord -is [byte[]]) { 
                             $DnsRecords += _Helper-Convert-DNSRecord -DNSRecord $DnsNode.dnsrecord 
                         } 
-                        # Nested dnsRecords (e.g. one IP for multiple nanmes)
+                        # Nested dnsRecords (e.g. one IP for multiple names)
                         elseif ($DnsNode.dnsrecord -is [System.DirectoryServices.ResultPropertyValueCollection]) { 
                             $DnsNode.dnsrecord |%{
                                 $DnsRecords += _Helper-Convert-DNSRecord -DNSRecord $_
@@ -13675,7 +13669,7 @@ function _PowerHound {
 
         .PARAMETER Domain
 
-            [System.Custom] 
+            [System.String] 
             
             The domain to enumerate.
 
@@ -14005,7 +13999,7 @@ function _PowerHound {
         }
         $BloodHoundObjects["GroupObjects"] | ForEach-Object {
             $Data += @{
-                # Some group SID (namely the well-known groups) has an SID starting with a dash. These edge-cases are simply storedd as the domain name.
+                # Some group SID (namely the well-known groups) has strange SIDs. These edge-cases' SIDs are taken from the well-known array during conversion
                 "ObjectIdentifier" = _Helper-PowerHound-ConvertSID -Domain $Domain -SID $_.objectsid -PrincipalName $_.name;
                 "Properties"       = _Helper-PowerHound-GetProperties -LDAPObject $_ -DataType 'group' -DomainSID $DomainSID;
                 "IsDeleted"        = $null -ne $_.isdeleted;
@@ -14069,7 +14063,6 @@ function _PowerHound {
             $Stream.Dispose()
 
             Write-Host "[+] Successfully Compressed BloodHound Collection Into '$OutZip' !"
-            Write-Host "[*] If, For Some Reasons, The BloodHound Upload Cancelled, You May Need To Retry Importing The Collection Multiple Times."
 
         } else {
 
@@ -14109,6 +14102,7 @@ function _PowerHound {
 
         Write-Host ""
 
+        Write-Host "[*] If, For Some Reasons, The BloodHound Upload Cancelled, You May Need To Retry Importing The Collection Multiple Times."
         Write-Host -ForegroundColor Blue "[+] Happy Graphing !"
 
     } else {
