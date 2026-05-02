@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.11.2 "
+    Write-Host -ForegroundColor Red     "   v1.11.3 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -7810,6 +7810,7 @@ function _GetAttributeOfObject {
             Returns the Attribute the specified LDAP object
 
             - If the array of bytes couldn't be converted, the function returns the input as is.
+            - If the LDAP attribute couldn't be read (e.g. unprivileged likely cannot read nTSecurityDescriptors), returns `$null`
 
         .PARAMETER LdapConnection
 
@@ -7904,6 +7905,9 @@ function _GetAttributeOfObject {
 
     if ($SearchResponse.Entries.Count -eq 0) {
         Write-Host "[!] Object '$ObjectDN' Not Found ! Returning `$null..."
+        return $null
+    } elseif ($SearchResponse.Entries.Attributes.Count -eq 0) {
+        Write-Verbose "[!] Attribute '$ObjectDN':'$Attribute' Not Readable ! Returning `$null..."
         return $null
     } else {
         $Value = $SearchResponse.Entries[0].Attributes[$Attribute][0]
@@ -9355,21 +9359,27 @@ function _Helper-PowerHound-GetAces {
     $Result = @()
 
     # 'Owns' BloodHound edge
-    $OwnerSID = (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $LDAPObject.distinguishedname -Attribute 'nTSecurityDescriptor').Owner.Value
-    # As per the 'Owns' ACE, the special SIDs are sometimes owners of objects, but have NO distinguished name. For instance, "Local System", with SID "S-1-5-18", is the owner of "CN=MicrosoftDNS,CN=System,DC=X". Therefore, we can't get their domain name, and we assume the domain is the LDAP Object's one.
-    if ($OwnerSID -in $SpecialSIDs) {
-        $PrincipalSID = _Helper-PowerHound-ConvertSID -Domain $(_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname) -SID $OwnerSID -PrincipalName (_Helper-GetWellKnownSIDs)[$OwnerSID].Names[0];
-        $PrincipalType = _Helper-PowerHound-GetObjectType -ObjectClass (_Helper-GetWellKnownSIDs)[$OwnerSID].PrincipalType;
-    } else {
-        $Owner = $BloodHoundSIDLookupTable[$OwnerSID]
-        $PrincipalSID = _Helper-PowerHound-ConvertSID -Domain $(_Helper-GetDomainNameFromDN -DN $Owner.distinguishedname) -SID $OwnerSID -PrincipalName $Owner.name;
-        $PrincipalType = _Helper-PowerHound-GetObjectType -ObjectClass $Owner.objectclass;
-    }
-    $Result += @{
-        "PrincipalSID"  = $PrincipalSID;
-        "PrincipalType" = $PrincipalType;
-        "RightName"     = "Owns";
-        "IsInherited"   = $false;
+    try {
+        $OwnerSID = (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $LDAPObject.distinguishedname -Attribute 'nTSecurityDescriptor').Owner.Value
+        # As per the 'Owns' ACE, the special SIDs are sometimes owners of objects, but have NO distinguished name. For instance, "Local System", with SID "S-1-5-18", is the owner of "CN=MicrosoftDNS,CN=System,DC=X". Therefore, we can't get their domain name, and we assume the domain is the LDAP Object's one.
+        if ($OwnerSID -in $SpecialSIDs) {
+            $PrincipalSID = _Helper-PowerHound-ConvertSID -Domain $(_Helper-GetDomainNameFromDN -DN $LDAPObject.distinguishedname) -SID $OwnerSID -PrincipalName (_Helper-GetWellKnownSIDs)[$OwnerSID].Names[0];
+            $PrincipalType = _Helper-PowerHound-GetObjectType -ObjectClass (_Helper-GetWellKnownSIDs)[$OwnerSID].PrincipalType;
+        } else {
+            $Owner = $BloodHoundSIDLookupTable[$OwnerSID]
+            $PrincipalSID = _Helper-PowerHound-ConvertSID -Domain $(_Helper-GetDomainNameFromDN -DN $Owner.distinguishedname) -SID $OwnerSID -PrincipalName $Owner.name;
+            $PrincipalType = _Helper-PowerHound-GetObjectType -ObjectClass $Owner.objectclass;
+        }
+        $Result += @{
+            "PrincipalSID"  = $PrincipalSID;
+            "PrincipalType" = $PrincipalType;
+            "RightName"     = "Owns";
+            "IsInherited"   = $false;
+        }
+    } catch {
+        # if we're here, it means we can't read the LDAPObject's nTSecurityDescriptor. 
+        # Hence, no need to go further.
+        return @()
     }
 
     # Aces BloodHound edges
@@ -10737,13 +10747,14 @@ function _GetInboundACEs {
     )
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
-
+    
     Write-Verbose "[*] Retrieving List Of Inbound ACEs Over The Object '$ObjectDN'..."
-    $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute "nTSecurityDescriptor"
-    $DomainDN = _Helper-GetDomainDNFromDN -DN $ObjectDN
 
     # https://www.powershellgallery.com/packages/RestSetAcls/0.2.6/Content/SddlUtils.ps1
     $ResultObjects = @()
+    
+    $SD = _GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $ObjectDN -Attribute "nTSecurityDescriptor"
+    
     for ($i = 0; $i -lt $SD.DiscretionaryAcl.Count; $i++) {
         $ResultObject = [PSCustomObject]$SD.DiscretionaryAcl[$i];
         # If the ACE has an ObjectAceType, add its name into the result object
@@ -10774,14 +10785,20 @@ function _GetInboundACEs {
             #   https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/5d58c90d-3cc5-444f-aabd-cff5f99d70f7 (Alternative Form of SIDs)
             #   https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/78eb9013-1c3a-4970-ad1f-2b1dad588a25 (SID)
             # Commenting resolution for now...
-
-            #$ResultObject = $ResultObject | Add-Member -PassThru -Force -NotePropertyName "SecurityIdentifierName" -NotePropertyValue $(_Filter -LdapConnection $LdapConnection -SearchBase $DomainDN -SIDFilter $($ResultObject.SecurityIdentifier.Value) -Properties 'sAMAccountName');
+            
+            # Uncommented, no issues found actually.
+            if ($ResultObject.SecurityIdentifier.Value -in (_Helper-GetWellKnownSIDs).Keys) {
+                $SecurityIdentifierName = (_Helper-GetWellKnownSIDs)[$ResultObject.SecurityIdentifier.Value].Names[0];
+            } else {
+                $SecurityIdentifierName = $(_Filter -LdapConnection $LdapConnection -SearchBase (_Helper-GetDomainDNFromDN -DN $ObjectDN) -SIDFilter $($ResultObject.SecurityIdentifier.Value) -Properties 'sAMAccountName').samaccountname;
+            }
+            $ResultObject = $ResultObject | Add-Member -PassThru -Force -NotePropertyName "SecurityIdentifierName" -NotePropertyValue $SecurityIdentifierName;
         }
         $ResultObjects += $ResultObject;
     }
 
     if ($ResultObjects.Length -eq 0) {
-        Write-Host "[!] No Inbound ACE Found !"
+        Write-Host "[!] No Inbound ACE Found On Object '$ObjectDN', Or Its nTSecurityDescriptor Couldn't Be Read ! "
     }
     
     return $ResultObjects;
@@ -13863,7 +13880,7 @@ function _PowerHound {
                 "Trusts"           = @(_Helper-PowerHound-GetTrusts -LDAPObject $_ -BloodHoundObjects $BloodHoundObjects);
                 "IsDeleted"        = $null -eq $_.isdeleted;
                 "IsACLProtected"   = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
-                "Aces"             = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+                "Aces"             = @(_Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain);
             }
         }
         $DomainsCollection = @{
@@ -13905,7 +13922,7 @@ function _PowerHound {
                 "SPNTargets"        = @();
                 "HasSIDHistory"     = if ($null -eq $_.sidhistory) { ,@() } else { $_.sidhistory };
                 "AllowedToDelegate" = @();
-                "Aces"             = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+                "Aces"              = @(_Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain);
             }
         }
         $UsersCollection = @{
@@ -13946,7 +13963,7 @@ function _PowerHound {
                 "RemoteDesktopUsers" = $UnsupportedEntry;
                 "DcomUsers"          = $UnsupportedEntry;
                 "PSRemoteUsers"      = $UnsupportedEntry;
-                "Aces"               = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+                "Aces"               = @(_Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain);
             }
         }
         $ComputersCollection = @{
@@ -13974,7 +13991,7 @@ function _PowerHound {
                     "ChildObjects"     = @(_Helper-PowerHound-GetChildObjects -LdapConnection $LdapConnection -LDAPObject $_);
                     "IsDeleted"        = $null -ne $_.isdeleted;
                     "IsACLProtected"   = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
-                    "Aces"            = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+                    "Aces"             = @(_Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain);
                 }
             }
         }
@@ -14008,7 +14025,7 @@ function _PowerHound {
                 "IsDeleted"        = $null -ne $_.isdeleted;
                 "IsACLProtected"   = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
                 "GPOChanges"       = $UnsupportedEntry;
-                "Aces"            = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+                "Aces"             = @(_Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain);
             }
         }
         $OUsCollection = @{
@@ -14030,7 +14047,7 @@ function _PowerHound {
                 "Properties"       = _Helper-PowerHound-GetProperties -LDAPObject $_ -DataType 'gpo' -DomainSID $DomainSID;
                 "IsDeleted"        = $null -ne $_.isdeleted;
                 "IsACLProtected"   = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
-                "Aces"            = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+                "Aces"            = @(_Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain);
             }
         }
         $GPOsCollection = @{
@@ -14099,7 +14116,7 @@ function _PowerHound {
                 "IsDeleted"        = $null -ne $_.isdeleted;
                 "IsACLProtected"   = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
                 "Members"          = @(_Helper-PowerHound-GetMembers -LDAPObject $_ -BloodHoundObjects $BloodHoundObjects -BloodHoundDNLookupTable $BloodHoundDNLookupTable);
-                "Aces"            = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
+                "Aces"             = @(_Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain);
             }
         }
         $GroupsCollection = @{

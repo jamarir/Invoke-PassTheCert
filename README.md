@@ -411,7 +411,7 @@ This function is a BloodHound data collector / ingestor, i.e. returning the JSON
 
 > PowerHound is able to gather data through Schannel (hence through LDAP) ONLY. Therefore, some BloodHound data, like computer sessions related to SMB, CANNOT be collected.
 
-> PowerHound has been implemented using an environmental lab empirically comparing the lab's data and a regular SharpHound collection. In particular, the environment lab used is likely not to illustrate every possible AD scenarios. Hence, the generated collection is NOT guaranteed to be exhaustive (especially for ACE BloodHound edges, e.g. Trusts). For exhaustivity, prefer using the other enumeration functions (e.g. GetInboundACEs, GetInboundSDDLs).
+> PowerHound has been implemented using an environmental lab empirically comparing the lab's data and a regular SharpHound collection. In particular, the environment lab used is likely not to illustrate every possible AD scenarios. Hence, the generated collection is NOT guaranteed to be exhaustive (especially for ACE BloodHound edges). For exhaustivity, prefer using the other enumeration functions (e.g. GetInboundACEs, GetInboundSDDLs, LDAPEnum).
 
 - ***TODO***
 
