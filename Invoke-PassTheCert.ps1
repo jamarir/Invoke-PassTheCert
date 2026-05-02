@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.11.1 "
+    Write-Host -ForegroundColor Red     "   v1.11.2 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -14419,13 +14419,19 @@ function Invoke-PassTheCert-GetLDAPConnectionInstance {
         
         # Set certificate authentication
         $LdapConnection.ClientCertificates.Add($LoadedCertificate) |Out-Null
-        $LdapConnection.SessionOptions.SecureSocketLayer = $false
+        $LdapConnection.SessionOptions.SecureSocketLayer = $true
+
         # Skip certificate verification
         $LdapConnection.SessionOptions.VerifyServerCertificate = { return $true }
+
         # Setting the authentication type (default)
         $LdapConnection.AuthType = [System.DirectoryServices.Protocols.AuthType]::Negotiate
+
         # Setting the ReferralChasing to all (default)
         $LdapConnection.SessionOptions.ReferralChasing = [System.DirectoryServices.ReferralChasingOption]::All
+
+        # Setting the Domain Name
+        $LdapConnection.SessionOptions.DomainName = _Helper-GetDomainNameFromDN -DN (_GetDomainDNOfCAIssuerFromLdapConnection -LdapConnection $LdapConnection)
 
         # The below request is an arbitrary (understand *useless*) RootDSE LDAP Request.
         # This workaround enables to sanity-check that a valid LDAP connection is established with the server.
