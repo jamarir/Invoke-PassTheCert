@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.10.3 "
+    Write-Host -ForegroundColor Red     "   v1.11.1 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -6688,6 +6688,7 @@ function _Helper-ExportRSAPublicKeyBCrypt {
             The BCRYPT_RSAKEY_BLOB of a certificate's RSA public key
 
         .LINK
+
             https://github.com/MichaelGrafnetter/DSInternals/blob/af4f0112a7baf57616ef515281f5c7344bcc49ed/Src/DSInternals.Common/Extensions/RSAExtensions.cs#L113-L145
 
     #>
@@ -8122,6 +8123,8 @@ function _Helper-PowerHound-GetBloodHoundObjects {
 
     Write-Host "[*] Dumping Domain Objects..."
     $DomainObjects = _Filter -LdapConnection $LdapConnection -SearchBase $(_Helper-GetDomainDNFromDomainName -DomainName $Domain) -LDAPFilter '(objectCategory=domain)' -Raw
+    Write-Host "[*] Dumping Trust Objects..."
+    $TrustObjects = _Filter -LdapConnection $LdapConnection -SearchBase $(_Helper-GetDomainDNFromDomainName -DomainName $Domain) -LDAPFilter '(objectClass=trustedDomain)' -Raw
     Write-Host "[*] Dumping Domain Controllers Objects..."
     $DomainControllerObjects = _Filter -LdapConnection $LdapConnection -SearchBase $(_Helper-GetDomainDNFromDomainName -DomainName $Domain) -LDAPFilter '(userAccountControl:1.2.840.113556.1.4.803:=8192)' -Raw
     Write-Host "[*] Dumping User Objects..."
@@ -8139,6 +8142,7 @@ function _Helper-PowerHound-GetBloodHoundObjects {
 
     $Result = @{
         "DomainObjects"           = $DomainObjects;
+        "TrustObjects"            = $TrustObjects;
         "DomainControllerObjects" = $DomainControllerObjects;
         "UserObjects"             = $UserObjects;
         "ComputerObjects"         = $ComputerObjects;
@@ -8153,6 +8157,9 @@ function _Helper-PowerHound-GetBloodHoundObjects {
         $Result[$Key] | ForEach-Object {
             if ($null -ne $_.objectsid) { 
                 $_ | Add-Member -Force -NotePropertyName 'objectsid' -NotePropertyValue $(_Helper-GetReadableValueOfBytes -Type 'objectSid' -ArrayOfBytes $_.objectsid) 
+            }
+            if ($null -ne $_.securityidentifier) { 
+                $_ | Add-Member -Force -NotePropertyName 'securityidentifier' -NotePropertyValue $(_Helper-GetReadableValueOfBytes -Type 'objectSid' -ArrayOfBytes $_.securityidentifier) 
             }
             if ($null -ne $_.objectguid) { 
                 $_ | Add-Member -Force -NotePropertyName 'objectguid' -NotePropertyValue $(_Helper-GetReadableValueOfBytes -Type 'objectGuid' -ArrayOfBytes $_.objectguid) 
@@ -8540,7 +8547,7 @@ function _Helper-PowerHound-GetProperties {
 
             _Helper-PowerHound-GetProperties -LDAPObject $LDAPObject -DataType 'domain' -DomainSID $DomainSID
 
-            Returns the properties of a domain-typed LDAP object to be injected into the BloodHound collection. Because the domain object's domainsid LDAP attribute id the domain's SID, the argument $DomainSID is unused.
+            Returns the properties of a domain-typed LDAP object to be injected into the BloodHound collection. Because the domain object's domainsid LDAP attribute is the domain's SID, the argument $DomainSID is unused.
         
         .EXAMPLE
 
@@ -8978,6 +8985,74 @@ function _Helper-PowerHound-GetLinks {
         }
     }
     return $Result;
+}
+
+
+function _Helper-PowerHound-GetTrusts {
+    
+    <#
+
+        .SYNOPSIS
+
+            Returns the data entry's Trust Relationships to be populated into the BloodHound collection.
+
+        .PARAMETER LDAPObject
+
+            [PSCustomObject]
+
+            The LDAP PowerShell object from which to gather the Trust relationships
+
+        .PARAMETER BloodHoundObjects
+
+            [System.Collections.Hashtable]
+
+            The locally dumped BloodHound objects
+        
+        .EXAMPLE
+
+            _Helper-PowerHound-GetTrusts -LDAPObject $LDAPObject -BloodHoundObjects $BloodHoundObjects
+
+            Returns the Trust relationships of an LDAP object to be injected into the BloodHound collection.
+
+        .OUTPUTS
+
+            [System.Collections.Hashtable[]] 
+            
+            The data entry's Trust Relationships to be populated into the BloodHound collection.
+
+        .LINK 
+
+            https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-adts/e9a2d23c-c31e-4a6f-88a0-6646fdb51a3c
+
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0, Mandatory=$true, HelpMessage="Enter the LDAP object (probably an entry from the Filter action) from which to gather the BloodHound data Trust relationships.")]
+        [ValidateNotNullorEmpty()]
+        [PSCustomObject]$LDAPObject,
+
+        [Parameter(Position=1, Mandatory=$true, HelpMessage="Enter the BloodHound dumped objects from which to lookup stuff locally (you are probably calling this function from PowerHound !).")]
+        [ValidateNotNullorEmpty()]
+        [System.Collections.Hashtable]$BloodHoundObjects
+    )
+
+    _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
+
+    $Result = @()
+
+    foreach ($Trust in $BloodHoundObjects["TrustObjects"]) {
+        $Result += @{
+            "TargetDomainSid"     = $Trust.securityidentifier;
+            "TargetDomainName"    = $Trust.trustpartner.ToUpper();
+            "IsTransitive"        = ($Trust.trustattributes -band 8) -eq 8;
+            "SidFilteringEnabled" = ($Trust.trustattributes -band 4) -eq 4;
+            "TrustDirection"      = $Trust.trustdirection;
+            "TrustType"           = $Trust.trusttype;
+        }
+    }
+    
+    return $Result
 }
 
 
@@ -9789,7 +9864,7 @@ function _Filter {
 
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
-    # If $SearchBase isn't specified, defaults to the LDAP/S Server's Domain.
+    # If $Domain isn't specified, defaults to the LDAP/S Server's Domain.
     # Such default value is defined ONLY IF $SearchBase has NOT been specifically set to $null (to look for the RootDSE).
     if (-not $SearchBase -and $SearchBase -ne $null) {
         $SearchBase = $(_Helper-GetDomainDNFromDN -DN $(_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)) 
@@ -9969,6 +10044,11 @@ function _Filter {
                             $AddMember = $true; 
                             $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value 
                         }
+    
+                        'securityidentifier' { 
+                            $AddMember = $true; 
+                            $NewMember = _Helper-GetReadableValueOfBytes -Type 'objectsid' -ArrayOfBytes $Property.Value 
+                        }
                         
                         'msds-managedpasswordid' { 
                             $AddMember = $true; 
@@ -10057,6 +10137,21 @@ function _Filter {
                         'pkioverlapperiod' { 
                             $AddMember = $true;
                             $NewMember = _Helper-GetReadableValueOfBytes -Type 'period' -ArrayOfBytes $Property.Value
+                        }
+    
+                        'forestfunctionality' { 
+                            $AddMember = $true;
+                            $NewMember = (_Helper-GetFunctionalLevels)[$Property.Value]
+                        }
+    
+                        'domainfunctionality' { 
+                            $AddMember = $true;
+                            $NewMember = (_Helper-GetFunctionalLevels)[$Property.Value]
+                        }
+    
+                        'domaincontrollerfunctionality' { 
+                            $AddMember = $true;
+                            $NewMember = (_Helper-GetFunctionalLevels)[$Property.Value]
                         }
     
                     }
@@ -12530,11 +12625,10 @@ function _LDAPEnum {
 
             LDAP Enumeration to be performed (e.g. 'Kerberoasting')
 
-        .PARAMETER SearchBase
+        .PARAMETER Domain
         
-            The Distinguished Name of the Search Base of the LDAP lookup (Optional).
+            The Domain from which to enumerate (Optional).
 
-            - MUST start with 'DC=' (e.g. 'DC=ADLAB,DC=LOCAL').
             - Defaults to the LDAP/S Server's domain.
 
         .PARAMETER SearchScope 
@@ -12557,9 +12651,9 @@ function _LDAPEnum {
 
         .EXAMPLE
 
-            _LDAPEnum -LdapConnection $LdapConnection -Enum 'DCs' -SearchBase 'DC=X'
+            _LDAPEnum -LdapConnection $LdapConnection -Enum 'DCs' -Domain 'ADLAB.LOCAL'
 
-            Returns all Domain Controllers in the domain `X` (or, if not specified, in the LDAP/S Server's Domain)
+            Returns all Domain Controllers in the domain `ADLAB.LOCAL` (or, if not specified, in the LDAP/S Server's Domain)
 
         .EXAMPLE
 
@@ -12812,8 +12906,8 @@ function _LDAPEnum {
         #[ValidateSet('Kerberoasting')]
         [System.String]$Enum,
 
-        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the Distinguished Name of the Search Base of the LDAP lookup")]
-        [System.String]$SearchBase,
+        [Parameter(Position=2, Mandatory=$false, HelpMessage="Enter the domain of the LDAP lookup")]
+        [System.String]$Domain,
         
         [Parameter(Position=3, Mandatory=$false, HelpMessage="Enter the Search Base of the LDAP lookup (accepted values: 'Base', 'OneLevel', 'Subtree')")]
         [ValidateSet('Base', 'OneLevel', 'Subtree')]
@@ -12842,10 +12936,10 @@ function _LDAPEnum {
     }
 
     # If $SearchBase isn't specified, defaults to the LDAP/S Server's Domain
-    if (-not $SearchBase) { $SearchBase = $(_Helper-GetDomainDNFromDN -DN $(_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)) }
-    elseif ($SearchBase -notmatch '^DC=') {
-        Write-Host "[*$Enum*] [!] SearchBase '$SearchBase' MUST start with 'DC=' (e.g. 'DC=ADLAB,DC=LOCAL') !"
-        return
+    if (-not $Domain) { 
+        $SearchBase = $(_Helper-GetDomainDNFromDN -DN $(_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)) 
+    } else {
+        $SearchBase = _Helper-GetDomainDNFromDomainName -DomainName $Domain
     }
 
     switch ($Enum) {
@@ -13658,7 +13752,7 @@ function _PowerHound {
 
             - Version 5 ONLY is currently supported.
             - PowerHound is able to gather data through Schannel (hence through LDAP) ONLY. Therefore, some BloodHound data, like computer sessions related to SMB, CANNOT be collected.
-            - PowerHound has been implemented using an environmental lab empirically comparing the lab's data and a regular SharpHound collection. In particular, the environment lab used is likely not to illustrate every possible AD scenarios. Hence, the generated collection is NOT guaranteed to be exhaustive (especially for ACE BloodHound edges, e.g. Trusts). For exhaustivity, prefer using the other enumeration functions (e.g. GetInboundACEs, GetInboundSDDLs).
+            - PowerHound has been implemented using an environmental lab empirically comparing the lab's data and a regular SharpHound collection. In particular, the environment lab used is likely not to illustrate every possible AD scenarios. Hence, the generated collection is NOT guaranteed to be exhaustive (especially for ACE BloodHound edges). For exhaustivity, prefer using the other enumeration functions (e.g. GetInboundACEs, GetInboundSDDLs, LDAPEnum).
             - Bloodhound supports the 'AllowedToAct' (RBCD) data entry in the 'computer.json' collection file. Yet, the edge is likely not shown within BloodHound. Hence, prefer using the 'LDAPEnum' action with 'RBCD' instead.
 
         .PARAMETER LdapConnection
@@ -13766,7 +13860,7 @@ function _PowerHound {
                 "Properties"       = _Helper-PowerHound-GetProperties -LDAPObject $_ -DataType 'domain' -DomainSID $DomainSID;
                 "ChildObjects"     = @(_Helper-PowerHound-GetChildObjects -LdapConnection $LdapConnection -LDAPObject $_);
                 "Links"            = @(_Helper-PowerHound-GetLinks -LDAPObject $_ -BloodHoundObjects $BloodHoundObjects);
-                "Trusts"           = @();
+                "Trusts"           = @(_Helper-PowerHound-GetTrusts -LDAPObject $_ -BloodHoundObjects $BloodHoundObjects);
                 "IsDeleted"        = $null -eq $_.isdeleted;
                 "IsACLProtected"   = 0 -ne ((_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $_.distinguishedname -Attribute 'nTSecurityDescriptor').ControlFlags -band 0x1000) # http://www.selfadsi.org/deep-inside/ad-security-descriptors.htm
                 "Aces"             = _Helper-PowerHound-GetAces -LdapConnection $LdapConnection -LDAPObject $_ -BloodHoundSIDLookupTable $BloodHoundSIDLookupTable -Domain $Domain;
@@ -14278,6 +14372,10 @@ function Invoke-PassTheCert-GetLDAPConnectionInstance {
 
             https://learn.microsoft.com/en-us/dotnet/api/system.directoryservices.protocols.ldapconnection
 
+        .LINK
+
+            https://learn.microsoft.com/en-us/dotnet/api/system.directoryservices.protocols.ldapdirectoryidentifier
+
     #>
     
     [CmdletBinding()]
@@ -14306,6 +14404,7 @@ function Invoke-PassTheCert-GetLDAPConnectionInstance {
     _Helper-ShowParametersOfFunction -FunctionName $MyInvocation.MyCommand -PSBoundParameters $PSBoundParameters
 
     try {
+
         # Load client certificate
         $LoadedCertificate = _Helper-GetCertificateFromFileOrBase64 -Certificate $Certificate -CertificatePassword $CertificatePassword
         
@@ -14320,21 +14419,34 @@ function Invoke-PassTheCert-GetLDAPConnectionInstance {
         
         # Set certificate authentication
         $LdapConnection.ClientCertificates.Add($LoadedCertificate) |Out-Null
-        $LdapConnection.SessionOptions.SecureSocketLayer = $true
+        $LdapConnection.SessionOptions.SecureSocketLayer = $false
         # Skip certificate verification
         $LdapConnection.SessionOptions.VerifyServerCertificate = { return $true }
-        
-        Write-Host "[+] Successfully Connected To LDAP/S Server $($LdapConnection.Directory.Servers):$($LdapConnection.Directory.PortNumber) !"
-        Write-Host "[*] The CA Issuer Of The Instance Of The Established LDAP Connection Is '$(_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)'"
-        Write-Host "[*] The Subject Of The Instance Of The Established LDAP Connection Is '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)'"
+        # Setting the authentication type (default)
+        $LdapConnection.AuthType = [System.DirectoryServices.Protocols.AuthType]::Negotiate
+        # Setting the ReferralChasing to all (default)
+        $LdapConnection.SessionOptions.ReferralChasing = [System.DirectoryServices.ReferralChasingOption]::All
 
-        Write-Host ""
-
-        return $LdapConnection
+        # The below request is an arbitrary (understand *useless*) RootDSE LDAP Request.
+        # This workaround enables to sanity-check that a valid LDAP connection is established with the server.
+        # If not, this allows to force the triggering of a catched exception.
+        $LdapConnection.SendRequest(
+            (New-Object System.DirectoryServices.Protocols.SearchRequest(
+                $null, 
+                "(|(namingcontexts=*)(!(namingcontexts=*)))", 
+                [System.DirectoryServices.Protocols.SearchScope]::Base
+            ))
+        ) |Out-Null
 
     } catch { Write-Host "[!] Getting An LDAP Connection Instance Authenticating With The Certificate Failed With Error: $_"; return }
-    
+        
+    Write-Host "[+] Successfully Connected To LDAP/S Server $($LdapConnection.Directory.Servers):$($LdapConnection.Directory.PortNumber) !"
+    Write-Host "[*] The CA Issuer Of The Instance Of The Established LDAP Connection Is '$(_GetIssuerDNFromLdapConnection -LdapConnection $LdapConnection)'"
+    Write-Host "[*] The Subject Of The Instance Of The Established LDAP Connection Is '$(_GetSubjectDNFromLdapConnection -LdapConnection $LdapConnection)'"
+
     Write-Host ""
+
+    return $LdapConnection
 }
 
 
@@ -14942,7 +15054,7 @@ function Invoke-PassTheCert {
             # =========================================
     
             "LDAPEnum" {
-                _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -SearchBase $SearchBase -SearchScope $SearchScope -Name $Name -ObjectDN $ObjectDN -Raw:$Raw
+                _LDAPEnum -LdapConnection $LdapConnection -Enum $Enum -Domain $Domain -SearchScope $SearchScope -Name $Name -ObjectDN $ObjectDN -Raw:$Raw
             }
 
             "PowerHound" {

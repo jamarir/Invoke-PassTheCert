@@ -72,6 +72,7 @@ PS (createnetonly) > Rubeus.exe asktgt /nowrap /domain:'<domain>' /dc:<dc_ip> /u
 - Using [AD Modules](https://learn.microsoft.com/en-us/powershell/module/activedirectory/) through [RSAT](https://learn.microsoft.com/en-us/troubleshoot/windows-server/system-management-components/remote-server-administration-tools):
 
 ```powershell
+PS > Import-Module ActiveDirectory
 PS (runas/createnetonly) > Get-ADObject -Server ADLAB.LOCAL -Filter 'objectClass -eq "certificationAuthority"' -SearchBase "CN=Certification Authorities,CN=Public Key Services,CN=Services,CN=Configuration,DC=ADLAB,DC=LOCAL" -Properties cACertificate |%{ Set-Content -Path ".\$($_.Name).cer" -Value $_.cACertificate[0] -Encoding Byte }
 ```
 
