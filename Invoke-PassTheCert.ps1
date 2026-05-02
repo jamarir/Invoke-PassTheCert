@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.11.3 "
+    Write-Host -ForegroundColor Red     "   v1.11.4 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -8838,10 +8838,10 @@ function _Helper-PowerHound-GetAllowedToActResourceBased {
         # Indeed, the DC's 'msDS-AllowedToActOnBehalfOfOtherIdentity' attribute ACE exists but CANNOT be retrieved. We skip such 'Cannot index into a null array' errors.
         try {
             $PrincipalSID = (_GetAttributeOfObject -LdapConnection $LdapConnection -ObjectDN $LDAPObject.distinguishedname -Attribute 'msDS-AllowedToActOnBehalfOfOtherIdentity').DiscretionaryAcl.SecurityIdentifier.Value
+            $Result += $BloodHoundSIDLookupTable[$PrincipalSID]
         } catch {
             continue
         }
-        $Result += $BloodHoundSIDLookupTable[$PrincipalSID]
     }
     
     $Result = $Result | Select-Object -Unique
